@@ -180,13 +180,17 @@ test("creator credit is visible in public footers and shared Settings and usage 
   assert.equal((legal.match(/<footer[^>]*>Made by Vibhav Thoota<\/footer>/g) ?? []).length, 2);
 });
 
-test("Firebase hosting publishes prerendered public documents from the frontend build", () => {
-  const { hosting } = JSON.parse(readFileSync(new URL("../firebase.json", import.meta.url), "utf8"));
-  assert.equal(hosting.public, "frontend/dist");
-  assert.ok(hosting.predeploy.includes("npm --prefix frontend run build"));
-  for (const path of Object.keys(PUBLIC_PAGES)) {
-    const route = hosting.rewrites.find(rule => rule.source === path);
-    assert.equal(route?.destination, ["/home", "/android", "/vibhavgpt-windows"].includes(path) ? `${path}/index.html` : `${path}.html`);
+test("the frontend server publishes prerendered public documents from the frontend build", () => {
+  const caddy = readFileSync(new URL("../frontend/Caddyfile", import.meta.url), "utf8").replace(/\r\n/g, "\n");
+  assert.ok(caddy.includes("root * dist"), "the site is served from the frontend build");
+  // A bare / gets the static homepage; every other public page is a real
+  // file in the build, found as {path}.html or {path}/index.html.
+  const home = caddy.slice(caddy.indexOf("handle @homeRoot {"), caddy.indexOf("@appShell"));
+  assert.ok(home.includes("rewrite * /home/index.html"), "a bare / serves the static homepage");
+  const fallback = caddy.slice(caddy.lastIndexOf("\thandle {"), caddy.indexOf("handle_errors 404"));
+  assert.ok(fallback.includes("try_files {path} {path}.html {path}/index.html\n"), "public pages resolve to their prerendered files");
+  const appShell = caddy.slice(caddy.indexOf("@appShell path ") + "@appShell path ".length).split("\n")[0].split(" ");
+  for (const path of Object.keys(PUBLIC_PAGES).filter((path) => path !== "/")) {
+    assert.ok(!appShell.includes(path), `${path} is served as its own document, not the app shell`);
   }
-  assert.equal(hosting.rewrites.at(-1).destination, "/index.html");
 });

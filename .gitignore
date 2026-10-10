@@ -9,10 +9,7 @@ coverage/
 .env.*
 !.env.example
 *.local
-.stripe-test-key
-.modal-test-key
-.modal-token-id
-.modal-token-secret
+.*-token-*
 
 # Logs
 logs/
@@ -66,5 +63,3 @@ local.properties
 *.exe
 *.blockmap
 frontend/public/downloads/*
-# Firebase CLI cache
-.firebase/

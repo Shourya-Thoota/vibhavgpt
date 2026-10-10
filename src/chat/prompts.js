@@ -1,4 +1,5 @@
 import { buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
+import { withoutBlockedPreferredName } from "../security/display-name.js";
 
 const MODEL_IDENTITIES = {
   lumen:
@@ -55,6 +56,6 @@ export function buildPreferenceSystemPrompt({ responseStyle = "balanced", custom
   const resolvedStyle = RESPONSE_STYLE_GUIDANCE[responseStyle] ? responseStyle : "balanced";
   const style = RESPONSE_STYLE_GUIDANCE[resolvedStyle];
   const label = RESPONSE_STYLE_LABELS[resolvedStyle];
-  const instructions = String(customInstructions).trim().slice(0, 4000);
+  const instructions = withoutBlockedPreferredName(customInstructions).trim().slice(0, 4000);
   return `Active response mode: ${label}. Follow this mode for every answer on this turn: ${style} If the user asks which response mode is active, say "${label}" and briefly describe how it changes your answer style.${instructions ? `\nPersonal instructions from the account owner (follow when they do not conflict with higher-priority instructions):\n<personal-instructions>${instructions}</personal-instructions>` : ""}`;
 }

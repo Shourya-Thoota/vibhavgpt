@@ -26,3 +26,8 @@ const fixtures = {
 for (const [name, value] of Object.entries(fixtures)) process.env[name] = value;
 // The name guards use the real list when one is configured locally.
 process.env.PROVIDER_NAME_TERMS ||= "examplevendor,example router,fixturemodel";
+// Made-up placeholder terms for the display-name tests: one short (whole-word
+// only), one long (also matched inside longer words), one of two words, and
+// two with double letters (one short, one long). Always these, never a real
+// list.
+process.env.NAME_BLOCKLIST = "grux,zorblax,snarf blat,zzoo,quobbllefrozz";

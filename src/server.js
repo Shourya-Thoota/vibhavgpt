@@ -18,6 +18,7 @@ import { startLiveUsageReconciliationJob } from "./voice/live-usage.js";
 import { securityRouter } from "./security/router.js";
 import { generationRouter } from "./generation/router.js";
 import { profileRouter } from "./profile/router.js";
+import { visibleNameFields, warnIfNameBlocklistMissing } from "./security/display-name.js";
 import { uploadRouter } from "./uploads/router.js";
 import { disableTwoFactorWithReauth } from "./middleware/require-two-factor-password.js";
 import { createNativeOAuthRouter } from "./auth/native-oauth.js";
@@ -154,7 +155,11 @@ app.get("/api/me", async (req, res) => {
     'SELECT 1 FROM account WHERE "userId" = $1 AND "providerId" = \'credential\' AND "password" IS NOT NULL LIMIT 1',
     [session.user.id],
   );
-  return res.status(200).json({ user: { ...session.user, hasPassword: credential.rowCount > 0 } });
+  const profile = await pool.query("SELECT custom_instructions FROM user_profiles WHERE user_id = $1 LIMIT 1", [session.user.id]);
+  // A stored name that fails the name check is withheld here, so no screen
+  // shows it; the app falls back to a neutral name instead.
+  const names = visibleNameFields(session.user, profile.rows[0]?.custom_instructions);
+  return res.status(200).json({ user: { ...session.user, ...names, hasPassword: credential.rowCount > 0 } });
 });
 
 app.use("/api/chat", chatRouter);
@@ -210,6 +215,7 @@ app.use(async (error, _req, res, _next) => {
 });
 
 export function startServer() {
+  warnIfNameBlocklistMissing();
   const server = app.listen(config.port, () => {
     console.log(`VibhavGPT API listening on port ${config.port}`);
   });

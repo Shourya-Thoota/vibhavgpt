@@ -10,6 +10,7 @@ import { turnstilePlugin } from "./security/turnstile.js";
 import { pool } from "./db/client.js";
 import { sendOtpEmail } from "./email/service.js";
 import { EMAIL_OTP_CONFIG, TWO_FACTOR_EMAIL_OTP_CONFIG } from "./auth/otp-config.js";
+import { displayNameHooks } from "./auth/display-name-hooks.js";
 
 requireAuthConfig();
 
@@ -232,5 +233,6 @@ export const auth = betterAuth({
     passkeyTwoFactorPlugin,
   ],
   socialProviders,
+  databaseHooks: displayNameHooks,
 });
 
