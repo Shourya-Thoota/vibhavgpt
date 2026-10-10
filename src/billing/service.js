@@ -18,8 +18,53 @@ export const CREDIT_PURCHASE = Object.freeze({
   presets: [5, 10, 20, 50],
 });
 
+// The tier for one of our own price lookup keys, or null for anything else.
+// There is no default: an unknown or missing price never maps to a paid tier.
+const PRICE_TIERS = new Map([
+  ["vibhavgpt_plus_monthly", "plus"],
+  ["vibhavgpt_plus_yearly", "plus"],
+  ["vibhavgpt_pro_monthly", "pro"],
+  ["vibhavgpt_pro_yearly", "pro"],
+]);
+const TIER_RANK = { plus: 1, pro: 2 };
+
 export function tierForPriceLookupKey(priceLookupKey) {
-  return priceLookupKey.startsWith("vibhavgpt_plus_") ? "plus" : "pro";
+  return PRICE_TIERS.get(priceLookupKey) ?? null;
+}
+
+const billingInterval = (priceLookupKey) => (priceLookupKey?.endsWith("_yearly") ? "yearly" : "monthly");
+
+// The tier the provider actually bills this subscription for, or null.
+export function billedTier(subscription) {
+  return tierForPriceLookupKey(subscription?.items?.data?.[0]?.price?.lookup_key ?? "");
+}
+
+// Newer provider API versions keep the billing period on the item.
+function periodBoundary(subscription, field) {
+  const seconds = subscription?.[field] ?? subscription?.items?.data?.[0]?.[field];
+  return Number.isFinite(seconds) ? new Date(seconds * 1000) : null;
+}
+
+// The local row for a subscription as the provider reports it right now. A
+// paid tier needs a paid status (active only follows a paid invoice; trialing
+// only follows checkout) and a price we sell; anything else is free.
+export function subscriptionRecordFor(subscription, userId) {
+  const status = subscription.status;
+  const tier = isPaidStatus(status) ? billedTier(subscription) ?? "free" : "free";
+  return {
+    userId,
+    customerId: typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id ?? null,
+    subscriptionId: subscription.id,
+    tier,
+    status,
+    billingSource: "stripe",
+    providerProductId: null,
+    providerBasePlanId: null,
+    providerPurchaseTokenHash: null,
+    cancelAtPeriodEnd: Boolean(subscription.cancel_at_period_end),
+    currentPeriodStartedAt: periodBoundary(subscription, "current_period_start"),
+    currentPeriodEndsAt: periodBoundary(subscription, "current_period_end"),
+  };
 }
 
 function stripeClient() {
@@ -41,22 +86,39 @@ export function checkoutRedirectUrls({ baseUrl, returnToApp = false, result }) {
   };
 }
 
-export async function createCheckoutSession({ userId, email, priceLookupKey, origin, returnToApp = false }) {
-  if (!VALID_PRICE_LOOKUP_KEYS.has(priceLookupKey)) throw new Error("Invalid price selection.");
-  const stripe = stripeClient();
-  const prices = await stripe.prices.list({ lookup_keys: [priceLookupKey], limit: 1 });
+// One trial per account, ever: any earlier subscription, in the local row or
+// in the provider's records for this account, rules a new trial out.
+export async function hadSubscriptionBefore({ userId, customerId }, { stripe, executor = db } = {}) {
+  const row = await getSubscriptionForUser(userId, executor);
+  if (row && (row.subscriptionId || row.status === "trialing" || (row.billingSource === "stripe" && row.tier !== "free"))) return true;
+  if (customerId) {
+    const listed = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 1 });
+    if (listed.data.length) return true;
+  }
+  // A last net for subscriptions held under an older customer record. Search
+  // can be unavailable on an account; the checks above still apply then.
+  const searched = await stripe.subscriptions.search({ query: `metadata['userId']:'${userId.replace(/'/g, "\\'")}'`, limit: 1 }).catch(() => null);
+  return Boolean(searched?.data?.length);
+}
+
+export async function createCheckoutSession({ userId, email, priceLookupKey, origin, returnToApp = false }, { stripe, executor = db, getCustomer = getOrCreateBillingCustomer } = {}) {
+  if (!tierForPriceLookupKey(priceLookupKey ?? "")) throw new Error("Invalid price selection.");
+  const client = stripe ?? stripeClient();
+  const prices = await client.prices.list({ lookup_keys: [priceLookupKey], limit: 1 });
   const price = prices.data[0];
   if (!price) throw new Error("The selected plan is unavailable.");
-  const tier = tierForPriceLookupKey(priceLookupKey);
   const baseUrl = config.clientOrigins.includes(origin) ? origin : config.clientOrigins[0];
   const redirects = checkoutRedirectUrls({ baseUrl, returnToApp });
-  const session = await stripe.checkout.sessions.create({
+  const customerId = await getCustomer({ userId, email }, { stripe: client, executor });
+  const trial = !(await hadSubscriptionBefore({ userId, customerId }, { stripe: client, executor }));
+  // The tier is never taken from metadata; the webhook reads the billed price.
+  const session = await client.checkout.sessions.create({
     mode: "subscription",
     line_items: [{ price: price.id, quantity: 1 }],
-    customer_email: email,
+    customer: customerId,
     client_reference_id: userId,
-    subscription_data: { trial_period_days: 7, metadata: { userId, tier } },
-    metadata: { userId, tier },
+    subscription_data: { ...(trial ? { trial_period_days: 7 } : {}), metadata: { userId } },
+    metadata: { userId },
     success_url: redirects.successUrl,
     cancel_url: redirects.cancelUrl,
   });
@@ -218,49 +280,74 @@ async function priceForLookupKey(stripe, priceLookupKey) {
   return prices.data[0];
 }
 
-export async function changeSubscriptionPlan({ userId, priceLookupKey }) {
-  const record = await getSubscriptionForUser(userId);
-  if (record && record.billingSource !== "stripe") throw new Error("This plan wasn't bought on the web, so it can't be changed here. It ends at the close of its paid period.");
-  if (!record?.subscriptionId) throw new Error("No active Stripe subscription was found for this account.");
-  const stripe = stripeClient();
-  const price = await priceForLookupKey(stripe, priceLookupKey);
-  const current = await stripe.subscriptions.retrieve(record.subscriptionId);
-  const item = current.items.data[0];
-  if (!item) throw new Error("The Stripe subscription has no billable item.");
-  const tier = tierForPriceLookupKey(priceLookupKey);
-  const updated = await stripe.subscriptions.update(record.subscriptionId, {
-    items: [{ id: item.id, price: price.id }],
-    proration_behavior: "none",
-    cancel_at_period_end: false,
-    metadata: { ...current.metadata, userId, tier },
-  });
-  await saveSubscription({
-    userId,
-    customerId: typeof updated.customer === "string" ? updated.customer : record.customerId,
-    subscriptionId: updated.id,
-    tier,
-    status: updated.status,
-    currentPeriodStartedAt: updated.current_period_start ? new Date(updated.current_period_start * 1000) : record.currentPeriodStartedAt,
-    currentPeriodEndsAt: updated.current_period_end ? new Date(updated.current_period_end * 1000) : record.currentPeriodEndsAt,
-  });
-  return { tier, status: updated.status, currentPeriodEndsAt: updated.current_period_end ? new Date(updated.current_period_end * 1000) : null };
+// A refused plan change, carrying the code the route answers with.
+export class PlanChangeError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+  }
 }
 
-export async function cancelSubscriptionForUser(userId) {
-  const record = await getSubscriptionForUser(userId);
+export const DOWNGRADE_PAUSED = "downgrade-paused";
+
+// Plan changes never write a tier. The provider is asked for the change, and
+// the signed webhook grants the new tier once the provider reports it.
+//  - An upgrade (a higher tier, or monthly to yearly) on a paid plan is
+//    invoiced immediately and applied only if that invoice is paid
+//    (always_invoice + pending_if_incomplete). A declined charge leaves the
+//    subscription, and so the tier, as it was.
+//  - During a trial the change keeps the trial; the new price is billed when
+//    the trial ends.
+//  - Downgrades are paused: applying them at the period end needs a
+//    subscription schedule, which is not built yet.
+export async function changeSubscriptionPlan({ userId, priceLookupKey }, { stripe, executor = db } = {}) {
+  const targetTier = tierForPriceLookupKey(priceLookupKey ?? "");
+  if (!targetTier) throw new Error("Invalid price selection.");
+  const record = await getSubscriptionForUser(userId, executor);
   if (record && record.billingSource !== "stripe") throw new Error("This plan wasn't bought on the web, so it can't be changed here. It ends at the close of its paid period.");
   if (!record?.subscriptionId) throw new Error("No active Stripe subscription was found for this account.");
-  const stripe = stripeClient();
-  const updated = await stripe.subscriptions.update(record.subscriptionId, { cancel_at_period_end: true });
+  const client = stripe ?? stripeClient();
+  const current = await client.subscriptions.retrieve(record.subscriptionId);
+  if (!isPaidStatus(current.status)) throw new Error("No active Stripe subscription was found for this account.");
+  const item = current.items?.data?.[0];
+  if (!item) throw new Error("The Stripe subscription has no billable item.");
+  const currentKey = item.price?.lookup_key ?? "";
+  const currentTier = tierForPriceLookupKey(currentKey);
+  if (!currentTier) throw new PlanChangeError("plan-change-unavailable", "This plan can't be changed here. Please contact support to change your plan.");
+  if (currentKey === priceLookupKey) throw new PlanChangeError("already-on-plan", "You're already on this plan.");
+  const downgrade = TIER_RANK[targetTier] < TIER_RANK[currentTier]
+    || (targetTier === currentTier && billingInterval(currentKey) === "yearly" && billingInterval(priceLookupKey) === "monthly");
+  if (downgrade) throw new PlanChangeError(DOWNGRADE_PAUSED, "Plan changes are paused right now. Please contact support to change your plan.");
+  if (current.cancel_at_period_end) throw new PlanChangeError("plan-ending", "Your plan is set to end at the close of this period, so it can't be changed now. You can choose a new plan after it ends.");
+  if (current.schedule) throw new PlanChangeError("change-scheduled", "A plan change is already scheduled. Please contact support to change your plan.");
+  const price = await priceForLookupKey(client, priceLookupKey);
+  const items = [{ id: item.id, price: price.id }];
+  if (current.status === "trialing") {
+    await client.subscriptions.update(current.id, { items, proration_behavior: "none" });
+    return { pending: true, trialing: true };
+  }
+  await client.subscriptions.update(current.id, { items, proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" });
+  return { pending: true };
+}
+
+export async function cancelSubscriptionForUser(userId, { stripe, executor = db } = {}) {
+  const record = await getSubscriptionForUser(userId, executor);
+  if (record && record.billingSource !== "stripe") throw new Error("This plan wasn't bought on the web, so it can't be changed here. It ends at the close of its paid period.");
+  if (!record?.subscriptionId) throw new Error("No active Stripe subscription was found for this account.");
+  const client = stripe ?? stripeClient();
+  const updated = await client.subscriptions.update(record.subscriptionId, { cancel_at_period_end: true });
+  // Stored now rather than left to the webhook, so deleting the account right
+  // after canceling is not refused while the webhook is still on its way.
   await saveSubscription({
     userId,
     customerId: typeof updated.customer === "string" ? updated.customer : record.customerId,
     subscriptionId: updated.id,
     tier: record.tier,
     status: updated.status,
+    cancelAtPeriodEnd: Boolean(updated.cancel_at_period_end),
     currentPeriodStartedAt: updated.current_period_start ? new Date(updated.current_period_start * 1000) : record.currentPeriodStartedAt,
     currentPeriodEndsAt: updated.current_period_end ? new Date(updated.current_period_end * 1000) : record.currentPeriodEndsAt,
-  });
+  }, executor);
   return { cancelAtPeriodEnd: Boolean(updated.cancel_at_period_end), currentPeriodEndsAt: updated.current_period_end ? new Date(updated.current_period_end * 1000) : null };
 }
 
@@ -284,6 +371,13 @@ export async function saveSubscription(record, executor = db) {
       && current.tier !== "free"
       && (!current.currentPeriodEndsAt || current.currentPeriodEndsAt > new Date());
     if (currentIsOtherSourceActive && record.billingSource === "stripe") return false;
+    // An event about an older subscription (replayed or late) never ends or
+    // lowers the subscription the account is on now.
+    const currentIsOtherLiveSubscription = current && record.subscriptionId && current.subscriptionId
+      && current.subscriptionId !== record.subscriptionId
+      && ["active", "trialing"].includes(current.status) && current.tier !== "free"
+      && (!current.currentPeriodEndsAt || current.currentPeriodEndsAt > new Date());
+    if (currentIsOtherLiveSubscription && !(isPaidStatus(record.status) && record.tier !== "free")) return false;
 
     const values = { ...record, updatedAt: new Date() };
     if (current) await tx.update(subscriptions).set(values).where(eq(subscriptions.id, current.id));
@@ -321,12 +415,43 @@ export async function grantCreditPurchase({ userId, credits, checkoutSessionId }
   return created.length > 0;
 }
 
-export async function applySubscriptionEvent(event, { persist = saveSubscription, grantCredits = grantCreditPurchase } = {}) {
-  const object = event.data?.object;
-  const userId = extractUserId(object);
+const SUBSCRIPTION_EVENTS = new Set(["customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"]);
+const INVOICE_EVENTS = new Set(["invoice.paid", "invoice.payment_succeeded", "invoice.payment_failed"]);
+const retrieveProviderSubscription = (subscriptionId) => stripeClient().subscriptions.retrieve(subscriptionId);
+
+function subscriptionIdFromInvoice(invoice) {
+  const id = invoice?.subscription ?? invoice?.parent?.subscription_details?.subscription;
+  return typeof id === "string" ? id : id?.id ?? null;
+}
+
+// Signed events say which subscription changed; the tier always comes from
+// that subscription as the provider reports it now, never from the event's
+// own copy or from metadata. A replayed or out-of-order event therefore
+// re-applies the current state, and nothing raises a tier the provider is
+// not billing for.
+async function syncSubscription(subscriptionId, userIdHint, { persist, retrieveSubscription }) {
+  if (!subscriptionId) return false;
+  const subscription = await retrieveSubscription(subscriptionId);
+  if (!subscription?.id) return false;
+  const userId = subscription.metadata?.userId ?? userIdHint ?? null;
   if (!userId) return false;
+  const record = subscriptionRecordFor(subscription, userId);
+  const saved = await persist(record);
+  if (saved === false && isPaidStatus(record.status) && record.tier !== "free" && record.billingSource === "stripe") {
+    // Only an active plan from another billing source refuses a paid web
+    // subscription; that duplicate is canceled rather than double-billed.
+    await cancelConflictingStripeSubscription(subscription.id);
+  }
+  return saved !== false;
+}
+
+export async function applySubscriptionEvent(event, { persist = saveSubscription, grantCredits = grantCreditPurchase, retrieveSubscription = retrieveProviderSubscription } = {}) {
+  const object = event.data?.object;
+  if (!object) return false;
 
   if (["checkout.session.completed", "checkout.session.async_payment_succeeded"].includes(event.type)) {
+    const userId = extractUserId(object);
+    if (!userId) return false;
     if (object.metadata?.kind === "credit_purchase") {
       if (object.payment_status !== "paid") return false;
       return grantCredits({
@@ -335,40 +460,16 @@ export async function applySubscriptionEvent(event, { persist = saveSubscription
         checkoutSessionId: object.id,
       });
     }
-    const saved = await persist({
-      userId,
-      customerId: typeof object.customer === "string" ? object.customer : null,
-      subscriptionId: typeof object.subscription === "string" ? object.subscription : null,
-      tier: object.metadata?.tier === "plus" ? "plus" : "pro",
-      status: "trialing",
-      billingSource: "stripe",
-      providerProductId: null,
-      providerBasePlanId: null,
-      providerPurchaseTokenHash: null,
-      cancelAtPeriodEnd: false,
-    });
-    if (saved === false) await cancelConflictingStripeSubscription(typeof object.subscription === "string" ? object.subscription : null);
-    return true;
+    const subscriptionId = typeof object.subscription === "string" ? object.subscription : object.subscription?.id ?? null;
+    return syncSubscription(subscriptionId, userId, { persist, retrieveSubscription });
   }
 
-  if (["customer.subscription.updated", "customer.subscription.deleted"].includes(event.type)) {
-    const status = event.type === "customer.subscription.deleted" ? "canceled" : object.status;
-    const saved = await persist({
-      userId,
-      customerId: typeof object.customer === "string" ? object.customer : null,
-      subscriptionId: object.id,
-      tier: isPaidStatus(status) ? (object.metadata?.tier === "plus" ? "plus" : "pro") : "free",
-      status,
-      billingSource: "stripe",
-      providerProductId: null,
-      providerBasePlanId: null,
-      providerPurchaseTokenHash: null,
-      cancelAtPeriodEnd: Boolean(object.cancel_at_period_end),
-      currentPeriodStartedAt: object.current_period_start ? new Date(object.current_period_start * 1000) : null,
-      currentPeriodEndsAt: object.current_period_end ? new Date(object.current_period_end * 1000) : null,
-    });
-    if (saved === false && isPaidStatus(status)) await cancelConflictingStripeSubscription(object.id);
-    return true;
+  if (SUBSCRIPTION_EVENTS.has(event.type)) {
+    return syncSubscription(object.id, object.metadata?.userId, { persist, retrieveSubscription });
+  }
+
+  if (INVOICE_EVENTS.has(event.type)) {
+    return syncSubscription(subscriptionIdFromInvoice(object), object.parent?.subscription_details?.metadata?.userId, { persist, retrieveSubscription });
   }
   return false;
 }
@@ -378,22 +479,3 @@ export function verifyWebhookSignature(rawBody, signature) {
   return stripeClient().webhooks.constructEvent(rawBody, signature, config.stripeWebhookSecret);
 }
 
-// Cancels every paid subscription the account has. The stored subscription
-// and the account's customers are checked directly; the metadata search is
-// a last net for a subscription the database never recorded. Search can be
-// unavailable on an account, so it may fail without blocking the others.
-export async function cancelActiveSubscriptionsForUser(userId, { subscriptionId = null, customerIds = [] } = {}, stripe = stripeClient()) {
-  const toCancel = new Map();
-  if (subscriptionId) {
-    const known = await stripe.subscriptions.retrieve(subscriptionId).catch((error) => (error?.statusCode === 404 ? null : Promise.reject(error)));
-    if (known && isPaidStatus(known.status)) toCancel.set(known.id, known);
-  }
-  for (const customer of new Set(customerIds.filter(Boolean))) {
-    const listed = await stripe.subscriptions.list({ customer, status: "all", limit: 100 });
-    for (const subscription of listed.data) if (isPaidStatus(subscription.status)) toCancel.set(subscription.id, subscription);
-  }
-  const searched = await stripe.subscriptions.search({ query: `metadata['userId']:'${userId.replace(/'/g, "\\'")}'` }).catch(() => ({ data: [] }));
-  for (const subscription of searched.data) if (isPaidStatus(subscription.status)) toCancel.set(subscription.id, subscription);
-  for (const id of toCancel.keys()) await stripe.subscriptions.cancel(id);
-  return [...toCancel.keys()];
-}

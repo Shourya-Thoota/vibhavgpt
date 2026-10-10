@@ -55,11 +55,52 @@ test("structured data names the operator, website, matching breadcrumbs and visi
 });
 
 test("deletion confirmation and static page include the cancellation responsibility notice", () => {
-  assert.match(DELETION_PLAN_NOTICE, /Cancel your plan before deleting your account\. Pansophy LLC is not responsible for subscriptions that were not cancelled\./);
+  assert.equal(DELETION_PLAN_NOTICE, "Cancel your plan before deleting your account. Deletion is blocked while a web plan is active. Pansophy LLC is not responsible for subscriptions that were not canceled.");
   const app = readFileSync(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /title="Delete your account\?"[\s\S]*?description=\{`[^`]*\$\{DELETION_PLAN_NOTICE\}/);
   const page = readFileSync(new URL("../frontend/public/account-deletion.html", import.meta.url), "utf8");
   assert.ok(page.includes(DELETION_PLAN_NOTICE));
+  assert.ok(PUBLIC_PAGES["/account-deletion"].faq.some(([, answer]) => answer === `${DELETION_PLAN_NOTICE} Open Plan and billing and choose Cancel plan. Once it is canceled, you can delete your account.`));
+});
+
+test("the static deletion page never claims deletion cancels a plan", () => {
+  const page = readFileSync(new URL("../frontend/public/account-deletion.html", import.meta.url), "utf8");
+  for (const claim of ["was canceled", "is canceled first", "was cancelled", "is cancelled first"]) assert.ok(!page.includes(claim), claim);
+  assert.ok(page.includes("Your conversations, projects, memory, files and images are gone from VibhavGPT, and you have been signed out.</p>"));
+  assert.ok(page.includes("Sign in if asked, then type DELETE to confirm. If you have an active plan, cancel it in Plan and billing first; deletion is blocked until you do. Your account and everything in it is then removed straight away."));
+});
+
+test("Settings links to Plan and billing when deletion is refused for an active plan", () => {
+  const app = readFileSync(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
+  const settings = app.slice(app.indexOf("function Settings("), app.indexOf("function SettingsFooter("));
+  const body = (name) => settings.slice(settings.indexOf(`function ${name}(`), settings.indexOf("\n  }\n", settings.indexOf(`function ${name}(`)));
+
+  // The refusal is kept in the dialog's own error, never the page banner.
+  const deleteAccount = body("deleteAccount");
+  assert.match(deleteAccount, /setDeleteError\(err\.message\)/);
+  assert.match(deleteAccount, /setDeleteErrorCode\(err\.code \?\? ""\)/);
+  assert.doesNotMatch(deleteAccount, /setError\(/, "deleting never writes the page-level error");
+  assert.match(settings, /\{deleteError && \(\s*<p className="note note--error" role="alert">\s*\{deleteError\}/);
+
+  // Opening and closing the dialog clear both errors.
+  for (const name of ["openDeleteDialog", "closeDeleteDialog"]) {
+    const fn = body(name);
+    assert.match(fn, /setError\(""\)/, `${name} clears the page error`);
+    assert.match(fn, /setDeleteError\(""\)/, `${name} clears the dialog error`);
+    assert.match(fn, /setDeleteErrorCode\(""\)/, name);
+  }
+  assert.match(settings, /onClick=\{openDeleteDialog\}/);
+  assert.match(settings, /onClose=\{closeDeleteDialog\}/);
+  assert.match(settings, /onClick=\{closeDeleteDialog\}>Keep my account</);
+  assert.doesNotMatch(settings, /setDeleteOpen\(false\)(?![\s\S]{0,80}setError)/, "every close goes through closeDeleteDialog");
+
+  // The link closes the dialog and moves in-app: no full page load.
+  assert.match(settings, /deleteErrorCode === "active-subscription" && \([\s\S]*?<a href="\/app\/billing" onClick=\{\(event\) => \{[\s\S]*?event\.preventDefault\(\); closeDeleteDialog\(\); onOpenBilling\(\);[\s\S]*?>Plan and billing<\/a>/);
+  assert.match(app, /onOpenBilling=\{\(\) => go\("billing"\)\}/);
+  assert.match(app, /const go = \(next[\s\S]*?window\.history\.pushState\(null, "", path\)/, "go() navigates with pushState, not a reload");
+
+  // The notice shows once: the section hides its copy while the dialog, which repeats it, is open.
+  assert.match(settings, /\{!deleteOpen && <p className="settings-notice">\{DELETION_PLAN_NOTICE\}<\/p>\}/);
 });
 
 test("standalone deletion uses the shared pre-paint theme and Daybreak honors saved preferences", () => {

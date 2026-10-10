@@ -139,3 +139,11 @@ test("no vendor names anywhere in the Terms, Privacy Policy, or Guarantee", () =
   assert.doesNotMatch(legalText, /Railway|PostgreSQL|Resend|Sentry|Stripe/);
   assert.doesNotMatch(legalText, providerTermsPattern);
 });
+
+test("the Privacy Policy no longer says deleting an account cancels a subscription", () => {
+  const [, retention] = PRODUCT_KNOWLEDGE.privacy.find(([heading]) => heading === "Retention and deletion");
+  assert.doesNotMatch(retention, /canceled as part of|cancelled as part of|deletion cancels|is canceled (first|when)/i);
+  assert.ok(retention.endsWith("Account deletion is blocked while a web subscription is active; cancel it in Plan and billing first."));
+  const privacy = PRODUCT_KNOWLEDGE.privacy.map(([, body]) => body).join(" ");
+  assert.doesNotMatch(privacy, /subscription is canceled as part of the account-deletion process/i);
+});

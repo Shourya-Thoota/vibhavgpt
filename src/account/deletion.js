@@ -19,6 +19,26 @@ import {
    must be gone before image folders can be.
    ========================================================================== */
 
+/* Deletion never cancels a plan. While a plan could still renew or charge,
+   deletion is refused and the person cancels it first: a web plan in Plan
+   and billing, a plan bought elsewhere where it was bought. A web plan whose
+   cancellation is already scheduled cannot renew, so it does not block, even
+   though its paid period is still running. */
+const OPEN_PLAN_STATUSES = new Set(["active", "trialing", "past_due", "unpaid"]);
+export const ACTIVE_SUBSCRIPTION_CODE = "active-subscription";
+export const WEB_PLAN_BLOCK = "You have an active plan. Cancel it in Plan and billing, then delete your account. Nothing was deleted.";
+export const OTHER_PLAN_BLOCK = "Your plan was bought outside the web, so it can't be canceled here. Cancel it where you bought it, then delete your account. Nothing was deleted.";
+
+// The reason deletion is refused for this subscription row, or null.
+export function deletionBlock(subscription, now = new Date()) {
+  if (!subscription || subscription.tier === "free" || !OPEN_PLAN_STATUSES.has(subscription.status)) return null;
+  const periodEndsAt = subscription.currentPeriodEndsAt ? new Date(subscription.currentPeriodEndsAt) : null;
+  if (periodEndsAt && periodEndsAt <= now) return null;
+  if (subscription.billingSource !== "stripe") return { error: OTHER_PLAN_BLOCK, code: ACTIVE_SUBSCRIPTION_CODE };
+  if (subscription.cancelAtPeriodEnd === true) return null;
+  return { error: WEB_PLAN_BLOCK, code: ACTIVE_SUBSCRIPTION_CODE };
+}
+
 // The auth library's tables, in delete order. Each is skipped if absent (a
 // plugin that was never enabled has no table).
 const AUTH_TABLES_BY_USER = ["passkey", "twoFactor", "session", "account"];

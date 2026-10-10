@@ -1,6 +1,6 @@
 import express, { Router } from "express";
 import { requireSession } from "../middleware/require-session.js";
-import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, tierForPriceLookupKey, verifyWebhookSignature } from "./service.js";
+import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, DOWNGRADE_PAUSED, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, tierForPriceLookupKey, verifyWebhookSignature } from "./service.js";
 import { getCurrentUsage } from "../usage/service.js";
 
 export const billingRouter = Router();
@@ -12,11 +12,22 @@ billingRouter.get("/subscription", requireSession, async (req, res, next) => {
   } catch (error) { return next(error); }
 });
 
+// Downgrades stay paused until they can be applied at the period end.
+export const PLAN_CHANGE_PAUSED = Object.freeze({
+  code: "plan-change-paused",
+  error: "Plan changes are paused right now. Please contact support to change your plan.",
+});
+
+// The request only chooses a price. The tier is granted by the signed webhook
+// once the provider has the change, after payment for an upgrade; this route
+// never writes one, and answers { pending: true } when the change is asked for.
 billingRouter.post("/change-plan", requireSession, async (req, res, next) => {
   try {
     const result = await changeSubscriptionPlan({ userId: req.authSession.user.id, priceLookupKey: req.body?.priceLookupKey ?? "" });
-    return res.json({ subscription: result });
+    return res.json(result);
   } catch (error) {
+    if (error.code === DOWNGRADE_PAUSED) return res.status(409).json(PLAN_CHANGE_PAUSED);
+    if (["already-on-plan", "plan-ending", "change-scheduled", "plan-change-unavailable"].includes(error.code)) return res.status(409).json({ code: error.code, error: error.message });
     if (["Invalid price selection.", "The selected plan is unavailable."].includes(error.message)) return res.status(400).json({ error: error.message });
     if (error.message.startsWith("No active") || error.message.includes("no billable") || error.message.includes("can't be changed here")) return res.status(409).json({ error: error.message });
     return next(error);

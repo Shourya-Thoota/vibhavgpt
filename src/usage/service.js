@@ -469,19 +469,3 @@ export async function reserveGeneration(userId, model = "__generation__") {
 
 export const reserveImageGeneration = (userId) => reserveGeneration(userId, "__image__");
 export const reserveDocumentGeneration = (userId) => reserveGeneration(userId, "__document__");
-
-export async function setTier(userId, tier, { executor = db } = {}) {
-  const canonicalTier = tier === "paid" ? "pro" : tier;
-  if (!Object.hasOwn(LIMITS, canonicalTier) || canonicalTier === "paid") throw new Error("Invalid subscription tier.");
-  const values = { userId, tier: canonicalTier, status: canonicalTier === "free" ? "inactive" : "active", updatedAt: new Date() };
-  const [existing] = await executor
-    .select({ id: subscriptions.id })
-    .from(subscriptions)
-    .where(eq(subscriptions.userId, userId))
-    .limit(1);
-  if (existing) {
-    await executor.update(subscriptions).set(values).where(eq(subscriptions.id, existing.id));
-  } else {
-    await executor.insert(subscriptions).values(values);
-  }
-}

@@ -2069,6 +2069,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
             onDeleted={onDeleted}
             onLegal={onLegal}
             onOpenUsage={() => go("usage")}
+            onOpenBilling={() => go("billing")}
             onboarding={onboarding}
             onSaveOnboarding={saveOnboarding}
             onRerunOnboarding={rerunSurvey}
@@ -3587,7 +3588,7 @@ const RESPONSE_STYLES = [
 ];
 
 function Settings({
-  section = "account", onSectionChange, user, appearance, tier = "free", creditBalance = 0, onDeleted, onLegal, onOpenUsage,
+  section = "account", onSectionChange, user, appearance, tier = "free", creditBalance = 0, onDeleted, onLegal, onOpenUsage, onOpenBilling = () => {},
   onboarding = defaultOnboarding(), onSaveOnboarding = async () => {}, onRerunOnboarding = () => {},
 }) {
   const { accentId, setAccentId, themeId, setThemeId, resolved } = appearance;
@@ -3597,6 +3598,11 @@ function Settings({
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // The delete dialog keeps its own error, so a refusal shows once, inside
+  // the dialog, and never as a banner on the page behind it.
+  const [deleteError, setDeleteError] = useState("");
+  // "active-subscription" when deletion was refused because a plan is active.
+  const [deleteErrorCode, setDeleteErrorCode] = useState("");
   const [responseStyle, setResponseStyle] = useState("balanced");
   const [customInstructions, setCustomInstructions] = useState("");
   const [preferencesBusy, setPreferencesBusy] = useState(false);
@@ -3674,15 +3680,32 @@ function Settings({
     resetPageScroll();
   }, []);
 
+  function openDeleteDialog() {
+    setConfirm("");
+    setError("");
+    setDeleteError("");
+    setDeleteErrorCode("");
+    setDeleteOpen(true);
+  }
+
+  function closeDeleteDialog() {
+    setDeleteOpen(false);
+    setError("");
+    setDeleteError("");
+    setDeleteErrorCode("");
+  }
+
   async function deleteAccount() {
     if (confirm !== "DELETE") return;
     setBusy(true);
-    setError("");
+    setDeleteError("");
+    setDeleteErrorCode("");
     try {
       await api("/api/account", { method: "DELETE" });
       onDeleted();
     } catch (err) {
-      setError(err.message);
+      setDeleteError(err.message);
+      setDeleteErrorCode(err.code ?? "");
       setBusy(false);
     }
   }
@@ -3946,12 +3969,13 @@ function Settings({
                     label="Permanently delete"
                     description={<>Permanently delete your VibhavGPT account and active account data. Restricted recovery backups expire within 12 months; billing providers may retain transaction records. <a href="https://vibhavgpt.com/account-deletion" target="_blank" rel="noreferrer">Learn about account deletion</a></>}
                   >
-                    <button className="btn btn--danger" onClick={() => { setConfirm(""); setDeleteOpen(true); }}>
+                    <button className="btn btn--danger" onClick={openDeleteDialog}>
                       <Trash2 size={15} /> Delete account
                     </button>
                   </SettingsRow>
                 </SettingsGroup>
-                <p className="settings-notice">{DELETION_PLAN_NOTICE}</p>
+                {/* The dialog repeats this notice, so it is not shown twice at once. */}
+                {!deleteOpen && <p className="settings-notice">{DELETION_PLAN_NOTICE}</p>}
               </div>
             )}
           </div>
@@ -3961,7 +3985,7 @@ function Settings({
 
       <Modal
         open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
+        onClose={closeDeleteDialog}
         eyebrow="Permanent"
         title="Delete your account?"
         description={`Your conversations, memory, uploads, image library, and account-linked records will be removed from active VibhavGPT systems. Recovery backups expire within 12 months, and billing providers may retain transaction records. ${DELETION_PLAN_NOTICE} Type DELETE to confirm.`}
@@ -3969,9 +3993,22 @@ function Settings({
         <Field label="Confirmation">
           <input className="input" autoFocus value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="DELETE" />
         </Field>
-        {error && <p className="note note--error" role="alert">{error}</p>}
+        {deleteError && (
+          <p className="note note--error" role="alert">
+            {deleteError}
+            {deleteErrorCode === "active-subscription" && (
+              <>
+                {" "}
+                <a href="/app/billing" onClick={(event) => {
+                  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault(); closeDeleteDialog(); onOpenBilling();
+                }}>Plan and billing</a>
+              </>
+            )}
+          </p>
+        )}
         <div className="ui-modal__actions">
-          <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => setDeleteOpen(false)}>Keep my account</button>
+          <button type="button" className="btn btn--ghost" disabled={busy} onClick={closeDeleteDialog}>Keep my account</button>
           <button type="button" className="btn btn--danger" disabled={confirm !== "DELETE" || busy} onClick={deleteAccount}>
             {busy ? "Deleting…" : "Delete permanently"}
           </button>
@@ -4398,6 +4435,16 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
   // Android app can't be changed here; it runs to the end of its paid period.
   const appSubscription = Boolean(subscription?.billingSource && subscription.billingSource !== "stripe");
 
+  // Checks the server's record until it shows the plan, for up to 20 seconds.
+  async function waitForPlan(planId) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const latest = await api("/api/billing/subscription", { cache: "no-store" }).catch(() => null);
+      if (latest?.subscription?.tier === planId) return true;
+    }
+    return false;
+  }
+
   async function purchase(planId) {
     if (publicPreview) { window.location.assign("/app?billing"); return; }
     if (checkingPlan || tier === planId) return;
@@ -4413,9 +4460,16 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
         if (Capacitor.isNativePlatform()) await Browser.open({ url: result.url });
         else window.location.assign(result.url);
       }
-      else {
-        setSubscription((current) => ({ ...current, ...result.subscription }));
-        window.location.reload();
+      else if (result.pending) {
+        // The server never grants a plan from this request: the new plan
+        // starts once the payment is confirmed, so wait for that before
+        // showing it.
+        setNotice(result.trialing ? "Updating your trial…" : "Confirming your payment. Your new plan starts as soon as it goes through.");
+        if (await waitForPlan(planId)) window.location.reload();
+        else {
+          setNotice("");
+          setError("Your payment is still being confirmed. Refresh in a moment, or contact support if your plan doesn't change.");
+        }
       }
     } catch (err) {
       const message = typeof err?.message === "string" ? err.message : "";

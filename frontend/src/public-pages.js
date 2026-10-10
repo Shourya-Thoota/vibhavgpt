@@ -1,6 +1,6 @@
 export const SITE_ORIGIN = "https://vibhavgpt.com";
 export const BRAND_IMAGE = `${SITE_ORIGIN}/brand/vibhavgpt-icon-512.png`;
-export const DELETION_PLAN_NOTICE = "Cancel your plan before deleting your account. Pansophy LLC is not responsible for subscriptions that were not cancelled.";
+export const DELETION_PLAN_NOTICE = "Cancel your plan before deleting your account. Deletion is blocked while a web plan is active. Pansophy LLC is not responsible for subscriptions that were not canceled.";
 
 // Shared by the browser, HTML build, sitemap and visible FAQ blocks.
 export const PUBLIC_PAGES = {
@@ -40,7 +40,7 @@ export const PUBLIC_PAGES = {
     description: "Delete your VibhavGPT account in Settings or request deletion by email. Cancel your plan first; read about data removal and retention. Made by Vibhav Thoota.",
     faq: [
       ["Can I delete my account without the Android app?", "Yes. Open the web confirmation from this page and sign in to your VibhavGPT account. If you cannot sign in, email support@pansophy.com from your account address with Account deletion request in the subject. We may need to verify ownership before removing the account."],
-      ["Do I need to cancel my subscription first?", DELETION_PLAN_NOTICE + " Open Plan and billing to check your subscription and use the management option for where you purchased it. Confirm cancellation with the billing provider before deleting your account."],
+      ["Do I need to cancel my subscription first?", DELETION_PLAN_NOTICE + " Open Plan and billing and choose Cancel plan. Once it is canceled, you can delete your account."],
       ["Can deleted data be recovered?", "Account deletion is permanent. Export the data you want to keep from Settings before confirming. Active account data is removed; restricted disaster-recovery backups rotate out within 12 months. Billing providers may retain transaction records under their own policies and legal obligations."],
     ],
   },

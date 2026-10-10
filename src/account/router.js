@@ -1,10 +1,8 @@
 import { asc, eq } from "drizzle-orm";
 import { Router } from "express";
-import { cancelActiveSubscriptionsForUser } from "../billing/service.js";
-import { config } from "../config.js";
 import { db } from "../db/client.js";
-import { attachments, billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, messages, subscriptions, usageEvents, userProfiles } from "../db/schema.js";
-import { deleteAccountData } from "./deletion.js";
+import { attachments, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, messages, subscriptions, usageEvents, userProfiles } from "../db/schema.js";
+import { deleteAccountData, deletionBlock } from "./deletion.js";
 import { requireSession } from "../middleware/require-session.js";
 import { deleteUserUploads } from "../uploads/service.js";
 
@@ -53,33 +51,25 @@ accountRouter.get("/export", async (req, res, next) => {
   }
 });
 
-accountRouter.delete("/", async (req, res, next) => {
-  const userId = req.authSession.user.id;
-  try {
-    const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
-    const hasUnexpiredPaidAccess = subscription
-      && ["active", "trialing"].includes(subscription.status)
-      && subscription.tier !== "free"
-      && (!subscription.currentPeriodEndsAt || subscription.currentPeriodEndsAt > new Date());
-    // A paid web subscription is canceled first, so deleting an account can
-    // never leave a renewal behind. If that fails, nothing is deleted.
-    if (hasUnexpiredPaidAccess && subscription.billingSource === "stripe") {
-      if (!config.stripeSecretKey) return res.status(409).json({ error: "Your subscription must be cancelled before deletion." });
-      const [customer] = await db.select({ customerId: billingCustomers.customerId }).from(billingCustomers).where(eq(billingCustomers.userId, userId)).limit(1);
-      try {
-        await cancelActiveSubscriptionsForUser(userId, {
-          subscriptionId: subscription.subscriptionId,
-          customerIds: [subscription.customerId, customer?.customerId],
-        });
-      } catch {
-        return res.status(502).json({ error: "We couldn't cancel your subscription, so nothing was deleted. Cancel it in Plan and billing, then try again." });
-      }
+// Deleting an account never cancels a plan. While the account has a plan
+// that could still renew or charge, the request is refused with 409 and
+// nothing is deleted; the person cancels it first and tries again. A web plan
+// whose cancellation is already scheduled does not block (see deletionBlock).
+export function deleteAccountHandler({ database = db, deleteUploads = deleteUserUploads } = {}) {
+  return async (req, res, next) => {
+    const userId = req.authSession.user.id;
+    try {
+      const [subscription] = await database.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
+      const block = deletionBlock(subscription);
+      if (block) return res.status(409).json(block);
+      // Stored files go before their rows, and their rows before image folders.
+      await deleteUploads(userId);
+      await deleteAccountData(database, userId);
+      return res.status(204).end();
+    } catch (error) {
+      return next(error);
     }
-    // Stored files go before their rows, and their rows before image folders.
-    await deleteUserUploads(userId);
-    await deleteAccountData(db, userId);
-    return res.status(204).end();
-  } catch (error) {
-    return next(error);
-  }
-});
+  };
+}
+
+accountRouter.delete("/", deleteAccountHandler());

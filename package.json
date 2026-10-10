@@ -29,7 +29,7 @@
     "backup:restore-drill": "sh scripts/restore-drill.sh",
     "auth:migrate": "npx auth@latest migrate",
     "check": "node --check src/server.js && node --check src/auth.js && node --check src/security/turnstile.js && node --check src/security/two-factor-recovery.js && node --check src/email/service.js && node --check src/db/schema.js && node --check src/chat/router.js && node --check src/chat/providers.js && node --check src/chat/tool-calls.js && node --check src/chat/web-search.js && node --check src/search/service.js && node --check src/chat/moderation.js && node --check src/uploads/router.js && node --check src/uploads/service.js && node --check src/generation/router.js && node --check src/generation/service.js && node --check src/voice/router.js && node --check src/memory/router.js && node --check src/memory/service.js && node --check src/usage/router.js && node --check src/usage/service.js && node --check src/billing/router.js && node --check src/billing/service.js && node --check src/account/router.js && node --check src/security/router.js && node --check src/middleware/require-two-factor-password.js && node --check scripts/reconcile-credit-customers.js && node --check scripts/verify-password-reset-flow.js && node --check scripts/verify-upload-flow.js && node --check scripts/verify-image-upload-flow.js && node --check scripts/verify-sports-search-flow.js && node --check scripts/verify-current-information-flow.js",
-    "test": "node --import ./test/setup-env.js --test test/*.test.js"
+    "test": "node --experimental-test-module-mocks --import ./test/setup-env.js --test test/*.test.js"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.2",

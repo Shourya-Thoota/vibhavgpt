@@ -32,7 +32,12 @@ test("Stripe lookup keys map to the correct subscription tier", () => {
   assert.equal(tierForPriceLookupKey("vibhavgpt_plus_yearly"), "plus");
   assert.equal(tierForPriceLookupKey("vibhavgpt_pro_monthly"), "pro");
   assert.equal(tierForPriceLookupKey("vibhavgpt_pro_yearly"), "pro");
+  for (const unknown of ["", "vibhavgpt_team_monthly", "pro", "something_else"]) assert.equal(tierForPriceLookupKey(unknown), null, unknown);
 });
+
+// The webhook reads the subscription from the provider; this stands in for it.
+const trialingPro = { id: "sub_123", status: "trialing", customer: "cus_123", cancel_at_period_end: false, metadata: { userId: "user-123" },
+  items: { data: [{ id: "si_123", price: { id: "price_pro", lookup_key: "vibhavgpt_pro_monthly" }, current_period_start: 1_790_000_000, current_period_end: 1_790_604_800 }] } };
 
 test("a correctly signed checkout event creates a Pro trial record", async () => {
   const payload = JSON.stringify({
@@ -53,7 +58,8 @@ test("a correctly signed checkout event creates a Pro trial record", async () =>
   });
   const event = verifyWebhookSignature(Buffer.from(payload), signature);
   const records = [];
-  const changed = await applySubscriptionEvent(event, { persist: async (record) => records.push(record) });
+  // Pro comes from the price the provider bills, not from the event metadata.
+  const changed = await applySubscriptionEvent(event, { persist: async (record) => records.push(record), retrieveSubscription: async () => trialingPro });
   assert.equal(changed, true);
   assert.deepEqual(records, [
     {
@@ -67,6 +73,8 @@ test("a correctly signed checkout event creates a Pro trial record", async () =>
       providerBasePlanId: null,
       providerPurchaseTokenHash: null,
       cancelAtPeriodEnd: false,
+      currentPeriodStartedAt: new Date(1_790_000_000 * 1000),
+      currentPeriodEndsAt: new Date(1_790_604_800 * 1000),
     },
   ]);
 });
@@ -158,7 +166,10 @@ test("a canceled subscription downgrades the user", async () => {
         },
       },
     },
-    { persist: async (record) => records.push(record) },
+    {
+      persist: async (record) => records.push(record),
+      retrieveSubscription: async () => ({ ...trialingPro, status: "canceled", current_period_end: 1_800_000_000 }),
+    },
   );
   assert.equal(records[0].tier, "free");
   assert.equal(records[0].status, "canceled");

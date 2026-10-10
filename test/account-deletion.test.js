@@ -87,21 +87,141 @@ test("a failed deletion rolls back and leaves the account whole", async (t) => {
   assert.equal(await count(client, `"session"`, `"userId"`, "leaving"), 1);
 });
 
-test("billing cancellation finds the subscription without relying on search", async () => {
+// Deletion is refused, and nothing deleted, while a plan could still renew or
+// charge. The route is mounted on its own app with a stub session and file
+// remover; the payment provider is never called.
+async function loadAccountModules() {
   process.env.DATABASE_URL ||= "postgresql://unused:unused@127.0.0.1:9/unused";
   const { config } = await import("../src/config.js");
   config.databaseUrl ||= process.env.DATABASE_URL;
-  const { cancelActiveSubscriptionsForUser } = await import("../src/billing/service.js");
-  const cancelled = [];
-  const stripe = {
-    subscriptions: {
-      retrieve: async (id) => ({ id, status: "active" }),
-      list: async ({ customer }) => ({ data: [{ id: `${customer}-old`, status: "canceled" }, { id: `${customer}-live`, status: "trialing" }] }),
-      search: async () => { throw new Error("Search is not available on this account."); },
-      cancel: async (id) => { cancelled.push(id); },
-    },
-  };
-  const ids = await cancelActiveSubscriptionsForUser("user-1", { subscriptionId: "sub_1", customerIds: ["cus_1", null, "cus_1"] }, stripe);
-  assert.deepEqual(ids.sort(), ["cus_1-live", "sub_1"]);
-  assert.deepEqual(cancelled.sort(), ["cus_1-live", "sub_1"]);
+  // The route module loads the auth library, which needs a secret to start.
+  config.authSecret ||= "test-only-auth-secret-not-used-for-anything-real";
+  const { deleteAccountHandler } = await import("../src/account/router.js");
+  const { deletionBlock, WEB_PLAN_BLOCK, OTHER_PLAN_BLOCK } = await import("../src/account/deletion.js");
+  return { deleteAccountHandler, deletionBlock, WEB_PLAN_BLOCK, OTHER_PLAN_BLOCK };
+}
+
+const DAY = 24 * 60 * 60 * 1000;
+const future = () => new Date(Date.now() + 10 * DAY);
+const past = () => new Date(Date.now() - DAY);
+
+async function withDeletionApp(t, subscription) {
+  const { default: express } = await import("express");
+  const { deleteAccountHandler } = await loadAccountModules();
+  const client = new PGlite();
+  t.after(() => client.close());
+  await applyMigrations(client);
+  await client.exec(AUTH_TABLES);
+  await seed(client, "leaving", "a@b.com");
+  if (subscription) {
+    const s = { tier: "pro", status: "active", billingSource: "stripe", cancelAtPeriodEnd: false, currentPeriodEndsAt: future(), ...subscription };
+    await client.query(
+      `INSERT INTO subscriptions (user_id, subscription_id, tier, status, billing_source, cancel_at_period_end, current_period_ends_at)
+       VALUES ('leaving', 'sub_test', $1, $2, $3, $4, $5)`,
+      [s.tier, s.status, s.billingSource, s.cancelAtPeriodEnd, s.currentPeriodEndsAt],
+    );
+  }
+  const removedUploads = [];
+  const app = express();
+  app.use((req, _res, next) => { req.authSession = { user: { id: "leaving" } }; next(); });
+  app.delete("/api/account", deleteAccountHandler({ database: drizzle(client), deleteUploads: async (id) => { removedUploads.push(id); } }));
+  const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/account`, { method: "DELETE" });
+  const body = response.status === 204 ? null : await response.json();
+  return { client, response, body, removedUploads };
+}
+
+async function assertNothingDeleted(client, removedUploads) {
+  assert.equal(await count(client, `"user"`, "id", "leaving"), 1);
+  assert.equal(await count(client, "conversations", "user_id", "leaving"), 1);
+  assert.equal(await count(client, "subscriptions", "user_id", "leaving"), 1);
+  assert.equal(await count(client, `"session"`, `"userId"`, "leaving"), 1);
+  assert.deepEqual(removedUploads, [], "stored files are kept too");
+}
+
+async function assertEverythingDeleted(client, removedUploads) {
+  assert.equal(await count(client, `"user"`, "id", "leaving"), 0);
+  assert.equal(await count(client, "conversations", "user_id", "leaving"), 0);
+  assert.equal(await count(client, "subscriptions", "user_id", "leaving"), 0);
+  assert.equal(await count(client, `"session"`, `"userId"`, "leaving"), 0);
+  assert.deepEqual(removedUploads, ["leaving"]);
+}
+
+test("an active, renewing web plan blocks deletion with 409 and deletes nothing", async (t) => {
+  const { WEB_PLAN_BLOCK } = await loadAccountModules();
+  for (const status of ["active", "trialing"]) {
+    const { client, response, body, removedUploads } = await withDeletionApp(t, { status });
+    assert.equal(response.status, 409, status);
+    assert.deepEqual(body, { error: WEB_PLAN_BLOCK, code: "active-subscription" });
+    await assertNothingDeleted(client, removedUploads);
+  }
+});
+
+test("a web plan that is past due or unpaid also blocks deletion", async (t) => {
+  for (const status of ["past_due", "unpaid"]) {
+    const { client, response, body, removedUploads } = await withDeletionApp(t, { status });
+    assert.equal(response.status, 409, status);
+    assert.equal(body.code, "active-subscription");
+    await assertNothingDeleted(client, removedUploads);
+  }
+});
+
+test("a web plan already canceled for the period end does not block deletion", async (t) => {
+  const { client, response, removedUploads } = await withDeletionApp(t, { status: "active", cancelAtPeriodEnd: true, currentPeriodEndsAt: future() });
+  assert.equal(response.status, 204);
+  await assertEverythingDeleted(client, removedUploads);
+});
+
+test("no plan, a free plan, an ended period or a canceled plan never blocks deletion", async (t) => {
+  for (const subscription of [null, { tier: "free" }, { currentPeriodEndsAt: past() }, { status: "canceled" }]) {
+    const { client, response, removedUploads } = await withDeletionApp(t, subscription);
+    assert.equal(response.status, 204, JSON.stringify(subscription));
+    await assertEverythingDeleted(client, removedUploads);
+  }
+});
+
+test("a paid plan bought outside the web blocks deletion with its own message", async (t) => {
+  const { OTHER_PLAN_BLOCK } = await loadAccountModules();
+  const { client, response, body, removedUploads } = await withDeletionApp(t, { billingSource: "google_play", cancelAtPeriodEnd: true });
+  assert.equal(response.status, 409);
+  assert.deepEqual(body, { error: OTHER_PLAN_BLOCK, code: "active-subscription" });
+  await assertNothingDeleted(client, removedUploads);
+});
+
+test("the blocked messages name no provider and claim no cancellation", async () => {
+  const { deletionBlock, WEB_PLAN_BLOCK, OTHER_PLAN_BLOCK } = await loadAccountModules();
+  assert.equal(WEB_PLAN_BLOCK, "You have an active plan. Cancel it in Plan and billing, then delete your account. Nothing was deleted.");
+  assert.equal(OTHER_PLAN_BLOCK, "Your plan was bought outside the web, so it can't be canceled here. Cancel it where you bought it, then delete your account. Nothing was deleted.");
+  for (const text of [WEB_PLAN_BLOCK, OTHER_PLAN_BLOCK]) {
+    assert.ok(!text.includes(String.fromCharCode(0x2014)), "no em dash");
+    assert.doesNotMatch(text, /was canceled|stripe|google|play store|app store/i);
+  }
+  // No period end on record counts as a period still running.
+  assert.equal(deletionBlock({ tier: "plus", status: "active", billingSource: "stripe", cancelAtPeriodEnd: false, currentPeriodEndsAt: null })?.code, "active-subscription");
+  assert.equal(deletionBlock(undefined), null);
+});
+
+test("canceling a web plan stores cancelAtPeriodEnd locally, without waiting for the webhook", async (t) => {
+  await loadAccountModules();
+  const { cancelSubscriptionForUser } = await import("../src/billing/service.js");
+  const client = new PGlite();
+  t.after(() => client.close());
+  await applyMigrations(client);
+  const periodEnd = Math.floor(future().getTime() / 1000);
+  await client.query(
+    `INSERT INTO subscriptions (user_id, customer_id, subscription_id, tier, status, billing_source, cancel_at_period_end, current_period_ends_at)
+     VALUES ('member', 'cus_member', 'sub_member', 'pro', 'active', 'stripe', false, to_timestamp($1))`,
+    [periodEnd],
+  );
+  const updates = [];
+  const stripe = { subscriptions: { update: async (id, params) => {
+    updates.push([id, params]);
+    return { id, customer: "cus_member", status: "active", cancel_at_period_end: true, current_period_start: periodEnd - 30 * 86400, current_period_end: periodEnd };
+  } } };
+  const result = await cancelSubscriptionForUser("member", { stripe, executor: drizzle(client) });
+  assert.deepEqual(updates, [["sub_member", { cancel_at_period_end: true }]]);
+  assert.equal(result.cancelAtPeriodEnd, true);
+  const { rows: [row] } = await client.query(`SELECT cancel_at_period_end, status, tier FROM subscriptions WHERE user_id = 'member'`);
+  assert.deepEqual(row, { cancel_at_period_end: true, status: "active", tier: "pro" });
 });
