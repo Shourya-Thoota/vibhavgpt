@@ -1,0 +1,331 @@
+/* ==========================================================================
+   Settings.
+
+   One page per section, organised the same way everywhere:
+   - on the left, the page title, whose account this is, and the sections in
+     three named groups (You, Experience, Privacy and security), each with an
+     icon; on phones the same links become a scrolling strip;
+   - on the right, the section's icon, title and line of help, then its
+     settings in titled groups. A group is a quiet panel of rows: a setting's
+     name and help on the left, its control on the right, and wide controls
+     (pickers, sliders, text) across the full row. The action that saves a
+     group sits in that group's footer, with its "Saved" beside it.
+   Delete account is the one place colour changes: its icon, its link and its
+   group take the danger tone.
+   ========================================================================== */
+
+/* --- Page frame ----------------------------------------------------------- */
+
+.page.settings { width: 100%; max-width: none; margin: 0; padding: 0; }
+
+.workspace[data-page="settings"] .workspace__main,
+.workspace[data-page="usage"] .workspace__main { min-height: 100vh; min-height: 100dvh; }
+.workspace[data-page="settings"] .workspace__main > .screen,
+.workspace[data-page="usage"] .workspace__main > .screen { display: flex; flex: 1; flex-direction: column; }
+.page.settings,
+.page.usage-page { display: flex; flex: 1; flex-direction: column; }
+.page.usage-page { padding-bottom: var(--space-xl); }
+.usage-page__back { align-self: flex-start; }
+
+/* The app sidebar's page links are anchors now; they read as navigation,
+   not as underlined text links. */
+.sidebar__link { text-decoration: none; }
+
+.settings__layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: min(100%, 940px);
+  margin: 0 auto;
+  /* The top edge matches the sidebar's, so the section header sits level
+     with the wordmark beside it. */
+  padding: 24px clamp(var(--space-md), 4vw, var(--space-2xl)) 0;
+}
+
+/* --- The dock ------------------------------------------------------------ */
+
+/* Every section sits across the top as an icon tile, in three clusters
+   (You, Experience, Privacy and security) divided by hairlines. The current
+   tile lights in the accent and an accent bar runs under it, on the dock's
+   own rule. It sits on the sky like the rest of the page, not on a panel. */
+.settings__top {
+  margin: 0 0 var(--space-xl);
+  padding: var(--space-md) 0 0;
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+}
+.settings__title {
+  margin: 0 0 var(--space-md);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: -0.018em;
+  line-height: 1.05;
+}
+
+.settings-dock {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.settings-dock::-webkit-scrollbar { display: none; }
+.settings-dock__group { display: grid; flex: 0 0 auto; align-content: start; gap: var(--space-2xs); padding: 0 var(--space-md); }
+.settings-dock__group:first-child { padding-left: 0; }
+.settings-dock__group + .settings-dock__group { border-left: var(--rule-fine) solid var(--color-rule); }
+.settings-dock__label { color: var(--color-faint); font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
+.settings-dock__items { display: flex; gap: var(--space-3xs); }
+
+.settings-dock__item {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: 84px;
+  padding: var(--space-xs) var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input) var(--radius-input) 0 0;
+  color: var(--color-ink-2);
+  text-decoration: none;
+  transition: color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+}
+.settings-dock__icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, var(--color-paper-2) 85%, transparent);
+  color: var(--color-muted);
+  transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+}
+.settings-dock__name { font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
+.settings-dock__item:hover { color: var(--color-ink); }
+.settings-dock__item:hover .settings-dock__icon { border-color: var(--color-rule-2); color: var(--color-ink); transform: translateY(-1px); }
+.settings-dock__item[aria-current="page"] { color: var(--color-ink); }
+.settings-dock__item[aria-current="page"] .settings-dock__name { font-weight: 650; }
+.settings-dock__item[aria-current="page"] .settings-dock__icon {
+  border-color: var(--color-accent-line);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
+  color: var(--color-accent);
+}
+.settings-dock__item[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  right: var(--space-sm);
+  bottom: -1px;
+  left: var(--space-sm);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-accent);
+}
+.settings-dock__item[data-tone="danger"] { color: color-mix(in srgb, var(--color-danger) 85%, var(--color-muted)); }
+.settings-dock__item[data-tone="danger"] .settings-dock__icon { color: color-mix(in srgb, var(--color-danger) 85%, var(--color-muted)); }
+.settings-dock__item[data-tone="danger"][aria-current="page"] { color: var(--color-danger); }
+.settings-dock__item[data-tone="danger"][aria-current="page"] .settings-dock__icon {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-paper-2));
+  color: var(--color-danger);
+}
+.settings-dock__item[data-tone="danger"][aria-current="page"]::after { background: var(--color-danger); }
+.settings-dock__item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+/* --- Right column: section ------------------------------------------------ */
+
+.settings__sections { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.settings__content { min-width: 0; }
+.settings [id^="settings-"] { scroll-margin-top: var(--space-lg); }
+
+.settings-section__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+}
+.settings-section__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-top: 4px;
+  border: var(--rule-fine) solid var(--color-accent-line);
+  border-radius: var(--radius-input);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-paper-2));
+  color: var(--color-accent);
+}
+.settings-section__head[data-tone="danger"] .settings-section__icon {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-paper-2));
+  color: var(--color-danger);
+}
+.settings-section__head h2 {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+  line-height: 1.15;
+}
+.settings-section__head p { max-width: 60ch; margin: var(--space-2xs) 0 0; color: var(--color-muted); font-size: 0.92rem; line-height: 1.55; }
+
+/* --- Groups and rows ------------------------------------------------------ */
+
+.settings-stack { display: grid; gap: var(--space-xl); }
+
+.settings-group__head { margin-bottom: var(--space-sm); padding: 0 var(--space-2xs); }
+.settings-group__head h3 { margin: 0; color: var(--color-ink); font-size: 1rem; font-weight: 650; }
+.settings-group__head p { max-width: 62ch; margin: var(--space-3xs) 0 0; color: var(--color-muted); font-size: 0.86rem; line-height: 1.5; }
+
+.settings-group__panel {
+  overflow: hidden;
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-paper-2) 78%, transparent);
+}
+.settings-group[data-tone="danger"] .settings-group__panel {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-rule));
+  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-paper-2));
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+}
+.settings-row + .settings-row { border-top: var(--rule-fine) solid var(--color-rule); }
+.settings-row[data-stacked] { grid-template-columns: minmax(0, 1fr); }
+.settings-row__text { display: grid; gap: var(--space-3xs); min-width: 0; }
+.settings-row__label { color: var(--color-ink); font-size: 0.94rem; font-weight: 600; }
+.settings-row__description { color: var(--color-muted); font-size: 0.84rem; line-height: 1.5; }
+.settings-row__description a { color: var(--color-accent); text-underline-offset: 3px; }
+.settings-row__control { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-xs); min-width: 0; }
+.settings-row[data-stacked] .settings-row__control { display: block; }
+.settings-value { color: var(--color-ink); font-size: 0.92rem; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+
+.settings-group__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-top: var(--rule-fine) solid var(--color-rule);
+  background: color-mix(in srgb, var(--color-paper-3) 45%, transparent);
+}
+.settings-saved { display: inline-flex; align-items: center; gap: var(--space-2xs); min-height: 1.4em; color: var(--color-positive); font-size: 0.86rem; font-weight: 600; }
+.settings-saved__error { color: var(--color-danger); font-weight: 500; }
+
+.settings-notice {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border-left: 2px solid var(--color-danger);
+  color: var(--color-ink-2);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+/* --- Controls inside rows ------------------------------------------------- */
+
+/* A picker in a row keeps a compact width beside its label. */
+.settings-picker { width: min(100%, 300px); }
+.settings-row:not([data-stacked]) .settings-picker { min-width: 240px; }
+.settings-picker .ui-select__trigger { height: 42px; }
+.settings-picker .ui-select__value {
+  font-family: var(--font-display);
+  font-size: 1.04rem;
+  font-weight: 400;
+}
+.ui-select__list.settings-picker__list {
+  min-width: 240px;
+  max-height: min(420px, calc(100dvh - 24px));
+  overflow-y: auto;
+}
+
+/* The group title already names a lone text field. */
+.settings-field--bare .ui-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.settings .textarea { min-height: 132px; background: var(--color-paper); }
+.settings .input { background: var(--color-paper); }
+
+.settings .theme-picker { margin: 0; }
+.settings .theme-option { background: var(--color-paper); }
+.settings .theme-option:hover { transform: none; box-shadow: none; }
+.settings .swatches { margin: 0; }
+.settings .ui-choice { background: var(--color-paper); }
+.settings .ui-choices { margin: 0; }
+.settings-sliders.survey__sliders { margin: 0; gap: var(--space-lg); }
+
+/* --- Security panel ------------------------------------------------------- */
+
+/* SecurityPanel's own blocks sit inside group panels as padded bodies. */
+.settings-group__panel > .card__body { display: grid; gap: var(--space-md); margin: 0; padding: var(--space-md) var(--space-lg) var(--space-lg); }
+.settings-group__panel > .card__body + .card__body { border-top: var(--rule-fine) solid var(--color-rule); }
+.settings-group__panel > .card__body > .ui-field { max-width: 420px; }
+.security-passkeys { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: end; }
+.security-passkeys > *:not(.ui-field) { grid-column: 1 / -1; }
+.security-passkeys .ui-field { max-width: none; }
+.security-passkeys .settings-picker { width: 100%; }
+.settings .key-list { display: grid; gap: 0; margin: 0; border: var(--rule-fine) solid var(--color-rule); border-radius: var(--radius-input); }
+.settings .key-row { padding: var(--space-sm) var(--space-md); border: 0; border-radius: 0; background: none; }
+.settings .key-row + .key-row { border-top: var(--rule-fine) solid var(--color-rule); }
+
+.authenticator-manual { display: grid; gap: var(--space-sm); max-width: 360px; }
+.authenticator-manual .btn { justify-self: start; }
+.settings .authenticator-manual__key { font-family: monospace; width: 100%; min-width: 0; height: auto; padding: 10px 14px; line-height: 1.5; overflow-wrap: anywhere; user-select: text; white-space: normal; }
+.authenticator-enrollment { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 360px); align-items: start; gap: var(--space-lg); }
+.settings .authenticator-enrollment .qr { margin: 0; max-width: 100%; height: auto; }
+
+/* --- Footer --------------------------------------------------------------- */
+
+.settings__footer { flex-shrink: 0; margin-top: auto; padding: var(--space-2xl) 0 var(--space-xl); }
+.settings__legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-lg);
+  margin: 0;
+  padding-top: var(--space-lg);
+  border-top: var(--rule-fine) solid var(--color-rule);
+  font-size: 0.84rem;
+}
+.settings__legal a,
+.settings__legal button { color: var(--color-muted); text-decoration: underline; text-underline-offset: 3px; }
+.settings__legal a:hover,
+.settings__legal button:hover { color: var(--color-ink); }
+.settings__attribution { margin: var(--space-md) 0 0; color: var(--color-muted); font-size: 0.84rem; line-height: 1.5; }
+
+/* --- Narrow --------------------------------------------------------------- */
+
+@media (min-width: 761px) {
+  .settings__layout,
+  .page.usage-page { min-height: 100vh; min-height: 100dvh; }
+}
+
+
+@media (max-width: 760px) {
+  .workspace[data-page="settings"] .topbar-mobile,
+  .workspace[data-page="usage"] .topbar-mobile { flex-shrink: 0; }
+  .page.usage-page { padding-bottom: var(--space-lg); }
+  .settings__layout { padding-top: 0; }
+  .settings__top { padding-top: var(--space-sm); }
+  .settings__title { display: none; }
+  .settings-dock__item { min-width: 72px; }
+  .settings-section__head { gap: var(--space-sm); margin-bottom: var(--space-lg); }
+  .settings-section__head h2 { font-size: 1.5rem; }
+  .settings-row { grid-template-columns: minmax(0, 1fr); padding: var(--space-md); }
+  .settings-row__control { justify-content: flex-start; }
+  .settings-value { text-align: left; }
+  .settings-row:not([data-stacked]) .settings-picker { min-width: 0; width: 100%; }
+  .settings-group__footer { padding: var(--space-sm) var(--space-md); }
+  .security-passkeys { grid-template-columns: minmax(0, 1fr); }
+  .authenticator-enrollment { grid-template-columns: minmax(0, 1fr); }
+}

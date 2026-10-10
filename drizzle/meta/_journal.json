@@ -1,0 +1,116 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1787788307392,
+      "tag": "0000_zippy_rawhide_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788223200000,
+      "tag": "0001_file_uploads",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788475964926,
+      "tag": "0002_silky_marvex",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788796800000,
+      "tag": "0003_plus_monthly_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788750000000,
+      "tag": "0004_memory_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788802000000,
+      "tag": "0005_usage_credits",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788803000000,
+      "tag": "0006_repair_memory_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788804000000,
+      "tag": "0007_usage_costs",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788920000000,
+      "tag": "0008_profile_model_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788921000000,
+      "tag": "0009_thinking_effort_usage_units",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788921934747,
+      "tag": "0004_news_briefings",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788921934748,
+      "tag": "0005_news_blog",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788925000000,
+      "tag": "0010_product_pricing_blog",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789257600000,
+      "tag": "0012_remove_news_briefings",
+      "breakpoints": true
+    },
+    { "idx": 12, "version": "7", "when": 1789420000000, "tag": "0013_study_mode", "breakpoints": true },
+    { "idx": 13, "version": "7", "when": 1789430000000, "tag": "0014_image_mode", "breakpoints": true },
+    { "idx": 14, "version": "7", "when": 1789850000000, "tag": "0015_voice_live_sessions", "breakpoints": true },
+    { "idx": 15, "version": "7", "when": 1790114400000, "tag": "0016_credit_denomination_100x", "breakpoints": true },
+    { "idx": 16, "version": "7", "when": 1790208000000, "tag": "0017_voice_live_connection_activity", "breakpoints": true },
+    { "idx": 17, "version": "7", "when": 1790294400000, "tag": "0018_billing_customers", "breakpoints": true },
+    { "idx": 18, "version": "7", "when": 1790380800000, "tag": "0019_image_folders", "breakpoints": true },
+    { "idx": 19, "version": "7", "when": 1790467200000, "tag": "0020_google_play_billing", "breakpoints": true },
+    { "idx": 20, "version": "7", "when": 1790553600000, "tag": "0021_google_play_test_classification", "breakpoints": true },
+    { "idx": 21, "version": "7", "when": 1790640000000, "tag": "0022_memory_enabled", "breakpoints": true },
+    { "idx": 22, "version": "7", "when": 1791072000000, "tag": "0023_token_reservations", "breakpoints": true },
+    { "idx": 23, "version": "7", "when": 1791158400000, "tag": "0024_conversation_groups", "breakpoints": true }
+  ]
+}

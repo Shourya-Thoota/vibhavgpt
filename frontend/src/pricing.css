@@ -1,0 +1,183 @@
+/* ==========================================================================
+   Plans: one rate card, then the comparison.
+
+   The three plans share a single panel split by hairlines, read across like
+   a printed rate card, instead of three lifted boxes. Prices are set in the
+   display serif. Plus carries the accent as a rule along its top edge; the
+   current plan is named in words. The comparison table underneath holds the
+   detail the old feature bullets crammed into each card.
+   ========================================================================== */
+
+.page.pricing { padding-top: var(--space-2xl); }
+
+.pricing__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+.pricing__title {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 2.4vw + 1.5rem, 3.2rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.04;
+}
+.pricing__lede { max-width: 52ch; margin: var(--space-xs) 0 0; color: var(--color-muted); font-size: 0.96rem; line-height: 1.55; }
+.pricing__period { display: grid; justify-items: end; gap: 6px; }
+.pricing__period .ui-segmented { margin: 0; }
+.pricing__saving { color: var(--color-muted); font-size: 0.8rem; }
+
+/* --- Rate card ------------------------------------------------------------ */
+
+.plans.rate-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 0;
+  overflow: hidden;
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-paper-2) 92%, transparent);
+}
+.rate-card .plan.rate-card__plan {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-xl) var(--space-lg) var(--space-lg);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  transform: none;
+}
+.rate-card .plan.rate-card__plan:hover { transform: none; box-shadow: none; }
+.rate-card .plan.rate-card__plan + .rate-card__plan { border-left: var(--rule-fine) solid var(--color-rule); }
+.rate-card .plan[data-featured] { box-shadow: inset 0 2px 0 var(--color-accent); }
+
+.rate-card .plan__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-xs); }
+.rate-card .plan__name {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 400;
+}
+.rate-card .plan__price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-xs);
+  margin: var(--space-md) 0 0;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 2vw + 1.6rem, 3rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.rate-card .plan__price small { color: var(--color-muted); font-family: var(--font-body); font-size: 0.86rem; letter-spacing: 0; }
+.plan__equivalent { min-height: 1.3em; margin: var(--space-2xs) 0 0; color: var(--color-muted); font-size: 0.82rem; }
+.rate-card .plan__blurb { flex: 1; min-height: 0; margin: var(--space-md) 0 var(--space-lg); color: var(--color-ink-2); font-size: 0.92rem; line-height: 1.55; }
+
+.plan__current {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  margin: 0;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-positive) 12%, transparent);
+  color: var(--color-positive);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.plan__current--quiet {
+  border: var(--rule-fine) solid var(--color-rule);
+  background: none;
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+/* --- Comparison ----------------------------------------------------------- */
+
+.compare { margin-top: var(--space-2xl); }
+.compare__title { margin: 0; color: var(--color-ink); font-family: var(--font-display); font-size: 1.6rem; font-weight: 400; }
+.compare__scroll { margin-top: var(--space-md); overflow-x: auto; }
+.compare__table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+.compare__table thead th {
+  padding: 0 var(--space-sm) var(--space-sm);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 400;
+  text-align: left;
+}
+.compare__table thead th[data-current] { color: var(--color-accent); }
+.compare__group th {
+  padding: var(--space-lg) 0 var(--space-xs);
+  border-bottom: var(--rule-fine) solid var(--color-rule-2);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: left;
+}
+.compare__table tbody th[scope="row"] {
+  width: 34%;
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) 0;
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+  color: var(--color-ink-2);
+  font-weight: 500;
+  text-align: left;
+}
+.compare__table tbody th small { display: block; margin-top: 2px; color: var(--color-faint); font-size: 0.74rem; font-weight: 400; }
+.compare__table td {
+  padding: var(--space-sm);
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+  color: var(--color-ink);
+  vertical-align: top;
+}
+.compare__table td svg { color: var(--color-accent); vertical-align: -3px; }
+.compare__none { color: var(--color-faint); }
+.compare__footnote { max-width: 72ch; margin: var(--space-md) 0 0; color: var(--color-faint); font-size: 0.8rem; line-height: 1.6; }
+
+/* --- Guarantee ------------------------------------------------------------ */
+
+.pricing__guarantee {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-2xl);
+  padding: var(--space-lg);
+  border: var(--rule-fine) solid var(--color-accent-line);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-paper-2));
+}
+.pricing__guarantee h2 { margin: 0; color: var(--color-ink); font-family: var(--font-display); font-size: 1.35rem; font-weight: 400; }
+.pricing__guarantee p { max-width: 64ch; margin: 0; color: var(--color-ink-2); font-size: 0.92rem; line-height: 1.6; }
+.pricing__guarantee a { justify-self: start; color: var(--color-accent); font-size: 0.9rem; font-weight: 600; text-underline-offset: 3px; }
+
+.pricing .subscription { margin-top: var(--space-xl); }
+
+@media (max-width: 900px) {
+  .plans.rate-card { grid-template-columns: minmax(0, 1fr); }
+  .rate-card .plan.rate-card__plan + .rate-card__plan { border-left: 0; border-top: var(--rule-fine) solid var(--color-rule); }
+  .pricing__period { justify-items: start; }
+}
+
+@media (max-width: 760px) {
+  .page.pricing { padding-top: var(--space-lg); }
+  .rate-card .plan.rate-card__plan { padding: var(--space-lg) var(--space-md); }
+}
+
+.compare__table { table-layout: fixed; }
+.compare__table thead td { width: 34%; border-bottom: 0; }

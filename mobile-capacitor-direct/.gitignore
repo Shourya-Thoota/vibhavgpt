@@ -1,0 +1,13 @@
+node_modules/
+android/.gradle/
+android/.idea/
+android/build/
+android/app/build/
+*.jks
+*.keystore
+direct-signing.properties
+
+# The native shell loads the production web bundle from vibhavgpt.com. Keep a
+# tiny offline fallback in git, but do not commit generated Vite output.
+www/*
+!www/index.html

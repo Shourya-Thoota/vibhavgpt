@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+
+  <link rel="icon" type="image/png" href="/favicon.ico">
+  <link rel="preload" href="/fonts/v1/prata/prata-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/fonts/v1/hanken-grotesk/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/fonts/v1/fonts.css">
+
+  <script src="/theme/appearance-boot.js"></script>
+    <script src="/theme/page-scroll-boot.js"></script>
+    <link rel="stylesheet" href="/theme/vibhav.css">
+    <link rel="stylesheet" href="/theme/public-pages.css">
+<style>
+    :root {
+      --paper-2: var(--color-paper-2);
+      --paper-3: var(--color-paper-3);
+      --rule: var(--color-rule);
+      --rule-2: var(--color-rule-2);
+      --sky-blue: var(--color-sky-blue);
+      --display: var(--font-display);
+      --body: var(--font-body);
+      --mono: var(--font-mono);
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background-color: var(--paper);
+      background-image:
+        radial-gradient(1px 1px at 37px 61px, var(--star), transparent 100%),
+        radial-gradient(1px 1px at 173px 211px, var(--star), transparent 100%),
+        radial-gradient(1px 1px at 89px 263px, var(--star), transparent 100%),
+        radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--sky-blue) 20%, transparent), transparent 62%),
+        radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 66%);
+      background-size: 293px 293px, 347px 347px, 331px 331px, auto, auto;
+      background-attachment: fixed;
+      color: var(--ink);
+      font-family: var(--body);
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+    .shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 64px; }
+
+    .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 1.15rem; text-decoration: none; }
+    .brand img { width: 30px; height: 30px; border-radius: 10px; }
+    .nav-link { color: var(--muted); font-size: 0.94rem; text-decoration: none; }
+    .nav-link:hover { color: var(--ink); }
+
+    /* Hero: the words and the download on the left, the app itself on the
+       right, drawn as a phone showing the real greeting screen. */
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 56px;
+      align-items: center;
+      padding: 64px 0 56px;
+    }
+    h1 {
+      max-width: 11ch;
+      margin: 0;
+      font-family: var(--display);
+      font-size: clamp(2.8rem, 5.4vw + 0.6rem, 5rem);
+      font-weight: 400;
+      letter-spacing: -0.025em;
+      line-height: 1;
+    }
+    .lede { max-width: 46ch; margin: 20px 0 0; color: var(--ink-2); font-size: 1.12rem; }
+    .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 32px; }
+    .download {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 0 24px;
+      border-radius: var(--radius-control);
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 700;
+      text-decoration: none;
+      transition: background-color 120ms var(--ease);
+    }
+    .download:hover { background: var(--accent-hover); }
+    .download svg { width: 18px; height: 18px; }
+    .download-meta { color: var(--muted); font-size: 0.9rem; }
+    .web-link { margin-top: 18px; color: var(--muted); font-size: 0.92rem; }
+    .web-link a { color: var(--ink-2); text-underline-offset: 3px; }
+
+    .phone {
+      position: relative;
+      width: 260px;
+      aspect-ratio: 9 / 19;
+      justify-self: center;
+      padding: 10px;
+      border: 1px solid var(--rule-2);
+      border-radius: 40px;
+      background: linear-gradient(160deg, #1a2d47, #0a1628);
+      box-shadow: 0 30px 70px -30px rgb(2 8 18 / 90%), inset 0 0 0 2px rgb(2 8 18 / 60%);
+    }
+    .phone__screen {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      overflow: hidden;
+      border-radius: 31px;
+      background:
+        radial-gradient(ellipse 90% 50% at 85% 0%, color-mix(in srgb, var(--sky-blue) 26%, transparent), transparent 70%),
+        var(--paper);
+    }
+    .phone__notch { width: 70px; height: 18px; margin-top: 8px; border-radius: 10px; background: var(--paper-deep); }
+    .phone__tabs { display: flex; gap: 2px; margin-top: 14px; padding: 3px; border-radius: 10px; background: var(--paper-2); font-size: 9px; }
+    .phone__tabs span { padding: 4px 10px; border-radius: 8px; color: var(--muted); }
+    .phone__tabs span:first-child { background: var(--paper-3); color: var(--ink); }
+    .phone__planet { width: 74px; height: 74px; margin-top: 68px; border-radius: 50%; object-fit: cover; filter: drop-shadow(0 10px 22px rgb(2 8 18 / 70%)); }
+    .phone__greeting { margin: 18px 0 0; padding: 0 18px; font-family: var(--display); font-size: 1.4rem; line-height: 1.12; text-align: center; text-wrap: balance; }
+    .phone__composer {
+      position: absolute;
+      right: 12px;
+      bottom: 14px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 40px;
+      padding: 0 6px 0 14px;
+      border: 1px solid var(--rule-2);
+      border-radius: 14px;
+      background: var(--paper-2);
+      color: var(--faint);
+      font-size: 11px;
+    }
+    .phone__composer i { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); }
+
+    /* Desktop visitors get the page on their phone in one scan. */
+    .scan { display: flex; align-items: center; gap: 16px; margin-top: 36px; color: var(--muted); font-size: 0.9rem; }
+    .scan__code { flex: 0 0 auto; width: 92px; height: 92px; padding: 8px; border-radius: 12px; background: #f4f8fc; }
+    .scan__code svg { display: block; width: 100%; height: 100%; }
+    .scan strong { display: block; color: var(--ink); font-weight: 600; }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 0;
+      border-top: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+    }
+    .facts div { padding: 20px 20px 20px 0; }
+    .facts div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
+    .facts dt { color: var(--muted); font-size: 0.82rem; }
+    /* Figures in the sans: Prata's old-style 1 reads as an l in "1.0.1". */
+    .facts dd { margin: 6px 0 0; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    .columns { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; margin-top: 56px; }
+    h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weight: 400; }
+
+    /* Installing is a real sequence, so it is numbered. */
+    .steps { display: grid; gap: 18px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+    .steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; color: var(--ink-2); counter-increment: step; }
+    .steps li::before { content: counter(step); color: var(--accent); font-size: 1.7rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
+    .note { margin: 20px 0 0; padding-left: 54px; color: var(--muted); font-size: 0.9rem; }
+
+    .notes { margin: 0; color: var(--ink-2); }
+    .verify { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--rule); }
+    .verify h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+    .verify p { margin: 6px 0 0; color: var(--muted); font-size: 0.88rem; }
+    .checksum-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; }
+    .checksum {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--paper-deep);
+      color: var(--ink-2);
+      font: 500 0.78rem/1.5 var(--mono);
+      overflow-wrap: anywhere;
+    }
+    .copy {
+      flex: 0 0 auto;
+      min-height: 38px;
+      padding: 0 14px;
+      border: 1px solid var(--rule-2);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--ink-2);
+      font: 600 0.84rem var(--body);
+      cursor: pointer;
+    }
+    .copy:hover { border-color: var(--accent); color: var(--ink); }
+    .command { margin-top: 10px; color: var(--faint); font-size: 0.82rem; }
+    .command code { color: var(--ink-2); font-family: var(--mono); font-size: 0.78rem; }
+
+    .footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 24px;
+      margin-top: 64px;
+      padding-top: 22px;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+    .footer span { margin-right: auto; }
+    .footer a { color: var(--muted); text-underline-offset: 3px; }
+    .footer a:hover { color: var(--ink); }
+
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: minmax(0, 1fr); gap: 40px; padding: 40px 0; }
+      .phone { width: 220px; }
+      .scan { display: none; }
+      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .facts div:nth-child(3) { padding-left: 0; border-left: 0; }
+      .facts div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+      .columns { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+    }
+    @media (max-width: 420px) {
+      .download { width: 100%; justify-content: center; }
+      .facts dd { font-size: 1.12rem; }
+    }
+  </style>
+
+<title>VibhavGPT for Android: Official App Download and Setup</title>
+    <meta name="description" content="Download the official VibhavGPT Android APK from Pansophy LLC, follow installation steps, check device requirements and verify files. Made by Vibhav Thoota.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://vibhavgpt.com/android">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="VibhavGPT">
+    <meta property="og:title" content="VibhavGPT for Android: Official App Download and Setup">
+    <meta property="og:description" content="Download the official VibhavGPT Android APK from Pansophy LLC, follow installation steps, check device requirements and verify files. Made by Vibhav Thoota.">
+    <meta property="og:url" content="https://vibhavgpt.com/android">
+    <meta property="og:image" content="https://vibhavgpt.com/brand/vibhavgpt-icon-512.png">
+    <meta property="og:image:alt" content="VibhavGPT brand icon">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="VibhavGPT for Android: Official App Download and Setup">
+    <meta name="twitter:description" content="Download the official VibhavGPT Android APK from Pansophy LLC, follow installation steps, check device requirements and verify files. Made by Vibhav Thoota.">
+    <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://vibhavgpt.com/home"},{"@type":"ListItem","position":2,"name":"Android","item":"https://vibhavgpt.com/android"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Where should I download the Android app?","acceptedAnswer":{"@type":"Answer","text":"Use the Download APK link on this official VibhavGPT page. Pansophy LLC operates VibhavGPT and distributes this Android release directly. Check the version, device requirements and release notes here before installing. Avoid copies from unfamiliar download sites. The SHA-256 checksum below lets you compare the file you downloaded with the official release."}},{"@type":"Question","name":"Why does Android ask for an installation permission?","acceptedAnswer":{"@type":"Answer","text":"A direct APK download is installed from your browser or file manager. Android may ask you to allow that app to install from this source. Grant the permission only for the official file you have just downloaded, follow the installation prompt, and turn the permission off again afterward if you do not need it. This is a device permission, not a VibhavGPT subscription."}},{"@type":"Question","name":"Can I use the same account on the web and Android?","acceptedAnswer":{"@type":"Answer","text":"Yes. Sign in with your existing VibhavGPT account to use the same projects and saved memory on your phone. Chat, image creation and Study are available according to your plan and allowances. If you prefer not to install an APK, open the browser workspace instead. You can also manage your data and request account deletion through the website without reinstalling the app."}},{"@type":"Question","name":"How do I check the downloaded file?","acceptedAnswer":{"@type":"Answer","text":"Compare its SHA-256 digest with the checksum shown in Verify your download. The commands on this page show how to calculate a digest on a computer. A matching checksum confirms that the file matches this release; it does not change your account permissions. For installation or account questions, contact support@pansophy.com and describe the version and device issue."}}]}]}</script>
+</head>
+<body>
+  <main class="shell">
+    <nav class="nav" aria-label="VibhavGPT">
+      <a class="brand" href="/home"><img src="/brand/vibhavgpt-icon-64.png" alt=""> <span>VibhavGPT</span></a>
+      <a class="nav-link" href="/app">Open workspace</a>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <h1>VibhavGPT for Android</h1>
+        <p class="lede">Chat, create images and study from your phone, with the same account, projects and memory you use on the web.</p>
+        <div class="cta-row">
+          <a class="download" href="https://github.com/Shourya-Thoota/vibhavgpt-releases/releases/latest/download/vibhavgpt-android.apk" download="vibhavgpt-android.apk">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></svg>
+            Download APK
+          </a>
+          <span class="download-meta" id="download-meta">Signed and published by VibhavGPT</span>
+        </div>
+        <p class="web-link">Prefer not to install anything? <a href="/app">Use VibhavGPT in your browser</a>.</p>
+        <div class="scan">
+          <div class="scan__code" role="img" aria-label="QR code for vibhavgpt.com/android">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 29 29" shape-rendering="crispEdges"><path stroke="#04101f" d="M0 0.5h7m1 0h2m1 0h2m2 0h2m1 0h3m1 0h7M0 1.5h1m5 0h1m1 0h1m1 0h3m1 0h2m1 0h1m4 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m2 0h1m1 0h1m1 0h3m2 0h1m1 0h1m1 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h1m2 0h2m3 0h2m1 0h1m2 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m3 0h4m5 0h2m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m3 0h1m1 0h1m1 0h1m2 0h4m1 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h1m2 0h4m2 0h1M0 8.5h1m1 0h2m1 0h3m1 0h2m1 0h3m1 0h3m3 0h1m2 0h1m1 0h2M8 9.5h1m1 0h2m3 0h2m1 0h7m3 0h1M2 10.5h7m1 0h1m1 0h1m1 0h2m1 0h2m4 0h1m2 0h2M0 11.5h3m1 0h2m2 0h1m3 0h4m4 0h3m1 0h1m3 0h1M0 12.5h2m1 0h1m2 0h2m8 0h2m1 0h1m5 0h2M4 13.5h1m2 0h2m3 0h2m3 0h3m1 0h2m3 0h3M2 14.5h1m2 0h2m1 0h2m1 0h1m2 0h1m2 0h1m1 0h4m1 0h1m1 0h3M1 15.5h5m2 0h1m2 0h3m1 0h1m2 0h2m1 0h2m1 0h1m2 0h1M2 16.5h1m2 0h3m1 0h2m1 0h1m5 0h1m1 0h2m1 0h3m1 0h1M1 17.5h1m5 0h1m4 0h2m3 0h1m2 0h1m2 0h1m1 0h3M0 18.5h1m2 0h2m1 0h2m1 0h4m4 0h1m5 0h2m1 0h1M4 19.5h1m2 0h2m1 0h2m3 0h5m1 0h4m1 0h1M1 20.5h2m3 0h1m1 0h2m3 0h1m1 0h1m1 0h2m1 0h7M8 21.5h1m1 0h1m1 0h4m1 0h2m1 0h1m3 0h5M0 22.5h7m1 0h3m2 0h1m2 0h2m1 0h2m1 0h1m1 0h2m1 0h1M0 23.5h1m5 0h1m1 0h2m1 0h1m4 0h1m1 0h3m3 0h2m1 0h2M0 24.5h1m1 0h3m1 0h1m3 0h2m2 0h2m1 0h1m2 0h5m1 0h1m1 0h1M0 25.5h1m1 0h3m1 0h1m1 0h1m2 0h2m1 0h1m1 0h2m2 0h2m1 0h3m1 0h1M0 26.5h1m1 0h3m1 0h1m1 0h1m1 0h1m4 0h2m1 0h1m2 0h1m1 0h1m2 0h1m1 0h1M0 27.5h1m5 0h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h4m3 0h1m1 0h1M0 28.5h7m1 0h3m4 0h1m1 0h1m1 0h2m4 0h1m1 0h1"/></svg>
+          </div>
+          <p><strong>On a computer?</strong> Scan this with your phone's camera to open this page there.</p>
+        </div>
+      </div>
+
+      <div class="phone" aria-hidden="true">
+        <div class="phone__screen">
+          <span class="phone__notch"></span>
+          <div class="phone__tabs"><span>Chat</span><span>Image</span><span>Study</span></div>
+          <img class="phone__planet" src="/planets/earth.webp" alt="">
+          <p class="phone__greeting">Ready when you are</p>
+          <div class="phone__composer">Ask anything<i></i></div>
+        </div>
+      </div>
+    </section>
+
+    <dl class="facts" aria-label="Release details">
+      <div><dt>Version</dt><dd id="version">Loading…</dd></div>
+      <div><dt>Released</dt><dd id="date">Loading…</dd></div>
+      <div><dt>Download size</dt><dd id="size">Loading…</dd></div>
+      <div><dt>Requires</dt><dd id="requirements">Loading…</dd></div>
+    </dl>
+
+    <div class="columns">
+      <section aria-labelledby="install-title">
+        <h2 id="install-title">Install in three steps</h2>
+        <ol class="steps">
+          <li>Download the APK, then open it from your browser or your Downloads app.</li>
+          <li>If Android asks, allow your browser or file manager to install apps from this source.</li>
+          <li>Follow the install prompt, then open VibhavGPT and sign in.</li>
+        </ol>
+        <p class="note" id="requirement-note">Only install APKs downloaded from this official VibhavGPT address. You can turn the browser permission off again after installation.</p>
+      </section>
+
+      <section aria-labelledby="notes-title">
+        <h2 id="notes-title">What's new</h2>
+        <p class="notes" id="notes">Loading release notes…</p>
+        <div class="verify">
+          <h3>Verify your download</h3>
+          <p>The SHA-256 checksum of the file should match this exactly.</p>
+          <div class="checksum-row">
+            <span class="checksum" id="checksum">Loading…</span>
+            <button class="copy" type="button" id="copy-checksum">Copy</button>
+          </div>
+          <p class="command">On a computer: <code>shasum -a 256 vibhavgpt-android.apk</code>, or on Windows <code>certutil -hashfile vibhavgpt-android.apk SHA256</code></p>
+        </div>
+      </section>
+    </div>
+
+    <!-- public-faq -->
+      <footer class="footer">
+      <span>VibhavGPT, operated by Pansophy LLC</span>
+      <a href="/guarantee">The VibhavGPT Guarantee</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms</a>
+      <a href="/account-deletion">Account deletion</a>
+      <small>Made by Vibhav Thoota</small>
+      </footer>
+  </main>
+  <script>
+    fetch('/android/version.json', { cache: 'no-store' }).then(function (response) { return response.ok ? response.json() : null; }).then(function (release) {
+      if (!release) return;
+      document.getElementById('version').textContent = release.versionName + ' (' + release.versionCode + ')';
+      document.getElementById('date').textContent = new Date(release.releaseDate + 'T12:00:00Z').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      document.getElementById('size').textContent = String(release.fileSize).replace(/\s*\(.*\)$/, '');
+      document.getElementById('requirements').textContent = release.androidRequirements;
+      document.getElementById('notes').textContent = release.releaseNotes;
+      document.getElementById('checksum').textContent = release.sha256;
+      document.getElementById('download-meta').textContent = 'Version ' + release.versionName + ', ' + String(release.fileSize).replace(/\s*\(.*\)$/, '');
+      document.getElementById('requirement-note').textContent = release.officialNote || 'Only install APKs downloaded from this official VibhavGPT address.';
+    }).catch(function () {});
+    document.getElementById('copy-checksum').addEventListener('click', function () {
+      var button = this;
+      var text = document.getElementById('checksum').textContent;
+      if (!navigator.clipboard) return;
+      navigator.clipboard.writeText(text).then(function () {
+        button.textContent = 'Copied';
+        setTimeout(function () { button.textContent = 'Copy'; }, 1800);
+      }).catch(function () {});
+    });
+  </script>
+</body>
+</html>

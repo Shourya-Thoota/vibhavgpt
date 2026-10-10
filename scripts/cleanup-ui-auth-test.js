@@ -1,0 +1,15 @@
+import { pool } from "../src/db/client.js";
+const email = process.env.TEST_EMAIL;
+if (!email) throw new Error("TEST_EMAIL is required.");
+const result = await pool.query('SELECT id FROM "user" WHERE email = $1', [email]);
+if (result.rowCount !== 1) throw new Error("The temporary test account was not found uniquely.");
+const userId = result.rows[0].id;
+await pool.query("DELETE FROM usage_events WHERE user_id = $1", [userId]);
+await pool.query("DELETE FROM subscriptions WHERE user_id = $1", [userId]);
+await pool.query("DELETE FROM memory_facts WHERE user_id = $1", [userId]);
+await pool.query("DELETE FROM user_profiles WHERE user_id = $1", [userId]);
+await pool.query("DELETE FROM conversations WHERE user_id = $1", [userId]);
+const deleted = await pool.query('DELETE FROM "user" WHERE id = $1', [userId]);
+if (deleted.rowCount !== 1) throw new Error("The temporary test account could not be deleted.");
+console.log(JSON.stringify({ testAccountAndDataDeleted: true }));
+await pool.end();

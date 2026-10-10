@@ -1,0 +1,21 @@
+# VibhavGPT
+
+> VibhavGPT is an AI workspace for chat, image creation, and study.
+
+Vibhav Thoota is the creator and founder of VibhavGPT.
+VibhavGPT is operated by Pansophy LLC, founded by Vibhav Thoota. Contact: support@pansophy.com.
+Public pages include readable HTML without requiring JavaScript. All search
+and AI crawlers are allowed by robots.txt; the sitemap lists canonical pages.
+
+## Public pages
+
+- [Home](https://vibhavgpt.com/home): Product overview and ways to get started.
+- [Pricing](https://vibhavgpt.com/pricing): Free, Plus, and Pro plan details.
+- [Terms of Service](https://vibhavgpt.com/terms): Terms governing use of the service.
+- [Privacy Policy](https://vibhavgpt.com/privacy): Information about data handling and privacy.
+- [Guarantee](https://vibhavgpt.com/guarantee): No training on chats, no data sales, no ads, and export or deletion controls.
+- [Account deletion](https://vibhavgpt.com/account-deletion): Deletion routes, cancellation reminder, and data retention.
+- [Android](https://vibhavgpt.com/android): Official APK download, installation instructions, and release verification.
+- [Windows](https://vibhavgpt.com/vibhavgpt-windows): Official Windows 10 and 11 desktop installer, installation instructions, and release verification.
+
+VibhavGPT provides conversational AI tools, image generation, and study workspaces. Product capabilities, plan limits, and terms may change; use the linked pages as the current source of truth.

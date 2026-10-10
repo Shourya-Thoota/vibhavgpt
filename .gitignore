@@ -1,0 +1,70 @@
+# Dependencies and build artifacts
+node_modules/
+dist/
+dist-ssr/
+coverage/
+
+# Environment files (the example file is safe to commit)
+.env
+.env.*
+!.env.example
+*.local
+.stripe-test-key
+.modal-test-key
+.modal-token-id
+.modal-token-secret
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor and operating-system files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+.tmp/
+.vscode/
+previous/
+previews/
+
+# Local-only files: assistant settings and the dev preview mock
+.claude/
+frontend/src/dev-preview-mock.js
+
+# Credentials, signing files and release binaries (never commit these).
+# Local key files
+.*-test-key
+.*-key
+*.key
+*.pem
+id_rsa*
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+# Android signing, in any directory (mobile-capacitor/ included)
+*.jks
+*.keystore
+keystore.properties
+signing.properties
+direct-signing.properties
+local.properties
+# Release binaries. Downloads are published outside git; new files under
+# frontend/public/downloads/ stay untracked.
+*.aab
+*.apk
+*.exe
+*.blockmap
+frontend/public/downloads/*
+# Firebase CLI cache
+.firebase/

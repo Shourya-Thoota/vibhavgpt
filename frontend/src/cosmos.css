@@ -1,0 +1,298 @@
+/* ==========================================================================
+   Cosmos: the workspace-wide visual pass (Chat, Study, and the shared
+   chrome around Image and Settings).
+
+   Loaded from App.jsx, so it lands after styles.css and planetary.css and
+   wins at equal specificity. Every value is a theme token.
+
+   What it changes, and why:
+   - The sky. One deep-blue wash high on the right, a faint cyan one low on
+     the left, and a sparse starfield on Deep Space only. It replaces the
+     single flat accent glow, so the navy reads as night sky, not a panel.
+   - Labels. Tracked-out capitals become quiet sentence-case labels: the
+     content is the hierarchy, not the chrome above it.
+   - Answers. Headings inside replies take the display serif, tables lose
+     their grid in favour of rules, and code sits in the deepest well.
+   ========================================================================== */
+
+/* --- Sky ------------------------------------------------------------------ */
+
+.workspace,
+.legal,
+.boot {
+  background-color: var(--color-paper);
+  background-image:
+    radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--color-sky-blue) 20%, transparent), transparent 62%),
+    radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 66%);
+  background-attachment: fixed;
+}
+
+/* Stars are tiny, sparse and still: two offset dot grids that never line
+   up into a pattern at reading distance. Deep Space only; Daybreak's sky is
+   daylight. */
+:root[data-theme="dark"] .workspace,
+:root[data-theme="dark"] .legal {
+  background-image:
+    radial-gradient(1px 1px at 37px 61px, var(--color-star), transparent 100%),
+    radial-gradient(1px 1px at 173px 211px, var(--color-star), transparent 100%),
+    radial-gradient(1.5px 1.5px at 251px 97px, var(--color-star-bright), transparent 100%),
+    radial-gradient(1px 1px at 89px 263px, var(--color-star), transparent 100%),
+    radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--color-sky-blue) 20%, transparent), transparent 62%),
+    radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 66%);
+  background-size: 293px 293px, 347px 347px, 409px 409px, 331px 331px, auto, auto;
+}
+
+/* The sidebar is the same night, one step deeper, not a grey panel. */
+.sidebar {
+  border-right: var(--rule-fine) solid var(--color-rule);
+  background: color-mix(in srgb, var(--color-paper-deep) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+/* --- Labels --------------------------------------------------------------- */
+
+.ui-eyebrow,
+.ui-menu__label,
+.sources > summary,
+.conversation-history__head,
+.memory-section__label,
+.usage-hero__eyebrow,
+.usage-cap > span,
+.usage-model__name,
+.usage-notice__eyebrow,
+.add-sheet__label {
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.ui-menu__label { color: var(--color-faint); font-weight: 500; }
+.tag { letter-spacing: 0; text-transform: none; font-size: 0.7rem; }
+
+/* --- Chat header ---------------------------------------------------------- */
+
+.chat__header-title strong {
+  min-width: 0;
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chat__header-title span { flex: 0 0 auto; }
+
+/* --- Greeting ------------------------------------------------------------- */
+
+/* The name is part of the sentence, not a highlighted word. */
+.opening__title em { color: inherit; }
+
+/* --- Answers -------------------------------------------------------------- */
+
+.prose h1,
+.prose h2 {
+  margin: 26px 0 10px;
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: var(--leading-snug);
+}
+.prose h1 { font-size: 1.4rem; }
+.prose h2 { font-size: 1.22rem; }
+.prose h3 { margin: 20px 0 8px; font-size: 0.98rem; font-weight: 650; }
+.prose strong { color: var(--color-ink); font-weight: 650; }
+.prose li::marker { color: var(--color-muted); }
+
+.prose .table-scroll { max-width: 100%; margin: 16px 0; overflow-x: auto; }
+.prose table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+}
+.prose th,
+.prose td {
+  padding: 9px 18px 9px 0;
+  border: 0;
+  border-bottom: var(--rule-fine) solid var(--color-rule);
+  vertical-align: top;
+}
+.prose th {
+  border-bottom-color: var(--color-rule-2);
+  background: none;
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+.prose tr:last-child td { border-bottom: 0; }
+
+.code-block {
+  border-color: var(--color-rule);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-deep);
+}
+.code-block__header { min-height: 36px; border-bottom-color: var(--color-rule); }
+.code-block__copy { border-color: transparent; }
+.code-block__copy:hover { background: var(--color-paper-3); }
+.prose :not(pre) > code { background: var(--color-paper-3); color: var(--color-ink); }
+
+.prose blockquote {
+  border-left-color: var(--color-accent);
+  color: var(--color-ink-2);
+  font-style: normal;
+}
+
+.sources { border-top-style: solid; border-top-color: var(--color-rule); }
+
+/* --- Thread rhythm -------------------------------------------------------- */
+
+/* More air between exchanges than inside one, so a long thread reads as a
+   sequence of question-and-answer pairs. */
+.chat__thread { gap: 34px; }
+.turn--user + .turn { margin-top: -14px; }
+/* An answer has no box, so it needs no padding inside one. The hover tools
+   row keeps its space (it must not shift the thread when it appears) but
+   tucks up under the last line. */
+.bubble--assistant { padding-block: 2px 0; }
+.bubble--assistant .thinking-tool { margin-bottom: 0; }
+.turn__tools { margin-top: -4px; }
+.bubble--user {
+  border-color: var(--color-rule);
+  background: var(--color-paper-3);
+}
+
+/* --- Dropdowns ------------------------------------------------------------ */
+
+/* Every dropdown is held to the model picker's standard: one raised panel,
+   roomy rounded rows, the option's name in the display serif with a muted
+   line of help under it, an accent tint on the chosen row and a check at the
+   right. Tier and plan notes are quiet text, never caps pills. The model
+   picker's own rules (composer.css) build on these. */
+.ui-popover {
+  border-color: var(--color-rule-2);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-raised);
+  box-shadow: var(--shadow-pop);
+}
+.ui-select__list { min-width: 240px; padding: var(--space-2xs); }
+.ui-option {
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-input);
+  font-size: 0.88rem;
+}
+.ui-option + .ui-option { margin-top: var(--space-3xs); }
+.ui-option[data-active] { background: var(--color-paper-3); }
+.ui-option[aria-selected="true"] { background: color-mix(in srgb, var(--color-accent) 9%, transparent); }
+.ui-option[aria-selected="true"][data-active] { background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-3)); }
+.ui-option[aria-disabled="true"] { opacity: 1; }
+.ui-option[aria-disabled="true"] .ui-option__label,
+.ui-option[aria-disabled="true"] .ui-option__body small { color: var(--color-faint); }
+.ui-option__body { gap: var(--space-3xs); }
+.ui-option__label {
+  gap: var(--space-xs);
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 400;
+  line-height: 1.25;
+}
+.ui-option__label svg { color: var(--color-muted); }
+.ui-option__body small { color: var(--color-ink-2); font-size: 0.79rem; line-height: 1.4; }
+.ui-option__check { margin-top: 3px; }
+.ui-option__badge,
+.ui-option__badge[data-tone] {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* Triggers: a quiet field that takes the accent only while open. */
+.ui-select__trigger {
+  border-color: var(--color-rule-2);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-2);
+}
+.ui-select__trigger:hover:not(:disabled) { border-color: var(--color-accent-line); }
+.ui-select[data-open] .ui-select__trigger { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 18%, transparent); }
+.ui-select__trigger:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.ui-select--sm .ui-select__trigger { border-color: transparent; background: var(--color-paper-3); }
+
+/* Segmented controls match the studio's: the chosen option is outlined in
+   the accent on a raised step, not lifted by a shadow. */
+.ui-segmented { border-color: var(--color-rule); border-radius: var(--radius-pill); background: var(--color-paper-3); }
+.ui-segmented__option { border-radius: 11px; }
+.ui-segmented__option[aria-checked="true"] {
+  background: var(--color-paper-raised);
+  box-shadow: inset 0 0 0 var(--rule-fine) var(--color-accent-line);
+}
+
+/* --- Menus ---------------------------------------------------------------- */
+
+/* Action menus (the composer's "+", the account menu, row actions) share the
+   pickers' rows: an icon in a small tile, the name with an optional line of
+   help, and a tint plus a check on the current choice. */
+.ui-menu__panel { min-width: 232px; padding: var(--space-2xs); }
+.ui-menu__item {
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 40px;
+  padding: 6px 10px 6px 6px;
+  border-radius: var(--radius-input);
+  color: var(--color-ink);
+  font-size: 0.9rem;
+}
+.ui-menu__item + .ui-menu__item { margin-top: var(--space-3xs); }
+.ui-menu__item > span.ui-menu__icon { flex: 0 0 auto; }
+.ui-menu__icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-icon);
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+  transition: color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+}
+.ui-menu__item svg { color: inherit; }
+.ui-menu__text { display: grid; flex: 1; gap: 1px; min-width: 0; text-align: left; }
+.ui-menu__name { color: var(--color-ink); font-weight: 500; line-height: 1.3; }
+.ui-menu__item[data-rich] { min-height: 50px; }
+.ui-menu__item[data-rich] .ui-menu__name {
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 400;
+  line-height: 1.2;
+}
+.ui-menu__description { color: var(--color-muted); font-size: 0.78rem; line-height: 1.35; }
+.ui-menu__check { flex: 0 0 auto; color: var(--color-accent); }
+.ui-menu__chevron { flex: 0 0 auto; color: var(--color-faint); }
+
+.ui-menu__item:hover:not(:disabled),
+.ui-menu__item:focus-visible { background: var(--color-paper-3); outline: 0; }
+.ui-menu__item:hover:not(:disabled) .ui-menu__icon,
+.ui-menu__item:focus-visible .ui-menu__icon { border-color: var(--color-accent-line); color: var(--color-accent); }
+.ui-menu__item[aria-checked="true"] { background: color-mix(in srgb, var(--color-accent) 9%, transparent); }
+.ui-menu__item[aria-checked="true"] .ui-menu__icon {
+  border-color: var(--color-accent-line);
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
+  color: var(--color-accent);
+}
+.ui-menu__item[aria-checked="true"]:hover:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-3)); }
+.ui-menu__item:disabled { opacity: 0.5; }
+.ui-menu__item[data-tone="danger"] .ui-menu__name,
+.ui-menu__item[data-tone="danger"] .ui-menu__icon { color: var(--color-danger); }
+.ui-menu__item[data-tone="danger"]:hover:not(:disabled) { background: color-mix(in srgb, var(--color-danger) 10%, transparent); }
+.ui-menu__item[data-tone="danger"]:hover:not(:disabled) .ui-menu__icon { border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); color: var(--color-danger); }
+.ui-menu__separator { margin: var(--space-2xs) var(--space-xs); background: var(--color-rule); }
+.ui-menu__label { padding: var(--space-xs) 10px var(--space-2xs); }
+.composer__add .ui-menu__panel { min-width: 288px; }

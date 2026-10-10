@@ -1,0 +1,395 @@
+/* ==========================================================================
+   Vibhav: the VibhavGPT theme, written in the Anti-Slop token schema.
+
+   Source of truth for every colour, length, radius, rule, depth, layer,
+   type size and motion value in the product. Components read these names
+   and nothing else; a raw hex, rgb(), px radius or ms duration in a
+   component is a bug to be fixed here, by adding a token first.
+
+   Structure (schema names first, then Vibhav-only extensions, then the
+   legacy aliases that keep the pre-redesign stylesheets working until each
+   page is rebuilt on the schema names):
+
+     1. Shared tokens        spacing, radius, rules, layers, type, layout,
+                             motion, identical in both skies
+     2. Deep Space (dark)    the default sky; also the un-themed first paint
+     3. Daybreak (light)     the same system seen at dawn
+     4. Universes            Orbit cyan, Nebula violet, Mars copper (plus the
+                             two older accents still offered in Settings),
+                             chosen with data-accent on <html>
+     5. Legacy aliases       --paper, --line, --r-*, --t-* … → schema names
+
+   Sky is data-theme on <html> ("dark" | "light"); universe is data-accent.
+   Both are set before first paint by the boot script in each HTML entry, so
+   a reader who chose Nebula never sees a flash of cyan.
+
+   Anti-Slop rules applied in the values themselves:
+   - No #000 or #fff anywhere. Every neutral, rule, shadow and highlight
+     carries a trace of the navy hue; "white" alphas are ink-tinted.
+   - One accent per view. The universe swaps which accent that is; it never
+     adds a second.
+   - No glow as depth on dark: shadow-card is none in Deep Space, where depth
+     reads from the paper steps and rules.
+   - Shape is Vellum-soft (18px cards, 14px controls) through the radius
+     tokens only; no component writes its own radius. A true circle is a
+     different shape from a pill and has its own token, --radius-round.
+   ========================================================================== */
+
+/* --- 1. Shared tokens ---------------------------------------------------- */
+
+:root {
+  /* Spacing: the only lengths a layout may use. Vary them inside a layout. */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6.5rem;
+  --space-4xl: 10rem;
+  --space-5xl: 13rem;
+  --section-gap: 6.5rem;
+  --section-head-gap: 1.5rem;
+
+  /* Shape: Vellum-soft. Controls (buttons, tabs, chips, toggles, inputs,
+     dropdown triggers) take 14px; cards and panels (including the composer,
+     sheets and message bubbles) take 18px. Soft, never a 999px blob: on a
+     control taller than 28px the ends stay visibly cornered. */
+  --radius-card: 18px;
+  --radius-pill: 14px;
+  --radius-input: 14px;
+  /* Vibhav extensions. Logo and icon tiles (24 to 40px squares) take a
+     proportional 10px; inline marks (inline code, kbd, favicons, small
+     thumbnails inside a row) take 6px so they never balloon into pills. */
+  --radius-icon: 10px;
+  --radius-mark: 6px;
+  /* Dots, avatars, switch knobs, circular icon buttons and planet orbs are
+     circles, not pills, so they never inherit the pill radius. */
+  --radius-round: 50%;
+  /* The thinking indicator's two organic shapes: a morphing activity mark,
+     not a corner radius. */
+  --shape-blob-a: 38% 62% 58% 42%;
+  --shape-blob-b: 45% 55% 36% 64%;
+
+  /* Rules: border weights. */
+  --rule-hair: 0.5px;
+  --rule-fine: 1px;
+  --rule-card: 1px;
+
+  /* Layers. Nothing in the product goes above --z-tooltip. */
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+
+  /* Type families, by key. Prata carries display and the wordmark, Hanken
+     Grotesk carries body, Geist Mono is the outlier for labels and figures.
+     All three are self-hosted (public/fonts/v1/fonts.css). */
+  --font-display: "Prata", Georgia, "Times New Roman", serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Type scale. Display sizes are fluid; the rest are fixed steps. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.125rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.25rem;
+  --text-3xl: 2.75rem;
+  --text-display: clamp(3rem, 5.5vw + 1rem, 5.75rem);
+  --text-display-s: clamp(2rem, 3vw + 1rem, 3rem);
+
+  /* Leading and tracking, from the type styles in tokens.json. */
+  --leading-display: 1.02;
+  --leading-snug: 1.18;
+  --leading-body: 1.45;
+  --leading-read: 1.6;
+  --tracking-display: -0.025em;
+  --tracking-label: 0.12em;
+
+  /* Layout. */
+  --page-max: 76rem;
+  --page-gutter: clamp(1.25rem, 4vw, 3rem);
+  --measure: 62ch;
+  --banner-height: 44px;
+  /* Vibhav extension: the chat reading column, fixed by the Vellum shell. */
+  --chat-column: 700px;
+  /* Vibhav extension: the workspace sidebar's open width. The collapsed
+     rail overrides it locally (.workspace[data-collapsed]). */
+  --sidebar-w: 268px;
+  /* Vibhav extension: the workspace sidebar. The current shell's width; the
+     Vellum rail-plus-Chats layout replaces it in the chat-shell phase. */
+  --sidebar-w: 268px;
+
+  /* Motion. Three durations, three curves; no bounce or elastic anywhere.
+     Exits run about 75% of the matching enter. */
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Derived accent tints. They read --color-accent, so a universe or sky
+     change retints them with no extra rules. */
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
+  --color-accent-line: color-mix(in srgb, var(--color-accent) 32%, var(--color-rule));
+}
+
+/* --- 2. Deep Space (dark) ------------------------------------------------ */
+
+/* Dark is also the un-themed default, so a paint before the boot script runs
+   shows the night sky rather than a light flash. */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Paper steps: page → cards → wells and hovered rows. */
+  --color-paper: #071227;
+  --color-paper-2: #0c1c33;
+  --color-paper-3: #12253e;
+  /* Vibhav extensions to the ladder: the canvas under the shell, a fourth
+     step for selected rows, and the surface menus and dialogs sit on. */
+  --color-paper-deep: #04101f;
+  --color-paper-4: #1a3350;
+  --color-paper-raised: #152a47;
+
+  /* Ink ladder, strongest first. Neutral sits between ink-2 and muted;
+     faint (Vibhav extension) is the quietest text step, still 6.7:1 here. */
+  --color-ink: #f4f8fc;
+  --color-ink-2: #c3d2e3;
+  --color-neutral: #aebfd2;
+  --color-muted: #9aadc2;
+  --color-faint: #8b9db0;
+
+  /* Rules are ink at low alpha, not white: a hairline keeps the sky's hue.
+     rule-2 is 1.8:1 on paper: a divider weight, never a control's only
+     boundary (controls use --color-muted or stronger). */
+  --color-rule: rgb(244 248 252 / 10%);
+  --color-rule-2: rgb(244 248 252 / 20%);
+
+  --color-accent-ink: #04101f;
+
+  /* Status. Always paired with a word or icon; colour never carries the
+     meaning alone. */
+  --color-positive: #79dcad;
+  --color-positive-soft: #0f2a24;
+  --color-danger: #ff8f7d;
+  --color-danger-soft: #2c1a17;
+  --color-warn-soft: #2a2314;
+
+  /* Depth. Cards get none on dark; depth reads from the paper steps. The
+     other steps exist for floating layers (menus, dialogs, sheets) only. */
+  --shadow-card: none;
+  --shadow-sm: 0 1px 2px rgb(2 8 18 / 45%);
+  --shadow-md: 0 8px 24px -8px rgb(2 8 18 / 60%);
+  --shadow-lg: 0 26px 60px -22px rgb(2 8 18 / 75%);
+  --shadow-pop: 0 20px 50px -16px rgb(2 8 18 / 70%);
+
+  /* Cosmic decoration that is not a surface. */
+  --color-planet-shadow: rgb(2 8 18 / 15%);
+  --color-star: rgb(244 248 252 / 40%);
+  --color-star-bright: rgb(244 248 252 / 60%);
+  --color-sheen: rgb(244 248 252 / 16%);
+  --color-scrim: rgb(2 8 18 / 62%);
+  --color-planet-venus: #e8bc75;
+  --color-planet-mars: #e6a17c;
+  /* The deep blue of the sky washes behind the workspace. Decoration only:
+     never a control, a text colour, or a second accent. */
+  --color-sky-blue: #2c63e8;
+
+  /* Universe palettes for this sky. --color-accent is chosen from these in
+     section 4. Each is 6.7:1 or better on --color-paper
+     (Nebula is the lowest at 6.75:1) and 4.9:1 or better on accent-soft. */
+  --color-accent-cerulean: #5fd0e1;
+  --color-accent-cerulean-hover: #79dce8;
+  --color-accent-nebula: #9b8cff;
+  --color-accent-nebula-hover: #b0a4ff;
+  --color-accent-ember: #ffad87;
+  --color-accent-ember-hover: #ffc2a3;
+  --color-accent-pine: #79dcad;
+  --color-accent-pine-hover: #94e6c0;
+  --color-accent-amber: #f0c674;
+  --color-accent-amber-hover: #f5d492;
+}
+
+/* --- 3. Daybreak (light) ------------------------------------------------- */
+
+/* Not white: the grounds keep a cool blue cast so the planets still read as
+   sky. Elevation inverts here: a soft shadow does what paper steps do in
+   the dark. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-paper: #eef2f9;
+  --color-paper-2: #fcfdff;
+  --color-paper-3: #f2f6fc;
+  --color-paper-deep: #e4eaf4;
+  --color-paper-4: #e7eefa;
+  --color-paper-raised: #fcfdff;
+
+  --color-ink: #0c1a2e;
+  --color-ink-2: #35475e;
+  --color-neutral: #3f5064;
+  --color-muted: #4a596b;
+  --color-faint: #586a80;
+
+  --color-rule: rgb(12 26 46 / 11%);
+  --color-rule-2: rgb(12 26 46 / 19%);
+
+  --color-accent-ink: #f8fbff;
+
+  --color-positive: #0f7a52;
+  --color-positive-soft: #e3f5ec;
+  --color-danger: #c23d24;
+  --color-danger-soft: #fdeae5;
+  --color-warn-soft: #fbf2da;
+
+  --shadow-card: 0 1px 2px rgb(16 31 51 / 7%);
+  --shadow-sm: 0 1px 2px rgb(16 31 51 / 7%);
+  --shadow-md: 0 8px 24px -8px rgb(16 31 51 / 15%);
+  --shadow-lg: 0 26px 60px -22px rgb(16 31 51 / 26%);
+  --shadow-pop: 0 20px 50px -16px rgb(16 31 51 / 20%);
+
+  --color-planet-shadow: rgb(16 31 51 / 18%);
+  --color-star: rgb(12 26 46 / 22%);
+  --color-star-bright: rgb(12 26 46 / 34%);
+  --color-sheen: rgb(252 253 255 / 70%);
+  --color-scrim: rgb(20 32 52 / 34%);
+  --color-planet-venus: #b07d1d;
+  --color-planet-mars: #bc5526;
+  --color-sky-blue: #6f95e6;
+
+  /* The dark-sky accents are pastels tuned for navy; on paper they fail
+     contrast, so each has a deeper twin. Each light value is the lightest
+     point on its hue that clears 4.5:1 as text on paper, as text on
+     --color-accent-soft, and as a fill under --color-accent-ink. */
+  --color-accent-cerulean: #0c6a7d;
+  --color-accent-cerulean-hover: #0b5d6e;
+  --color-accent-nebula: #5b45d6;
+  --color-accent-nebula-hover: #503dbc;
+  --color-accent-ember: #9f431e;
+  --color-accent-ember-hover: #8c3b1a;
+  --color-accent-pine: #0e6f4b;
+  --color-accent-pine-hover: #0c6242;
+  --color-accent-amber: #7e5908;
+  --color-accent-amber-hover: #6f4e07;
+}
+
+/* --- 4. Universes -------------------------------------------------------- */
+
+/* The universe picks which accent is THE accent. Because these read the
+   per-sky palette above, switching sky retints the accent with no extra
+   rule. Orbit cyan is the default and the un-themed first paint. */
+:root,
+:root[data-accent="cerulean"] {
+  --color-accent: var(--color-accent-cerulean);
+  --color-accent-hover: var(--color-accent-cerulean-hover);
+}
+:root[data-accent="nebula"] {
+  --color-accent: var(--color-accent-nebula);
+  --color-accent-hover: var(--color-accent-nebula-hover);
+}
+:root[data-accent="ember"] {
+  --color-accent: var(--color-accent-ember);
+  --color-accent-hover: var(--color-accent-ember-hover);
+}
+:root[data-accent="pine"] {
+  --color-accent: var(--color-accent-pine);
+  --color-accent-hover: var(--color-accent-pine-hover);
+}
+:root[data-accent="amber"] {
+  --color-accent: var(--color-accent-amber);
+  --color-accent-hover: var(--color-accent-amber-hover);
+}
+
+:root {
+  /* Focus follows the accent: 6.7:1 or better on Deep Space paper and
+     5.5:1 or better on Daybreak paper for every universe. */
+  --color-focus: var(--color-accent);
+}
+
+/* --- 5. Legacy aliases --------------------------------------------------- */
+
+/* The pre-redesign stylesheets read these names. Each is now a pointer to a
+   schema token, so the values above are the only place a colour or length
+   is defined. As each page is rebuilt it switches to the schema names, and
+   an alias is deleted once nothing reads it. */
+:root {
+  /* Surfaces */
+  --paper: var(--color-paper);
+  --paper-deep: var(--color-paper-deep);
+  --surface: var(--color-paper-2);
+  --surface-2: var(--color-paper-3);
+  --surface-3: var(--color-paper-4);
+  --surface-raised: var(--color-paper-raised);
+
+  /* Text */
+  --ink: var(--color-ink);
+  --ink-2: var(--color-ink-2);
+  --muted: var(--color-muted);
+  --faint: var(--color-faint);
+
+  /* Rules */
+  --line: var(--color-rule);
+  --line-strong: var(--color-rule-2);
+
+  /* Accent */
+  --accent: var(--color-accent);
+  --accent-hover: var(--color-accent-hover);
+  --accent-ink: var(--color-accent-ink);
+  --accent-soft: var(--color-accent-soft);
+  --accent-line: var(--color-accent-line);
+  /* Retained only until the pages that still glow are rebuilt: glow is not
+     a depth cue in this system. */
+  --accent-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
+
+  /* Status */
+  --positive: var(--color-positive);
+  --positive-soft: var(--color-positive-soft);
+  --danger: var(--color-danger);
+  --danger-soft: var(--color-danger-soft);
+  --warn-soft: var(--color-warn-soft);
+
+  /* Decoration */
+  --planet-shadow: var(--color-planet-shadow);
+  --star: var(--color-star);
+  --star-bright: var(--color-star-bright);
+  --sheen: var(--color-sheen);
+  --scrim: var(--color-scrim);
+  --planet-venus: var(--color-planet-venus);
+  --planet-mars: var(--color-planet-mars);
+
+  /* Radius. The old six-step scale collapses onto the theme's: the two
+     small steps were controls and take the control radius, every panel
+     step takes the card radius, and the old fully-round pill becomes the
+     theme's 14px pill. */
+  --r-xs: var(--radius-input);
+  --r-sm: var(--radius-pill);
+  --r-md: var(--radius-card);
+  --r-lg: var(--radius-card);
+  --r-xl: var(--radius-card);
+  --r-pill: var(--radius-pill);
+
+  /* Motion. The overshooting curves (--spring, --bounce) resolve to the
+     plain entering curve: no bounce or elastic easing on UI. */
+  --t-fast: var(--dur-micro);
+  --t-base: var(--dur-short);
+  --t-slow: var(--dur-long);
+  --t-enter: var(--dur-long);
+  --ease: var(--ease-out);
+  --spring: var(--ease-out);
+  --bounce: var(--ease-out);
+
+  /* Type */
+  --font-ui: var(--font-body);
+  --font-logo: var(--font-display);
+}

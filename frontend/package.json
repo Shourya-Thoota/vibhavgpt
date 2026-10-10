@@ -1,0 +1,36 @@
+{
+  "name": "vibhavgpt-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --configLoader runner",
+    "build": "vite build --configLoader runner && node scripts/prerender-public.js"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "^1.7.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.2",
+    "@sentry/react": "^10.73.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@tabler/icons-react": "^3.48.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "better-auth": "^1.7.2",
+    "clsx": "^2.1.1",
+    "katex": "^0.18.7",
+    "lucide-react": "^1.40.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "tailwind-merge": "^3.7.0",
+    "vite": "^7.1.7"
+  }
+}

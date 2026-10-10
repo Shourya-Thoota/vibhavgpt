@@ -1,0 +1,9 @@
+{
+  "appId": "com.pansophy.vibhavgpt.direct",
+  "appName": "VibhavGPT",
+  "webDir": "www",
+  "server": {
+    "url": "https://vibhavgpt.com/?distribution=direct&versionCode=3",
+    "cleartext": false
+  }
+}

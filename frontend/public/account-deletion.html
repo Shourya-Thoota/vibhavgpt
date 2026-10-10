@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="preload" href="/fonts/v1/prata/prata-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/v1/hanken-grotesk/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/fonts/v1/fonts.css" />
+    <script src="/theme/appearance-boot.js"></script>
+    <script src="/theme/page-scroll-boot.js"></script>
+    <link rel="stylesheet" href="/theme/vibhav.css">
+    <link rel="stylesheet" href="/theme/public-pages.css">
+<style>
+      :root {
+      --paper-2: var(--color-paper-2);
+      --paper-3: var(--color-paper-3);
+      --rule: var(--color-rule);
+      --rule-2: var(--color-rule-2);
+      --sky-blue: var(--color-sky-blue);
+      --display: var(--font-display);
+      --body: var(--font-body);
+      --mono: var(--font-mono);
+    }
+    * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background-color: var(--paper);
+        background-image:
+          radial-gradient(1px 1px at 37px 61px, var(--star), transparent 100%),
+          radial-gradient(1px 1px at 173px 211px, var(--star), transparent 100%),
+          radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--sky-blue) 20%, transparent), transparent 62%);
+        background-size: 293px 293px, 347px 347px, auto;
+        background-attachment: fixed;
+        color: var(--ink);
+        font-family: var(--body);
+        line-height: 1.6;
+      }
+      a { color: inherit; }
+      :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+      .shell { width: min(880px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 72px; }
+      .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 1.15rem; text-decoration: none; }
+      .brand img { width: 30px; height: 30px; border-radius: 10px; }
+      .nav a.plain { color: var(--muted); font-size: 0.94rem; text-decoration: none; }
+      .nav a.plain:hover { color: var(--ink); }
+
+      .done {
+        display: none;
+        margin-top: 40px;
+        padding: 18px 20px;
+        border: 1px solid color-mix(in srgb, var(--positive) 40%, transparent);
+        border-radius: 18px;
+        background: color-mix(in srgb, var(--positive) 10%, var(--paper-2));
+      }
+      .done strong { display: block; font-family: var(--display); font-size: 1.3rem; font-weight: 400; }
+      .done p { margin: 6px 0 0; color: var(--ink-2); }
+      body[data-deleted] .done { display: block; }
+      body[data-deleted] .paths { display: none; }
+
+      header.intro { margin-top: 56px; }
+      h1 { max-width: 14ch; margin: 0; font-family: var(--display); font-size: clamp(2.6rem, 4vw + 1.2rem, 4.2rem); font-weight: 400; letter-spacing: -0.025em; line-height: 1.02; }
+      .lede { max-width: 54ch; margin: 18px 0 0; color: var(--ink-2); font-size: 1.1rem; }
+
+      /* Two ways to delete, side by side: one is immediate, one needs no
+         sign-in. Each is a single action, not a form. */
+      .paths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 44px; }
+      .path { display: flex; flex-direction: column; padding: 26px; border: 1px solid var(--rule); border-radius: 18px; background: color-mix(in srgb, var(--paper-2) 85%, transparent); }
+      .path--now { border-color: color-mix(in srgb, var(--danger) 35%, var(--rule)); }
+      h2 { margin: 0; font-family: var(--display); font-size: 1.5rem; font-weight: 400; line-height: 1.2; }
+      .path p { flex: 1; margin: 10px 0 22px; color: var(--ink-2); }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 20px;
+        border: 1px solid transparent;
+        border-radius: 14px;
+        font-weight: 650;
+        text-decoration: none;
+        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+      }
+      .button--danger { background: var(--danger); color: var(--accent-ink); }
+      .button--danger:hover { background: color-mix(in srgb, var(--danger) 85%, var(--ink)); }
+      .button--quiet { border-color: var(--rule-2); color: var(--ink); }
+      .button--quiet:hover { border-color: var(--accent); }
+      .hint { margin: 10px 0 0; color: var(--faint); font-size: 0.86rem; }
+
+      .facts { margin-top: 56px; }
+      .fact { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 24px; padding: 22px 0; border-top: 1px solid var(--rule); }
+      .fact h3 { margin: 0; font-family: var(--display); font-size: 1.15rem; font-weight: 400; }
+      .fact p, .fact ul { margin: 0; color: var(--ink-2); }
+      .fact ul { padding-left: 18px; }
+      .fact li + li { margin-top: 4px; }
+
+      .footer { display: flex; flex-wrap: wrap; gap: 10px 24px; margin-top: 48px; padding-top: 22px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 0.88rem; }
+      .footer span { margin-right: auto; }
+      .footer a { color: var(--muted); text-underline-offset: 3px; }
+      .footer a:hover { color: var(--ink); }
+
+      @media (max-width: 720px) {
+        header.intro { margin-top: 36px; }
+        .paths { grid-template-columns: minmax(0, 1fr); }
+        .fact { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+        .button { width: 100%; }
+      }
+    </style>
+
+<title>Delete Your VibhavGPT Account: Data and Subscription Help</title>
+    <meta name="description" content="Delete your VibhavGPT account in Settings or request deletion by email. Cancel your plan first; read about data removal and retention. Made by Vibhav Thoota.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://vibhavgpt.com/account-deletion">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="VibhavGPT">
+    <meta property="og:title" content="Delete Your VibhavGPT Account: Data and Subscription Help">
+    <meta property="og:description" content="Delete your VibhavGPT account in Settings or request deletion by email. Cancel your plan first; read about data removal and retention. Made by Vibhav Thoota.">
+    <meta property="og:url" content="https://vibhavgpt.com/account-deletion">
+    <meta property="og:image" content="https://vibhavgpt.com/brand/vibhavgpt-icon-512.png">
+    <meta property="og:image:alt" content="VibhavGPT brand icon">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Delete Your VibhavGPT Account: Data and Subscription Help">
+    <meta name="twitter:description" content="Delete your VibhavGPT account in Settings or request deletion by email. Cancel your plan first; read about data removal and retention. Made by Vibhav Thoota.">
+    <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://vibhavgpt.com/home"},{"@type":"ListItem","position":2,"name":"Account deletion","item":"https://vibhavgpt.com/account-deletion"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Can I delete my account without the Android app?","acceptedAnswer":{"@type":"Answer","text":"Yes. Open the web confirmation from this page and sign in to your VibhavGPT account. If you cannot sign in, email support@pansophy.com from your account address with Account deletion request in the subject. We may need to verify ownership before removing the account."}},{"@type":"Question","name":"Do I need to cancel my subscription first?","acceptedAnswer":{"@type":"Answer","text":"Cancel your plan before deleting your account. Pansophy LLC is not responsible for subscriptions that were not cancelled. Open Plan and billing to check your subscription and use the management option for where you purchased it. Confirm cancellation with the billing provider before deleting your account."}},{"@type":"Question","name":"Can deleted data be recovered?","acceptedAnswer":{"@type":"Answer","text":"Account deletion is permanent. Export the data you want to keep from Settings before confirming. Active account data is removed; restricted disaster-recovery backups rotate out within 12 months. Billing providers may retain transaction records under their own policies and legal obligations."}}]}]}</script>
+</head>
+  <body>
+    <main class="shell">
+      <nav class="nav" aria-label="VibhavGPT">
+        <a class="brand" href="/home"><img src="/brand/vibhavgpt-icon-64.png" alt="" /> <span>VibhavGPT</span></a>
+        <a class="plain" href="/app">Open VibhavGPT</a>
+      </nav>
+
+      <section class="done" role="status" aria-live="polite">
+        <strong>Your account has been deleted.</strong>
+        <p>Your conversations, projects, memory, files and images are gone from VibhavGPT, and you have been signed out. Any active web subscription was canceled.</p>
+      </section>
+
+      <header class="intro">
+        <h1>Delete your account</h1>
+        <p class="lede">Delete your VibhavGPT account in Settings or request deletion by email without reinstalling the Android app. VibhavGPT is operated by Pansophy LLC. Cancel your plan before deleting your account.</p>
+      </header>
+
+      <div class="paths">
+        <section class="path path--now" aria-labelledby="now-title">
+          <h2 id="now-title">Delete it now</h2>
+          <p>Sign in if asked, then type DELETE to confirm. Your account and everything in it is removed straight away, and an active web subscription is canceled first.</p>
+          <a class="button button--danger" href="/app?delete-account">Delete my account</a>
+          <p class="hint">Opens VibhavGPT at the confirmation step. Nothing is deleted until you confirm.</p>
+        </section>
+
+        <section class="path" aria-labelledby="email-title">
+          <h2 id="email-title">Request it by email</h2>
+          <p>Can't sign in? Email us from the address on your account with "Account deletion request" in the subject. We may ask you to verify that the account is yours before we delete it.</p>
+          <a class="button button--quiet" href="mailto:support@pansophy.com?subject=VibhavGPT%20account%20deletion%20request">Email a deletion request</a>
+          <p class="hint">If your email app does not open, write to support@pansophy.com.</p>
+        </section>
+      </div>
+
+      <section class="facts" aria-label="What deletion covers">
+        <div class="fact">
+          <h3>What is deleted</h3>
+          <ul>
+            <li>Your account, sign-in methods, passkeys and two-step verification</li>
+            <li>Conversations, messages, projects and folders</li>
+            <li>Saved memories and personal instructions</li>
+            <li>Uploaded files, generated images and image folders</li>
+            <li>Usage, credit and subscription records linked to the account</li>
+          </ul>
+        </div>
+        <div class="fact">
+          <h3>Your subscription</h3>
+          <p>Cancel your plan before deleting your account. Pansophy LLC is not responsible for subscriptions that were not cancelled. Open Plan and billing and use the management option for where you purchased your subscription. Confirm cancellation with your billing provider before proceeding.</p>
+        </div>
+        <div class="fact">
+          <h3>What remains for a while</h3>
+          <p>Restricted disaster-recovery backups expire through scheduled rotation within 12 months. Our payment processor keeps transaction records the law requires, under its own policies.</p>
+        </div>
+        <div class="fact">
+          <h3>Before you go</h3>
+          <p>You can download a copy of your data first in Settings, then Your data. Deletion cannot be undone.</p>
+        </div>
+      </section>
+
+      <!-- public-faq -->
+      <footer class="footer">
+        <span>VibhavGPT, operated by Pansophy LLC</span>
+        <a href="/guarantee">The VibhavGPT Guarantee</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <small>Made by Vibhav Thoota</small>
+      </footer>
+    </main>
+    <script>
+      // Arriving here right after deleting in the app shows the confirmation
+      // instead of the ways to delete.
+      if (new URLSearchParams(window.location.search).has("deleted")) document.body.setAttribute("data-deleted", "");
+    </script>
+  </body>
+</html>

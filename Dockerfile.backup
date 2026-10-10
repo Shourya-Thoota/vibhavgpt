@@ -1,0 +1,7 @@
+FROM postgres:18-alpine
+
+COPY scripts/backup-postgres.sh /usr/local/bin/backup-postgres
+COPY scripts/restore-drill.sh /usr/local/bin/restore-drill
+RUN chmod 0755 /usr/local/bin/backup-postgres /usr/local/bin/restore-drill
+
+ENTRYPOINT ["/usr/local/bin/backup-postgres"]

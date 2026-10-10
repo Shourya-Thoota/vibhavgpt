@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<base target="_top">
+
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+
+
+
+
+
+
+
+
+
+
+
+
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico">
+
+<!-- Fonts are self-hosted: no visitor IP or referrer reaches a font CDN. -->
+<link rel="preload" href="/fonts/v1/hanken-grotesk/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/v1/prata/prata-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/fonts/v1/fonts.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--dw:1353;--dh:1163;--gutter:25;--u:max(min(.72px,calc(100vh / 700)),min(calc(100vw / 1353),calc(100vh / 1163)));--dh-px:calc(1163 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .42);--ink:#fff;--cyan:#79dce8;--cyan-logo:#5fd0e1;--rule:rgba(255,255,255,.23);--btn-ink:#071227;--font-serif:'Prata',Georgia,serif;--font-body:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;--font-logo:'Prata',Georgia,serif}
+@supports(height:100dvh){:root{--u:max(min(.72px,calc(100dvh / 700)),min(calc(100vw / 1353),calc(100dvh / 1163)));--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .42)}}
+html,body{height:100%}body{background:#04101f;color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;overflow:hidden}
+.stage{position:fixed;inset:0;overflow:hidden;isolation:isolate}.sky{position:absolute;inset:0;z-index:0;background:#030b17;overflow:hidden}.sky::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(1,7,18,.1),rgba(1,7,18,.12) 60%,rgba(1,7,18,.7));pointer-events:none}
+.atmosphere{position:absolute;inset:0;opacity:0;transition:opacity .22s linear;background:radial-gradient(ellipse at 50% 66%,var(--glow),transparent 66%)}.atmosphere.is-active{opacity:1}.atmosphere[data-planet=earth]{--glow:#12547380}.atmosphere[data-planet=venus]{--glow:#8b66345c}.atmosphere[data-planet=mars]{--glow:#873f305e}
+.orb{position:absolute;width:calc(1090 * var(--u));height:calc(1090 * var(--u));left:50%;top:calc(660 * var(--u));transform:translateX(-50%);animation:drift 28s ease-in-out infinite alternate;filter:brightness(.54);opacity:.82}.orb img{width:100%;height:100%;display:block}.atmosphere::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 88%,var(--glow),transparent 55%);animation:breathe 14s ease-in-out infinite alternate}.stars{position:absolute;inset:0;pointer-events:none}.star{position:absolute;width:calc(var(--s) * var(--u));height:calc(var(--s) * var(--u));border-radius:50%;background:#d5e9f3;opacity:var(--a)}
+@keyframes drift{to{transform:translateX(-50%) rotate(3deg) translateY(calc(-12 * var(--u)))}}@keyframes breathe{to{opacity:.4;transform:scale(1.1)}}
+.ui{position:absolute;inset:0;z-index:3}.copy{position:absolute;inset:0;transform:translateY(var(--vshift));pointer-events:none}.copy a{pointer-events:auto}.col{position:absolute;left:0;right:calc(var(--gutter) * var(--u));text-align:center}
+.navbar{position:absolute;top:0;left:0;right:0;z-index:6;height:calc(88 * var(--u))}.navbar::after{content:'';position:absolute;left:calc(25 * var(--u));right:calc(49 * var(--u));top:calc(86 * var(--u));height:calc(2 * var(--u));background:var(--rule)}.navrow{position:absolute;left:calc(25 * var(--u));right:calc(49 * var(--u));top:0;height:calc(86 * var(--u));display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--font-logo);font-weight:400;font-size:calc(18.4 * var(--u));letter-spacing:calc(-.15 * var(--u));line-height:1;color:#fff;text-decoration:none;white-space:nowrap;position:relative;top:calc(-1 * var(--u))}.logo i{font-style:normal;color:var(--cyan-logo)}
+.burger{display:none;position:relative;width:calc(46 * var(--u));height:calc(46 * var(--u));padding:0;border:0;background:none;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:calc(6 * var(--u));flex:none}.burger span{display:block;width:calc(24 * var(--u));height:calc(2 * var(--u));border-radius:calc(2 * var(--u));background:#fff;transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .18s linear}.navrow[data-open=true] .burger span:nth-child(1){transform:translateY(calc(8 * var(--u))) rotate(45deg)}.navrow[data-open=true] .burger span:nth-child(2){opacity:0}.navrow[data-open=true] .burger span:nth-child(3){transform:translateY(calc(-8 * var(--u))) rotate(-45deg)}
+.links{display:flex;align-items:center}.links a{position:relative;display:flex;align-items:center;height:calc(86 * var(--u));font-size:calc(18.4 * var(--u));font-weight:400;line-height:1;color:#fff;text-decoration:none;padding:0 calc(17.5 * var(--u));letter-spacing:calc(-1 * var(--u));white-space:nowrap}.links a[aria-current=page]::after{content:'';position:absolute;left:0;right:0;top:calc(83.5 * var(--u));height:calc(4 * var(--u));background:var(--cyan);border-radius:calc(1 * var(--u))}.links a+a{margin-left:calc(25 * var(--u))}
+.links a.enroll{margin-left:calc(28.5 * var(--u));min-width:calc(107 * var(--u));width:auto;height:calc(38 * var(--u));border-radius:calc(19 * var(--u));display:flex;align-items:center;justify-content:center;font-size:calc(17 * var(--u));font-weight:600;letter-spacing:calc(-.75 * var(--u));line-height:1;color:var(--btn-ink);padding-top:calc(2 * var(--u));padding-left:calc(18 * var(--u));padding-right:calc(18 * var(--u));background:linear-gradient(180deg,#fff 0%,#d8ecfe 9%,#dceefe 72%,#f4f9ff 100%);box-shadow:0 calc(3 * var(--u)) calc(14 * var(--u)) #ffffff38,inset 0 0 0 calc(1.5 * var(--u)) #ffffffeb;flex:none}
+.links .avatar-chip + .enroll{margin-left:calc(16 * var(--u))}
+/* Shown in place of "Sign in" once /api/me confirms a session (see script
+   below). Sized against the same --u scale as the rest of the nav so it
+   doesn't look like a foreign element bolted onto a static page. */
+.links .avatar-chip{margin-left:calc(24 * var(--u));box-sizing:border-box;width:calc(34 * var(--u));height:calc(34 * var(--u));padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 calc(34 * var(--u));background:var(--cyan-logo);color:var(--btn-ink);font-family:var(--font-body);font-weight:600;font-size:calc(13.5 * var(--u));letter-spacing:0;text-decoration:none;line-height:1}
+.avatar-chip[hidden]{display:none}
+@media(max-width:1030px),(max-height:620px){.navrow .links a.avatar-chip{align-self:flex-start;border:0;justify-content:center;letter-spacing:0;width:calc(38 * var(--u));height:calc(38 * var(--u));margin:calc(6 * var(--u)) calc(16 * var(--u));padding:0;flex-basis:calc(38 * var(--u));font-size:calc(15 * var(--u))}}
+.eyebrow{top:calc(188.8 * var(--u));font-size:calc(30.45 * var(--u));font-weight:500;line-height:1;letter-spacing:calc(4 * var(--u));text-indent:calc(4 * var(--u))}h1.title{top:calc(268 * var(--u));font-family:var(--font-serif);font-weight:400;font-size:calc(112.4 * var(--u));line-height:1;letter-spacing:calc(2 * var(--u));text-indent:calc(2 * var(--u))}.rule{top:calc(405.5 * var(--u));height:calc(5 * var(--u));font-size:0;line-height:0;padding-right:calc(2 * var(--u))}.rule span{display:inline-block;vertical-align:top;width:calc(100 * var(--u));height:100%;border-radius:calc(2.5 * var(--u));background:var(--cyan)}p.lede{top:calc(433.2 * var(--u));font-size:calc(18.36 * var(--u));font-weight:400;line-height:calc(30 * var(--u));color:#fffffff2;max-width:calc(690 * var(--u));margin-left:auto;margin-right:auto;text-wrap:pretty}
+.cta{top:calc(597 * var(--u));height:calc(66 * var(--u));isolation:isolate}.cta a{display:inline-flex;align-items:center;justify-content:center;width:calc(216 * var(--u));height:calc(66 * var(--u));border-radius:calc(33 * var(--u));font-size:calc(17 * var(--u));font-weight:700;line-height:1;color:var(--btn-ink);text-decoration:none;padding-top:calc(2 * var(--u));background:linear-gradient(180deg,#fff 0%,#d6e8f8 4%,#d9ecfe 72%,#fff 100%);box-shadow:0 calc(10 * var(--u)) calc(18 * var(--u)) calc(-8 * var(--u)) #ffffff80,0 0 calc(26 * var(--u)) #ffffff2e,inset 0 0 0 calc(2 * var(--u)) #ffffffe6}
+.planet{position:absolute;z-index:-1;padding:0;border:0;background:none;appearance:none;line-height:0;cursor:pointer;pointer-events:auto;transition:transform .45s cubic-bezier(.22,1,.36,1)}.planet img{display:none;width:100%;height:auto}.planet img.is-shown{display:block}.planet:hover{transform:scale(1.045)}.planet:active{transform:scale(.99)}.planet-l{width:calc(143 * var(--u));left:calc(-69.5 * var(--u));top:calc(-38.3 * var(--u))}.planet-r{width:calc(143 * var(--u));right:calc(-64.7 * var(--u));top:calc(-40.6 * var(--u))}.label{position:absolute;top:calc(33 * var(--u));font-family:var(--font-serif);font-weight:400;font-size:calc(17.8 * var(--u));letter-spacing:calc(4.6 * var(--u));line-height:1;white-space:nowrap}.label-l{left:calc(111 * var(--u))}.label-r{right:calc(104 * var(--u))}
+.scroll{position:absolute;z-index:4;left:50%;margin-left:calc((-48 - (var(--gutter) / 2)) * var(--u));bottom:calc(68 * var(--u));width:calc(96 * var(--u));height:calc(96 * var(--u));border-radius:50%;background:#181e2ab3;backdrop-filter:blur(calc(6 * var(--u)));border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}.scroll svg{width:calc(20 * var(--u));height:calc(25 * var(--u));display:block}
+:is(.scroll,.links a,.cta a,.logo,.burger):focus-visible{outline:calc(2 * var(--u)) solid var(--cyan);outline-offset:calc(3 * var(--u))}.planet:focus-visible{outline:calc(2 * var(--u)) solid var(--cyan);outline-offset:calc(6 * var(--u));border-radius:50%}
+/* A — collapse navigation */
+@media(max-width:1030px),(max-height:620px){.navrow{left:calc(25 * var(--u));right:calc(25 * var(--u))}.burger{display:flex}.links{position:absolute;top:calc(96 * var(--u));right:0;z-index:5;width:min(calc(324 * var(--u)),calc(100vw - 50 * var(--u)));flex-direction:column;align-items:stretch;padding:calc(12 * var(--u));border-radius:calc(20 * var(--u));background:#09152ad6;backdrop-filter:blur(calc(18 * var(--u)));border:calc(1 * var(--u)) solid #ffffff24;box-shadow:0 calc(18 * var(--u)) calc(44 * var(--u)) #0208148c;opacity:0;visibility:hidden;transform:translateY(calc(-10 * var(--u)));transition:opacity .24s ease,transform .28s cubic-bezier(.4,0,.2,1),visibility .28s}.navrow[data-open=true] .links{opacity:1;visibility:visible;transform:none}.links a:nth-child(n){margin-left:0;height:auto;justify-content:flex-start;padding:calc(14 * var(--u)) calc(16 * var(--u));font-size:calc(19 * var(--u));letter-spacing:calc(-.6 * var(--u))}.links a+a{border-top:calc(1 * var(--u)) solid #ffffff14}.links a[aria-current=page]::after{top:auto;bottom:calc(9 * var(--u));left:calc(16 * var(--u));right:auto;width:calc(26 * var(--u));height:calc(3 * var(--u))}.links a.enroll{margin:calc(14 * var(--u)) 0 calc(2 * var(--u));width:100%;height:calc(46 * var(--u));border-radius:calc(23 * var(--u));justify-content:center;padding-top:calc(2 * var(--u));font-size:calc(18 * var(--u));letter-spacing:calc(-.4 * var(--u));border-top:0}.links a.enroll::after{content:none}}
+/* B — tablet */
+@media(min-width:580px) and (max-width:1030px) and (min-height:621px){:root{--gutter:0;--u:min(max(min(.85px,calc(100vh / 780)),min(calc(100vw / 900),calc(100vh / 1163))),1.15px);--dh-px:calc(1120 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .38)}@supports(height:100dvh){:root{--u:min(max(min(.85px,calc(100dvh / 780)),min(calc(100vw / 900),calc(100dvh / 1163))),1.15px);--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .38)}}.navbar::after{left:calc(25 * var(--u));right:calc(25 * var(--u))}p.lede br{display:none}p.lede{max-width:calc(620 * var(--u))}.label-r{right:calc(116 * var(--u))}}
+/* C — phone, including short viewports */
+@media(max-width:579px),(max-height:620px){:root{--gutter:0;--u:max(min(.92px,calc(100vh / 620)),min(calc(100vw / 430),calc(100vh / 880)));--dh-px:calc(880 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .34)}@supports(height:100dvh){:root{--u:max(min(.92px,calc(100dvh / 620)),min(calc(100vw / 430),calc(100dvh / 880)));--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .34)}}.navbar{height:calc(76 * var(--u))}.navbar::after{left:calc(24 * var(--u));right:calc(24 * var(--u));top:calc(74 * var(--u))}.navrow{left:calc(24 * var(--u));right:calc(24 * var(--u));height:calc(74 * var(--u))}.links{top:calc(84 * var(--u))}.copy{top:calc(76 * var(--u));display:flex;flex-direction:column;align-items:center;padding:calc(56 * var(--u)) calc(26 * var(--u)) 0}.col{position:static;width:100%;right:auto}.eyebrow{font-size:calc(20 * var(--u));letter-spacing:calc(5 * var(--u));text-indent:calc(5 * var(--u))}h1.title{font-size:calc(86 * var(--u));margin-top:calc(15 * var(--u))}.rule{margin-top:calc(20 * var(--u));height:calc(5 * var(--u));padding-right:0}.rule span{width:calc(84 * var(--u))}p.lede{margin-top:calc(19 * var(--u));font-size:calc(15.5 * var(--u));line-height:calc(26 * var(--u));max-width:calc(400 * var(--u));text-wrap:balance}p.lede br{display:none}.cta{top:auto;margin-top:calc(32 * var(--u));height:calc(60 * var(--u));position:relative;flex-shrink:0}.cta a{width:calc(190 * var(--u));height:calc(60 * var(--u));border-radius:calc(30 * var(--u))}.label{top:50%;transform:translateY(-50%);font-size:calc(16 * var(--u));letter-spacing:calc(4 * var(--u))}.label-l{left:calc(56 * var(--u))}.label-r{right:calc(60 * var(--u))}.planet-l{width:calc(89 * var(--u));left:calc(-44.5 * var(--u));top:calc(-17 * var(--u))}.planet-r{width:calc(89 * var(--u));right:calc(-44.5 * var(--u));top:calc(-18.3 * var(--u))}.scroll{width:calc(74 * var(--u));height:calc(74 * var(--u));margin-left:calc(-37 * var(--u));bottom:calc(49 * var(--u))}.scroll svg{width:calc(15.5 * var(--u));height:calc(19.5 * var(--u))}.orb{top:calc(590 * var(--u));width:calc(730 * var(--u));height:calc(730 * var(--u))}}
+/* D — hide lower control where space is limited */
+@media(max-height:660px){.scroll{display:none}}
+/* E — short */
+@media(max-height:620px){:root{--u:max(min(.85px,calc(100vh / 470)),min(calc(100vw / 640),calc(100vh / 560)));--dh-px:calc(560 * var(--u));--vshift:0px}.copy{padding-top:calc(26 * var(--u))}h1.title{font-size:calc(64 * var(--u));margin-top:calc(8 * var(--u))}.rule{margin-top:calc(12 * var(--u))}p.lede{margin-top:calc(12 * var(--u))}.cta{margin-top:calc(20 * var(--u))}.label{top:50%;transform:translateY(-50%);font-size:calc(15 * var(--u))}.label-l{left:calc(58 * var(--u))}.label-r{right:calc(58 * var(--u))}}@media(min-width:821px) and (max-height:660px){.copy{transform:none}}
+/* F — narrow phone, deliberately last */
+@media(max-width:500px){h1.title{font-size:min(calc(86 * var(--u)),calc((100vw - 52 * var(--u)) / 4.5))}.label{top:calc(100% + 34 * var(--u));transform:none;font-size:calc(15 * var(--u))}.label-l{left:calc(6 * var(--u))}.label-r{right:calc(6 * var(--u))}}
+@keyframes ent-reveal{from{transform:translateY(115%)}to{transform:translateY(0)}}@keyframes ent-rise{from{opacity:0;transform:translateY(var(--rise,calc(10 * var(--u))))}to{opacity:1;transform:none}}@keyframes ent-settle{from{opacity:0;transform:translateY(var(--rise,calc(8 * var(--u)))) scale(.965)}to{opacity:1;transform:none}}@keyframes ent-draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes ent-fade{from{opacity:0}to{opacity:1}}
+.anim{--e-expo:cubic-bezier(.16,1,.3,1);--e-quint:cubic-bezier(.22,1,.36,1);--e-slow:cubic-bezier(.4,0,.2,1)}.ent-mask,.ent-line{display:block}.anim .ent-mask{overflow:hidden;padding-top:calc(20 * var(--u));margin-top:calc(-20 * var(--u))}.anim .ent-line{transform:translateY(115%);will-change:transform}.anim .navbar::after,.anim .links a[aria-current=page]::after,.anim .rule span{transform:scaleX(0)}.anim .logo,.anim .links a,.anim .burger,.anim p.lede,.anim .label,.anim .cta a,.anim .scroll,.anim .sky{opacity:0}.anim .sky{will-change:opacity}
+.anim.play .sky{animation:ent-fade 1.6s var(--e-slow) .25s both}.anim.play .navbar::after{animation:ent-draw .9s var(--e-expo) .12s both}.anim.play .logo{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) .20s both}.anim.play .links a{--rise:calc(8 * var(--u));animation:ent-rise .55s var(--e-quint) .26s both}.anim.play .links a:nth-child(2){animation-delay:.31s}.anim.play .links a:nth-child(3){animation-delay:.36s}.anim.play .links a:nth-child(4){animation-delay:.41s}.anim.play .links a.enroll,.anim.play .burger{--rise:calc(8 * var(--u));animation:ent-settle .6s var(--e-quint) .46s both}.anim.play .links a[aria-current]::after{animation:ent-draw .55s var(--e-expo) .60s both}.anim.play .eyebrow .ent-line{animation:ent-reveal .75s var(--e-expo) .30s both}.anim.play h1.title .ent-line{animation:ent-reveal .95s var(--e-expo) .44s both}.anim.play .rule span{animation:ent-draw .65s var(--e-expo) .78s both}.anim.play p.lede{--rise:calc(12 * var(--u));animation:ent-rise .7s var(--e-quint) .86s both}.anim.play .label-l{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) 1.04s both}.anim.play .label-r{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) 1.10s both}.anim.play .cta a{--rise:calc(8 * var(--u));animation:ent-settle .7s var(--e-quint) 1.14s both}.anim.play .scroll{animation:ent-settle .6s var(--e-quint) 1.42s both}
+/* Animate artwork independently of positioning, entrance and button hover. */
+.orb img{transform-origin:50% 50%;animation:planet-spin 240s linear infinite;animation-play-state:paused}
+.atmosphere.is-active .orb img{animation-play-state:running}
+.planet img.is-shown{animation:planet-idle 12s ease-in-out infinite}
+.planet-r img.is-shown{animation-duration:15s;animation-delay:-5s}
+@keyframes planet-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes planet-idle{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(calc(-3 * var(--u))) scale(1.012)}}
+@media(prefers-reduced-motion:reduce){.orb,.orb img,.planet img.is-shown,.atmosphere::before{animation:none!important}.planet,.links,.burger span,.atmosphere{transition:none}.planet:hover,.planet:active{transform:none}}
+</style>
+  <script src="/theme/page-scroll-boot.js"></script>
+
+<title>VibhavGPT: Private AI Chat, Image Creation and Study</title>
+    <meta name="description" content="Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.">
+    <meta name="robots" content="index, follow, max-image-preview:large">
+    <link rel="canonical" href="https://vibhavgpt.com/home">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="VibhavGPT">
+    <meta property="og:title" content="VibhavGPT: Private AI Chat, Image Creation and Study">
+    <meta property="og:description" content="Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.">
+    <meta property="og:url" content="https://vibhavgpt.com/home">
+    <meta property="og:image" content="https://vibhavgpt.com/brand/vibhavgpt-icon-512.png">
+    <meta property="og:image:alt" content="VibhavGPT brand icon">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="VibhavGPT: Private AI Chat, Image Creation and Study">
+    <meta name="twitter:description" content="Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.">
+    <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}}]}</script>
+</head>
+<body>
+<main class="stage" id="features">
+ <div class="sky" aria-hidden="true">
+  <div class="stars"></div>
+  <div class="atmosphere is-active" data-planet="earth"><div class="orb"><img src="/planets/earth.webp" alt=""></div></div>
+  <div class="atmosphere" data-planet="venus"><div class="orb"><img src="/planets/venus.webp" alt=""></div></div>
+  <div class="atmosphere" data-planet="mars"><div class="orb"><img src="/planets/mars.webp" alt=""></div></div>
+ </div>
+ <div class="ui">
+  <header class="navbar"><div class="navrow">
+   <a class="logo" href="/home">Vibhav<i>GPT</i></a>
+   <nav class="links" id="site-nav" aria-label="Main navigation"><a href="#features" aria-current="page">Features</a><a href="/pricing">Pricing</a><a href="/app" id="nav-signin">Sign in</a><a class="avatar-chip" href="/app" id="nav-avatar" aria-label="Open your workspace" hidden></a><a class="enroll" href="/signup" id="nav-enroll">Get Started</a></nav>
+   <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span></button>
+  </div></header>
+  <div class="copy">
+   <div class="col eyebrow"><span class="ent-mask"><span class="ent-line">FEATURE</span></span></div>
+   <h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">PRIVATE AI</span></span></h1>
+   <div class="col rule"><span></span></div>
+   <p class="col lede">The VibhavGPT Guarantee: we don't train AI models on your chats, we don't sell your data, and we don't run ads. Export your data or delete your account from Settings at any time.</p>
+   <div class="col cta">
+    <button class="planet planet-l" type="button" data-slot="l" aria-label="Show CHAT"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="venus" class="is-shown" src="/planets/venus.webp" alt=""><img data-planet="mars" src="/planets/mars.webp" alt=""></button>
+    <button class="planet planet-r" type="button" data-slot="r" aria-label="Show STUDY"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" class="is-shown" src="/planets/mars.webp" alt=""></button>
+    <a href="/signup">GET STARTED</a><span class="label label-l">CHAT</span><span class="label label-r">STUDY</span>
+   </div>
+  </div>
+ </div>
+ <button class="scroll" type="button" aria-label="Explore next feature"><svg viewBox="0 0 26 33" fill="none" aria-hidden="true"><path d="M13 1.5 V31.5 M1.9 20.4 L13 31.5 L24.1 20.4" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg></button>
+<footer style="position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.55);z-index:2">Made by Vibhav Thoota</footer>
+</main>
+<script>
+(() => {
+ // This is a static page with no framework and no session state of its own,
+ // so the nav always started rendered as signed-out ("Sign in" / "Get
+ // Started") — it never checked whether the visitor actually had a session,
+ // which is the bug: a signed-in visitor landing here always saw "Sign in".
+ //
+ // Fired as the very first thing on the page (ahead of the entrance
+ // animation, which takes >=500ms — see the bottom of this file) specifically
+ // so the real race condition is closed: the check finishing *after* the nav
+ // has already been shown to the visitor. That ordering is fine — the
+ // markup's default (signed-out) is a safe first paint — as long as the DOM
+ // is actually corrected once the answer comes back, which is what needs
+ // verifying here, not just "does a request get sent."
+ //
+ // api.<host> because this file is a static asset with no build step, so it
+ // can't read VITE_API_URL the way the React app does; every other page on
+ // this domain resolves the API the same way (see api.vibhavgpt.com in the
+ // deployed Caddy/Railway config). Falls back to a relative path so this
+ // still works against the local Vite dev proxy (see vite.config.js).
+ const apiBase = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "" : `https://api.${location.hostname.replace(/^www\./, "")}`;
+ fetch(`${apiBase}/api/me`, { credentials: "include", cache: "no-store" })
+  .then(response => (response.ok ? response.json() : null))
+  .then(data => {
+   const user = data?.user;
+   if (!user) return; // Genuinely signed out (or the check failed) — the default markup is already correct for this case.
+   const displayName = user.name?.trim() || user.email.split("@")[0];
+   const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+   const signIn = document.getElementById("nav-signin");
+   const avatar = document.getElementById("nav-avatar");
+   const enroll = document.getElementById("nav-enroll");
+   if (signIn) signIn.remove();
+   if (avatar) { avatar.textContent = initials || "V"; avatar.hidden = false; }
+   if (enroll) { enroll.textContent = "Open workspace"; enroll.href = "/app"; }
+  })
+  .catch(() => {}); // Network hiccup: leave the safe signed-out default in place.
+})();
+</script>
+<script>
+(() => {
+ const ORDER=['venus','earth','mars'];
+ const data={venus:{name:'CHAT',lede:'Ask a question. Explore an idea. Search the web when you need something current. VibhavGPT keeps your conversation and saved context close, so you can pick up where you left off.'},earth:{name:'PRIVATE AI',lede:"The VibhavGPT Guarantee: we don't train AI models on your chats, we don't sell your data, and we don't run ads. Export your data or delete your account from Settings at any time."},mars:{name:'STUDY',lede:'Upload your notes for worked examples, flashcards, and quizzes. On Plus and Pro, you can also create graphics with image generation.'}};
+ const slots=[...document.querySelectorAll('.planet')];let featured=null;
+ function adjacent(direction){return ORDER[(ORDER.indexOf(featured)+direction+ORDER.length)%ORDER.length];}
+ function show(next){if(!data[next]||featured===next)return;featured=next;document.querySelectorAll('.atmosphere').forEach(el=>el.classList.toggle('is-active',el.dataset.planet===next));document.querySelector('h1 .ent-line').textContent=data[next].name;document.querySelector('.lede').textContent=data[next].lede;slots.forEach(slot=>{const preview=adjacent(slot.dataset.slot==='l'?-1:1);slot.querySelectorAll('img').forEach(img=>img.classList.toggle('is-shown',img.dataset.planet===preview));slot.dataset.planet=preview;slot.setAttribute('aria-label','Show '+data[preview].name);document.querySelector('.label-'+slot.dataset.slot).textContent=data[preview].name;});}
+ // All nine image nodes retain their original src; decode up front for same-frame swaps.
+ const images=[...document.images];const decoded=Promise.all(images.map(img=>img.decode().catch(()=>{})));
+ slots.forEach(slot=>slot.addEventListener('click',()=>show(adjacent(slot.dataset.slot==='l'?-1:1))));document.querySelector('.scroll').addEventListener('click',()=>show(adjacent(1)));show('earth');
+ const nav=document.querySelector('.navrow'),menu=document.querySelector('.links'),burger=document.querySelector('.burger');function setMenu(open){nav.dataset.open=String(open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Close navigation':'Open navigation');}setMenu(false);burger.addEventListener('click',e=>{e.stopPropagation();setMenu(nav.dataset.open!=='true');});document.addEventListener('click',e=>{if(!menu.contains(e.target)&&!burger.contains(e.target))setMenu(false);});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&nav.dataset.open==='true'){setMenu(false);burger.focus();}});menu.addEventListener('click',e=>{if(e.target.closest('a'))setMenu(false);});
+ let seed=218;const stars=document.querySelector('.stars');for(let i=0;i<85;i++){seed=(seed*16807)%2147483647;const x=seed%10000/100;seed=(seed*16807)%2147483647;const y=seed%10000/100;const star=document.createElement('i');star.className='star';star.style.cssText=`left:${x}%;top:${y}%;--s:${i%9===0?2:1};--a:${.12+(i%5)*.08}`;stars.append(star);}
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.classList.add('anim');let started=false;const start=()=>{if(started)return;started=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{document.documentElement.classList.add('play');setTimeout(()=>document.documentElement.classList.remove('anim','play'),2150);}));};Promise.race([Promise.all([document.fonts.ready,decoded]),new Promise(resolve=>setTimeout(resolve,500))]).then(start);}
+})();
+</script>
+</body></html>
+

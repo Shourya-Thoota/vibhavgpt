@@ -1,0 +1,135 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	log {
+		format json
+	}
+
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+:{$PORT:80} {
+	log {
+		format json
+	}
+
+	# Security headers (same as Railpack's own default static-site Caddyfile)
+	header {
+		X-XSS-Protection "1; mode=block"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Authenticated previews are fetched by the app and rendered as local blobs.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob: https: *; style-src 'self' 'unsafe-inline' https: *; script-src 'self' 'unsafe-inline' https: *; font-src 'self' data: https: *; connect-src 'self' https: *; media-src 'self' https: *; object-src 'none'; frame-src 'self' https: *; upgrade-insecure-requests;"
+		-Server
+	}
+
+	root * dist
+	encode gzip zstd
+
+	# Old legal URLs resolve to their rendered, canonical public documents.
+	redir /terms-of-service /terms 308
+	redir /privacy-policy /privacy 308
+
+	# All routing decisions are grouped into explicitly ordered `handle`
+	# blocks (first match wins) rather than mixed with bare top-level
+	# directives — a bare `respond /health 200` here was silently losing to
+	# the catch-all handle block below and returning index.html instead of a
+	# plain 200, since Caddy sorts handle blocks and ungrouped directives
+	# differently. Verified against production after the fix, not assumed.
+	@health path /health
+	handle @health {
+		respond 200
+	}
+
+	# Vite fingerprints every file under /assets with a content hash, so a
+	# changed file is always a new URL — caching these forever is safe, and is
+	# the actual fix for the bug this file exists for: a browser silently
+	# reusing a stale JS bundle after a deploy, so its requests no longer match
+	# the current backend's contract (this is what broke Voice Session's
+	# session-creation call after the 806333d deploy — worked in a fresh
+	# incognito window, failed in a tab with an old bundle cached).
+	@immutableAssets path /assets/*
+	handle @immutableAssets {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server {
+			hide .git
+			hide .env*
+		}
+	}
+
+	# Self-hosted fonts are versioned by folder (/fonts/v1/…): a changed font
+	# ships under a new folder, never in place, so the same forever-cache as
+	# /assets is safe here. The homepage and the app share these URLs, so a
+	# visitor downloads each face once across both.
+	@immutableFonts path /fonts/*
+	handle @immutableFonts {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server {
+			hide .git
+			hide .env*
+		}
+	}
+
+	# Keep the favicon URL stable while serving the branded PNG bytes and MIME.
+	@favicon path /favicon.ico
+	handle @favicon {
+		rewrite * /brand/vibhavgpt-icon-32.png
+		file_server
+	}
+
+	# Release files are published outside this site. The old download paths
+	# stay valid for bookmarks, shared links and older app builds: they
+	# redirect to the latest release's files, which keep stable names.
+	redir /downloads/vibhavgpt-android.apk https://github.com/Shourya-Thoota/vibhavgpt-releases/releases/latest/download/vibhavgpt-android.apk 302
+	redir /downloads/VibhavGPT-Setup-1.0.0-x64.exe https://github.com/Shourya-Thoota/vibhavgpt-releases/releases/latest/download/VibhavGPT-Setup-x64.exe 302
+
+	# The public homepage is its own static document (dist/home/index.html,
+	# copied from public/home/index.html). A plain visit to / gets it directly: no app
+	# bundle, no client-side redirect to /home that a slow or failed script
+	# could leave stranded on the app shell. Only a bare / qualifies — a /
+	# carrying a query string (?upgraded=true, ?credits=…, older billing
+	# links the app still reads) falls through to the app shell below.
+	@homeRoot {
+		path /
+		expression {query} == ""
+	}
+	handle @homeRoot {
+		header Cache-Control "no-cache"
+		rewrite * /home/index.html
+		file_server {
+			hide .git
+			hide .env*
+		}
+	}
+
+	# Only application routes receive the SPA document as a fallback. Public
+	# SEO pages and crawler files are real static files; unknown paths must stay
+	# missing so the custom error handler can return an actual 404.
+	@appShell path / /signup /app /app/* /onboarding /account /mobile-auth/turnstile /terms-of-service /privacy-policy
+	handle @appShell {
+		header Cache-Control "no-cache"
+		try_files {path} {path}.html {path}/index.html /index.html
+		file_server {
+			hide .git
+			hide .env*
+		}
+	}
+
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} {path}.html {path}/index.html
+		file_server {
+			hide .git
+			hide .env*
+		}
+	}
+
+	handle_errors 404 {
+		rewrite * /404.html
+		file_server
+	}
+}

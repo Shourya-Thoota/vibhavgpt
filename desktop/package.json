@@ -1,0 +1,67 @@
+{
+  "name": "vibhavgpt-desktop",
+  "productName": "VibhavGPT",
+  "version": "1.0.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Windows desktop shell for VibhavGPT",
+  "author": "VibhavGPT",
+  "main": "main.js",
+  "scripts": {
+    "dev": "electron .",
+    "icon": "node scripts/make-icon.mjs",
+    "dist": "electron-builder --win nsis --x64"
+  },
+  "devDependencies": {
+    "electron": "^38.2.0",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^2.1.8"
+  },
+  "build": {
+    "appId": "com.pansophy.vibhavgpt.desktop",
+    "productName": "VibhavGPT",
+    "copyright": "VibhavGPT",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "protocols": [
+      {
+        "name": "VibhavGPT",
+        "schemes": [
+          "vibhavgpt"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VibhavGPT",
+      "artifactName": "VibhavGPT-Setup-${version}-x64.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  },
+  "allowScripts": {
+    "electron@38.8.6": true
+  }
+}

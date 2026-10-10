@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+
+# All search engines and AI crawlers may read the public site.
+
+Sitemap: https://vibhavgpt.com/sitemap.xml

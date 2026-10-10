@@ -1,0 +1,378 @@
+/* ==========================================================================
+   Phone layout
+   ==========================================================================
+
+   Everything that reshapes the workspace for phones lives here, imported
+   last so it wins over styles.css, planetary.css and study.css without
+   touching any rule those files apply on wider screens. The structure borrows
+   ChatGPT's mobile patterns: a drawer instead of a sidebar, a minimal title
+   bar, flowing replies, a pill composer pinned to the bottom, and choices made
+   in bottom sheets. The palette, planets and tier badges stay VibhavGPT's.
+
+   The width matches NARROW_QUERY in components/ui.jsx; keep them together. */
+
+/* The screen wrapper only exists so a phone can animate between screens. On
+   wider layouts it must not add a box of its own. */
+.screen { display: contents; }
+
+/* --- Bottom sheet --------------------------------------------------------- */
+
+/* Unscoped: the component is only mounted on phones, but its styling does
+   not depend on the width it happens to be opened at. */
+.ui-sheet { position: fixed; inset: 0; z-index: 110; }
+.ui-sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--paper-deep) 62%, transparent);
+  opacity: 0;
+  transition: opacity 280ms var(--ease);
+}
+.ui-sheet[data-shown] .ui-sheet__scrim { opacity: 1; }
+.ui-sheet__panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 86vh;
+  max-height: 86dvh;
+  padding: 0 12px calc(14px + env(safe-area-inset-bottom));
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-lg);
+  outline: 0;
+  transform: translateY(100%);
+  transition: transform 280ms var(--ease);
+}
+.ui-sheet[data-shown] .ui-sheet__panel { transform: none; }
+/* The grab area owns vertical drags outright so pulling the sheet down never
+   scrolls the page behind it. */
+.ui-sheet__grab {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 10px 8px 12px;
+  touch-action: none;
+  cursor: grab;
+}
+.ui-sheet__handle { width: 38px; height: 5px; border-radius: var(--r-pill); background: var(--line-strong); }
+.ui-sheet__title { justify-self: start; padding: 0 6px; font-family: var(--font-ui); font-size: 1.02rem; }
+.ui-sheet__body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Model picker, as a sheet. Rows are tall enough for a thumb and carry the
+   same tier badges as the desktop dropdown. */
+.model-sheet { display: grid; gap: 2px; }
+.model-sheet__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 62px;
+  padding: 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  text-align: left;
+  transition: background-color var(--t-fast) var(--ease);
+}
+.model-sheet__option:active:not(:disabled) { background: var(--surface-2); }
+.model-sheet__option[aria-checked="true"] { background: var(--accent-soft); }
+.model-sheet__option:disabled,
+.model-sheet__option[aria-disabled="true"] { opacity: 0.45; }
+.model-sheet__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-round);
+  background: var(--surface-2);
+  color: var(--accent);
+}
+.model-sheet__option[aria-checked="true"] .model-sheet__icon { background: var(--accent); color: var(--accent-ink); }
+.model-sheet__copy { display: grid; flex: 1; gap: 3px; min-width: 0; }
+.model-sheet__name { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 0.96rem; font-weight: 600; }
+.model-sheet__copy small { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.model-sheet__check { flex: 0 0 auto; color: var(--accent); }
+
+/* Workspace tabs: a segmented control with a sliding thumb. Phones show it
+   in the title bar; wider screens in a strip above the conversation. */
+.mode-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
+  width: min(100%, 300px);
+  padding: 3px;
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+}
+.mode-tabs::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--tab-count));
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(calc(100% * var(--tab-index)));
+  transition: transform var(--t-base) var(--spring);
+}
+.mode-tabs__tab {
+  position: relative;
+  height: 32px;
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: color var(--t-fast) var(--ease);
+}
+.mode-tabs__tab[aria-selected="true"] { color: var(--ink); }
+.mode-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mode-tabs__tab:disabled { cursor: default; }
+.mode-tabs-bar { display: flex; justify-content: center; padding: 12px 16px 0; }
+.workspace[data-collapsed="true"] .sidebar__brand > span { display: none; }
+
+/* The composer's "+" sheet: attachments as tiles, then tools and settings
+   as full-width rows. Everything that used to sit above the composer. */
+.add-sheet { display: grid; gap: 6px; padding-bottom: 6px; }
+.add-sheet__tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 2px 4px 8px; }
+.add-sheet__tile {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 16px 8px 14px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 600;
+  transition: transform var(--t-base) var(--spring);
+}
+.add-sheet__tile > svg { color: var(--accent); }
+.add-sheet__tile:active:not(:disabled) { transform: scale(0.97); }
+.add-sheet__tile:disabled { opacity: 0.45; }
+.add-sheet__list { display: grid; gap: 2px; }
+.add-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ink);
+  text-align: left;
+  transition: background-color var(--t-fast) var(--ease);
+}
+.add-sheet__row > svg:first-child { flex: 0 0 auto; color: var(--ink-2); }
+.add-sheet__row > svg:last-child:not(:first-child) { flex: 0 0 auto; color: var(--muted); }
+.add-sheet__row[aria-checked="true"] > svg:last-child { color: var(--accent); }
+.add-sheet__row:active:not(:disabled) { background: var(--surface-2); }
+.add-sheet__row:disabled { opacity: 0.45; }
+.add-sheet__copy { display: grid; flex: 1; gap: 2px; min-width: 0; font-size: 0.95rem; font-weight: 550; }
+.add-sheet__copy small { color: var(--muted); font-size: 0.8rem; font-weight: 450; }
+.add-sheet__label { margin: 10px 10px 2px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
+.add-sheet__switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 26px;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  transition: background-color var(--t-fast) var(--ease);
+}
+.add-sheet__switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-round);
+  background: #f4f8fc; /* the knob reads light on both skies, like a physical switch */
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--t-base) var(--spring);
+}
+.add-sheet__row[aria-checked="true"] .add-sheet__switch { background: var(--accent); }
+.add-sheet__row[aria-checked="true"] .add-sheet__switch::after { transform: translateX(16px); }
+
+@media (max-width: 760px) {
+  .workspace {
+    --topbar-h: calc(54px + env(safe-area-inset-top));
+  }
+
+  /* --- Title bar ---------------------------------------------------------- */
+
+  /* Menu, workspace tabs (or the page title off the chat screen), new chat. */
+  .topbar-mobile {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    gap: 4px;
+    height: var(--topbar-h);
+    padding: env(safe-area-inset-top) 6px 0;
+    border-bottom-color: transparent;
+    background: color-mix(in srgb, var(--paper) 90%, transparent);
+  }
+  .topbar-mobile .ui-icon-button { width: 44px; height: 44px; color: var(--ink); }
+  .topbar-mobile .mode-tabs { justify-self: center; }
+  .mode-tabs-bar { display: none; }
+  .topbar-mobile__title {
+    justify-self: center;
+    max-width: 100%;
+    overflow: hidden;
+    font-family: var(--font-ui);
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* --- Drawer ------------------------------------------------------------- */
+
+  .sidebar {
+    z-index: 40;
+    width: min(86vw, 320px);
+    height: 100vh;
+    height: 100dvh;
+    padding-top: calc(14px + env(safe-area-inset-top));
+    padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    border-radius: 0 var(--r-lg) var(--r-lg) 0;
+    /* Opaque over the page; the desktop column's slight translucency reads
+       as the conversation bleeding through once the drawer overlaps it. */
+    background: var(--paper-deep);
+    transition: transform 320ms var(--ease), box-shadow 320ms var(--ease);
+    will-change: transform;
+  }
+  /* The drawer closes by swipe, by tapping the dimmed page, or by Back, so
+     the X in its head is redundant on phones. */
+  .sidebar__close { display: none; }
+  .sidebar__new { min-height: 46px; }
+  .sidebar__link, .conversation-item__open { min-height: 44px; }
+
+  /* Always mounted; shown and hidden by opacity so it fades both ways. The
+     visibility delay on the way out keeps it painted until the fade ends. */
+  .scrim-mobile {
+    z-index: 35;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    animation: none;
+    transition: opacity 320ms var(--ease), visibility 0s linear 320ms;
+  }
+  .scrim-mobile[data-open] {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition: opacity 320ms var(--ease), visibility 0s;
+  }
+
+  /* --- Screen transitions ------------------------------------------------- */
+
+  /* The incoming screen slides in from the side it lives on. Only `from` is
+     given, and the fill is `backwards`, so no transform is left behind once
+     it settles: a leftover transform would become the containing block for
+     every position:fixed descendant. */
+  .workspace__main { overflow-x: clip; }
+  .screen { display: flex; flex-direction: column; min-height: 0; }
+  .screen[data-direction="forward"] { animation: screen-in-forward 320ms var(--ease) backwards; }
+  .screen[data-direction="back"] { animation: screen-in-back 320ms var(--ease) backwards; }
+
+  /* --- Conversation ------------------------------------------------------- */
+
+  .chat { height: calc(100vh - var(--topbar-h)); height: calc(100dvh - var(--topbar-h)); }
+  .image-workspace { height: calc(100dvh - var(--topbar-h)); }
+
+  .chat__thread { gap: 28px; padding: 16px 18px 32px; }
+
+  /* Replies are plain text on the page, not cards. The byline is dropped
+     too: the model in use is always visible on the pill above the composer. */
+  .turn__byline { display: none; }
+  .bubble--assistant,
+  .bubble--wide {
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .prose { font-size: 1rem; line-height: 1.7; }
+  .prose pre { margin-inline: 0; }
+  .turn__tools { margin-left: -7px; }
+
+  /* The user's own turns keep the brand blue, as a soft rounded pill without
+     the tail or glow the desktop bubble has. */
+  .bubble--user {
+    max-width: 84%;
+    padding: 10px 16px;
+    border-radius: var(--radius-card);
+    box-shadow: none;
+    font-size: 1rem;
+  }
+  .bubble--user::after { display: none; }
+  .bubble { animation-duration: 320ms; }
+
+  /* --- Composer ----------------------------------------------------------- */
+
+  .composer-wrap {
+    padding: 4px 12px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--paper) 74%, transparent);
+  }
+
+
+  /* One rounded row: add, the growing text field, and Send. Buttons sit on
+     the bottom edge so they stay under the thumb as the field grows upward. */
+  .composer[data-layout="pill"] { border-radius: var(--radius-card); box-shadow: var(--shadow-sm); }
+  .composer__row { display: flex; align-items: flex-end; gap: 2px; padding: 5px; }
+  .composer[data-layout="pill"] .composer__input {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    max-height: 168px;
+    padding: 9px 6px;
+    /* 16px or larger, or iOS zooms the page when the field takes focus. */
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .composer[data-layout="pill"] .tray { padding: 10px 12px 2px; }
+  /* Active tools show inside the composer, not as pills above it. */
+  .composer__tools { display: flex; gap: 6px; padding: 8px 10px 0; }
+  .composer__tool {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: var(--r-pill);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+  .composer__row .composer__add-trigger,
+  .composer__row .composer__send { flex: 0 0 auto; width: 40px; height: 40px; }
+  .composer__row .pill-toggle {
+    flex: 0 0 auto;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 10px;
+  }
+  .settings__info-link { margin-top: 10px; font-size: 0.82rem; }
+  .settings__info-link a { color: var(--accent); text-underline-offset: 3px; }
+  .card--danger .card__body { margin-top: 14px; }
+  .subscription__actions { width: 100%; }
+  .subscription__actions .btn { flex: 1 1 160px; }
+}
+
+@keyframes screen-in-forward {
+  from { opacity: 0; transform: translateX(24%); }
+}
+@keyframes screen-in-back {
+  from { opacity: 0; transform: translateX(-24%); }
+}

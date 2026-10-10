@@ -1,0 +1,6 @@
+.public-faq { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--color-rule); }
+.public-faq > h2 { margin: 0 0 24px; font: 400 1.65rem var(--display, var(--font-display)); }
+.public-faq h3 { margin: 24px 0 8px; font: 600 1rem var(--body, var(--font-body)); line-height: 1.5; }
+.public-faq p { max-width: 75ch; color: var(--ink-2); line-height: 1.7; overflow-wrap: anywhere; }
+.public-faq a { color: var(--accent); text-underline-offset: 3px; }
+.public-operator { margin-top: 32px; font-size: 0.88rem; }

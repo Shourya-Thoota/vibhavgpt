@@ -1,0 +1,21 @@
+{
+  "name": "vibhavgpt-mobile-capacitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android Capacitor shell for VibhavGPT",
+  "scripts": {
+    "sync": "cap sync android",
+    "android": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/app": "8.1.1",
+    "@capacitor/browser": "8.0.4",
+    "@capacitor/core": "8.5.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}

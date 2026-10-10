@@ -1,0 +1,13 @@
+{
+  "versionName": "1.0.1",
+  "versionCode": 2,
+  "downloadUrl": "https://github.com/Shourya-Thoota/vibhavgpt-releases/releases/latest/download/vibhavgpt-android.apk",
+  "downloadPage": "https://vibhavgpt.com/android",
+  "sha256": "e14f0dc7ce86df4f8bc529b62d926fe125cb8200ecd874de235fbac4b9ad7f2c",
+  "fileSize": "7.95 MB (8,332,173 bytes)",
+  "releaseDate": "2026-09-28",
+  "releaseNotes": "Stability update: fixed the direct Android launcher crash and updated the native release shell.",
+  "androidRequirements": "Android 8.0+",
+  "minimumSupportedVersionCode": 1,
+  "officialNote": "This APK is officially distributed by VibhavGPT. Android may ask you to allow installation from your browser or file manager."
+}
