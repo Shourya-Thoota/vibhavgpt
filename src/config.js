@@ -90,6 +90,8 @@ export const config = {
   },
   // Names that must never be stored as facts about the assistant.
   providerNameTerms: splitOrigins(process.env.PROVIDER_NAME_TERMS),
+  // Terms a display name may not contain (see src/security/display-name.js).
+  nameBlocklist: splitOrigins(process.env.NAME_BLOCKLIST),
   // Chat-completions base URLs (no trailing slash) for each inference stage.
   providerBaseUrls: {
     primaryFree: endpoint("INFERENCE_PRIMARY_BASE_URL"),

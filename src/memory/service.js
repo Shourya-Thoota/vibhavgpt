@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { memoryFacts, userProfiles } from "../db/schema.js";
+import { withoutBlockedNameFacts } from "../security/display-name.js";
 
 // Extraction runs on the primary inference stage with MEMORY_EXTRACTION_MODEL.
 const MAX_FACTS = 50;
@@ -105,7 +106,7 @@ export function buildMemorySystemPrompt(basePrompt, facts) {
 }
 
 function memoryFactsForPrompt(facts) {
-  const safeFacts = facts.filter((fact) => isSafeFact(fact.content ?? fact));
+  const safeFacts = withoutBlockedNameFacts(facts.filter((fact) => isSafeFact(fact.content ?? fact)));
   const preferredName = safeFacts.map((fact) => fact.content ?? fact)
     .map((content) => content.match(/^User(?:'s)? preferred name is ([\p{L}\p{M} ]+)\./iu)?.[1]).find(Boolean);
   if (!preferredName) return safeFacts;

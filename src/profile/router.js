@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { userProfiles } from "../db/schema.js";
 import { requireSession } from "../middleware/require-session.js";
+import { NAME_NOT_ALLOWED, preferredNameFromInstructions, reviewDisplayName } from "../security/display-name.js";
 import { getCurrentUsage } from "../usage/service.js";
 
 const STYLE_OPTIONS = new Set(["concise", "balanced", "detailed", "friendly"]);
@@ -101,6 +102,14 @@ profileRouter.patch("/preferences", async (req, res, next) => {
     if (!STYLE_OPTIONS.has(responseStyle)) return res.status(400).json({ error: "Choose a valid response style." });
     if (!THINKING_EFFORTS.has(thinkingEffort)) return res.status(400).json({ error: "Choose a valid thinking effort." });
     if (customInstructions.length > MAX_INSTRUCTIONS) return res.status(400).json({ error: `Personal instructions must be ${MAX_INSTRUCTIONS} characters or fewer.` });
+    // The survey's "Call me" answer is saved as a line of these instructions.
+    // A new name gets the same check as an account name; an unchanged one is
+    // left alone, so other settings stay savable.
+    const preferredName = preferredNameFromInstructions(customInstructions);
+    if (preferredName && preferredName !== preferredNameFromInstructions(existing?.customInstructions)
+      && !(await reviewDisplayName(preferredName)).allowed) {
+      return res.status(400).json(NAME_NOT_ALLOWED);
+    }
     if ((preferredModel && !MODEL_OPTIONS.has(preferredModel)) || (lastUsedModel && !MODEL_OPTIONS.has(lastUsedModel))) {
       return res.status(400).json({ error: "Choose a valid model." });
     }

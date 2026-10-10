@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Android Capacitor shell for VibhavGPT",
+  "license": "AGPL-3.0-only",
   "scripts": {
     "sync": "cap sync android",
     "android": "cap open android"

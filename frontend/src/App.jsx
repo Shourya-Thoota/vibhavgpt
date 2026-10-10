@@ -50,6 +50,7 @@ import {
   THEME_OPTIONS, UNIT_OPTIONS, writeOnboarding,
 } from "./onboarding.js";
 import { checkDirectAndroidUpdate } from "./direct-distribution.js";
+import { NAMELESS_GREETING, workspaceNames } from "./display-names.js";
 import { COMPARISON_GROUPS, monthlyEquivalent, yearlySaving } from "./plan-comparison.js";
 import Sentry from "./sentry.js";
 
@@ -1747,9 +1748,9 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     return () => { cancelled = true; };
   }, [tier, creditBalance]);
 
-  const displayName = user.name?.trim() || user.email.split("@")[0];
-  // The name chosen in the survey wins over the account name in greetings.
-  const firstName = onboarding.preferred_name || displayName.split(/\s+/)[0];
+  const names = workspaceNames(user, onboarding);
+  const { displayName } = names;
+  const firstName = names.greetingName;
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   const tierKey = tier ?? "free";
 
@@ -1867,9 +1868,14 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     appearance.setThemeId(saved.sky);
     setSurveyToast(`Set up. ${personalityHeadline(saved.personality)}`);
     // Best-effort: the answers are already applied locally, so a failed write
-    // must not block the user out of the workspace they just set up.
-    void persistOnboardingProfile(saved).catch(() => null);
-  }, [appearance, leaveSurvey]);
+    // must not block the user out of the workspace they just set up. A
+    // refused "Call me" name is dropped and the reason shown.
+    void persistOnboardingProfile(saved).catch((error) => {
+      if (error?.code !== "name-not-allowed") return;
+      setOnboarding(writeOnboarding(user.id, { ...saved, preferred_name: "" }));
+      setSurveyToast(error.message);
+    });
+  }, [appearance, leaveSurvey, user.id]);
 
   // Skipping records that the survey has been seen, so it does not reappear on
   // the next load, but writes nothing to the account: a skip is not an answer.
@@ -1889,7 +1895,12 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     const saved = writeOnboarding(user.id, record);
     setOnboarding(saved);
     appearance.setAccentId(accentForTheme(saved.theme));
-    await persistOnboardingProfile(saved);
+    try {
+      await persistOnboardingProfile(saved);
+    } catch (error) {
+      if (error?.code === "name-not-allowed") setOnboarding(writeOnboarding(user.id, { ...saved, preferred_name: "" }));
+      throw error;
+    }
   }, [appearance, user.id]);
 
   async function switchMode(next) {
@@ -1964,7 +1975,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
       <Onboarding
         // The sky starts as whatever the reader sees now, so a re-run from
         // Settings never flips Daybreak back to night by default.
-        initial={{ ...onboarding, sky: appearance.resolved, preferred_name: onboarding.preferred_name || (user.name?.trim().split(/\s+/)[0] ?? "") }}
+        initial={{ ...onboarding, sky: appearance.resolved, preferred_name: names.surveyName }}
         tier={tierKey}
         onFinish={finishSurvey}
         onSkip={skipSurvey}
@@ -2817,7 +2828,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           <div className="opening">
             <div className="opening__planet" aria-hidden="true"><img src={mode === "study" ? "/planets/mars.webp" : "/planets/earth.webp"} alt="" /></div>
             <h1 className="opening__title">
-              <RevealWords text={greeting} />
+              <RevealWords text={mode !== "study" && !userName ? NAMELESS_GREETING : greeting} />
               {mode !== "study" && userName ? <em>, {userName}</em> : null}
             </h1>
             {mode === "study" && <div className="study-starters" aria-label="Study suggestions">
@@ -3592,6 +3603,7 @@ function Settings({
   onboarding = defaultOnboarding(), onSaveOnboarding = async () => {}, onRerunOnboarding = () => {},
 }) {
   const { accentId, setAccentId, themeId, setThemeId, resolved } = appearance;
+  const names = workspaceNames(user, onboarding);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(() => new URLSearchParams(window.location.search).has("delete-account"));
@@ -3733,7 +3745,7 @@ function Settings({
             {section === "account" && (
               <div className="settings-stack">
                 <SettingsGroup title="Profile">
-                  <SettingsRow label="Name"><span className="settings-value">{user.name || "Not set"}</span></SettingsRow>
+                  <SettingsRow label="Name"><span className="settings-value">{names.settingsName}</span></SettingsRow>
                   <SettingsRow label="Email"><span className="settings-value">{user.email}</span></SettingsRow>
                 </SettingsGroup>
                 <SettingsGroup title="Plan usage">
@@ -3933,7 +3945,7 @@ function Settings({
                       : "Not answered"}</span>
                   </SettingsRow>
                   <SettingsRow label="Opens on"><span className="settings-value">{CAPABILITY_OPTIONS.find((option) => option.value === onboarding.primary_capability)?.label ?? "Chat"}</span></SettingsRow>
-                  <SettingsRow label="Call me"><span className="settings-value">{onboarding.preferred_name || "Not answered"}</span></SettingsRow>
+                  <SettingsRow label="Call me"><span className="settings-value">{names.settingsCallMe}</span></SettingsRow>
                   <SettingsRow label="Background"><span className="settings-value">{(EXPERTISE_OPTIONS.find((option) => option.value === onboarding.expertise) ?? EXPERTISE_OPTIONS[1]).label}</span></SettingsRow>
                   <SettingsRow label="Units"><span className="settings-value">{(UNIT_OPTIONS.find((option) => option.value === onboarding.units) ?? UNIT_OPTIONS[0]).label}</span></SettingsRow>
                   <SettingsRow label="Universe"><span className="settings-value">{(THEME_OPTIONS.find((option) => option.value === onboarding.theme) ?? THEME_OPTIONS[0]).label}</span></SettingsRow>

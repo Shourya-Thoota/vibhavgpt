@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { safeDisplayName } from "../security/display-name.js";
 
 const APP_URL = "https://vibhavgpt.com";
 const SUPPORT_URL = "mailto:support@pansophy.com";
@@ -65,7 +66,8 @@ async function lookupRecipientName(email) {
   try {
     const { pool } = await import("../db/client.js");
     const result = await pool.query('SELECT name FROM "user" WHERE lower(email) = lower($1) LIMIT 1', [email]);
-    return result.rows[0]?.name ?? "";
+    // A withheld name becomes "there" in the greeting line.
+    return safeDisplayName(result.rows[0]?.name);
   } catch {
     // Delivery must remain available if non-essential personalization fails.
     return "";

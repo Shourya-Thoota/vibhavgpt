@@ -4,6 +4,7 @@ import { db } from "../db/client.js";
 import { userProfiles } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { getFacts } from "../memory/service.js";
+import { safeDisplayName, withoutBlockedNameFacts, withoutBlockedPreferredName } from "../security/display-name.js";
 import { cancelLiveSession, finalizeLiveSession, markLiveSessionConnected, recordLiveSessionActivity, reserveLiveSession, VoiceSessionError } from "./live-usage.js";
 
 const UNAVAILABLE = "Voice is temporarily unavailable. Please try again shortly.";
@@ -29,8 +30,12 @@ export function sanitizeCometTimings(value) {
     }));
 }
 
-function buildInstructions({ name, facts, responseStyle, customInstructions }) {
+export function buildInstructions({ name, facts, responseStyle, customInstructions }) {
   const lines = [BASE_INSTRUCTIONS], context = [];
+  // Withheld names never reach the voice model.
+  name = safeDisplayName(name);
+  customInstructions = withoutBlockedPreferredName(customInstructions ?? "");
+  facts = withoutBlockedNameFacts(facts);
   if (name) context.push(`The caller's name is ${name}. Address them by name when it feels natural.`);
   if (responseStyle && responseStyle !== "balanced") context.push(`They generally prefer ${responseStyle} responses.`);
   if (customInstructions) context.push(`Personal instructions from the caller: ${customInstructions}`);
