@@ -18,9 +18,10 @@ const storageKey = (userId) => (userId ? `${STORAGE_PREFIX}:${userId}` : STORAGE
 
 // `mode` seeds which workspace gets surfaced first for a role answer. Icons
 // are lucide names resolved by the view, so this module stays render-free.
+// "code" was offered here before; normalizeOnboarding drops it (and any other
+// value not listed) from answers saved by an older build.
 export const ROLE_OPTIONS = [
   { value: "study", label: "Study", icon: "GraduationCap", mode: "study" },
-  { value: "code", label: "Code", icon: "Code2", mode: "chat" },
   { value: "write", label: "Write", icon: "PenLine", mode: "chat" },
   { value: "research", label: "Research", icon: "Globe", mode: "chat" },
   { value: "images", label: "Create images", icon: "Image", mode: "image" },

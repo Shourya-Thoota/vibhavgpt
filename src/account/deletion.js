@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import {
-  billingCustomers, conversationGroups, conversations, creditLedger, googlePlayAccounts, googlePlayNotifications,
-  googlePlayPurchases, imageFolders, memoryFacts, subscriptions, usageEvents, userProfiles, voiceLiveSessions,
+  billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, subscriptions,
+  usageEvents, userProfiles, voiceLiveSessions,
 } from "../db/schema.js";
 
 /* ==========================================================================
@@ -55,13 +55,6 @@ async function tableExists(tx, name) {
 export async function deleteAccountData(db, userId) {
   if (typeof userId !== "string" || !userId) throw new Error("A user id is required to delete an account.");
   return db.transaction(async (tx) => {
-    // Legacy Android in-app purchase records (no longer written) still go
-    // with the account.
-    const playPurchaseHashes = await tx.select({ purchaseTokenHash: googlePlayPurchases.purchaseTokenHash })
-      .from(googlePlayPurchases).where(eq(googlePlayPurchases.userId, userId));
-    for (const { purchaseTokenHash } of playPurchaseHashes) {
-      await tx.delete(googlePlayNotifications).where(eq(googlePlayNotifications.purchaseTokenHash, purchaseTokenHash));
-    }
     // Conversations take their messages with them (cascade), and must go
     // before the projects and folders they are filed in.
     await tx.delete(conversations).where(eq(conversations.userId, userId));
@@ -73,8 +66,6 @@ export async function deleteAccountData(db, userId) {
     await tx.delete(voiceLiveSessions).where(eq(voiceLiveSessions.userId, userId));
     await tx.delete(memoryFacts).where(eq(memoryFacts.userId, userId));
     await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
-    await tx.delete(googlePlayPurchases).where(eq(googlePlayPurchases.userId, userId));
-    await tx.delete(googlePlayAccounts).where(eq(googlePlayAccounts.userId, userId));
     await tx.delete(subscriptions).where(eq(subscriptions.userId, userId));
     await tx.delete(billingCustomers).where(eq(billingCustomers.userId, userId));
 

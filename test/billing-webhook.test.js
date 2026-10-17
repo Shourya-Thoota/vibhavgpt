@@ -6,7 +6,7 @@ process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:5432/test";
 const { config } = await import("../src/config.js");
 config.stripeSecretKey = "sk_test_local_verification";
 config.stripeWebhookSecret = "whsec_local_verification";
-const { applySubscriptionEvent, checkoutRedirectUrls, createCustomerPortalSession, createCreditCheckoutSession, creditCheckoutSessionParams, creditPurchaseHistoryItem, normalizeCreditPurchaseAmount, tierForPriceLookupKey, verifyWebhookSignature } = await import("../src/billing/service.js");
+const { CHECKOUT_TEXT, applySubscriptionEvent, checkoutRedirectUrls, createCustomerPortalSession, createCreditCheckoutSession, creditCheckoutSessionParams, creditPurchaseHistoryItem, normalizeCreditPurchaseAmount, tierForPriceLookupKey, verifyWebhookSignature } = await import("../src/billing/service.js");
 
 test("a non-web subscription cannot open a Stripe portal even with a stale Stripe customer ID", async () => {
   const executor = {
@@ -174,4 +174,26 @@ test("a canceled subscription downgrades the user", async () => {
   assert.equal(records[0].tier, "free");
   assert.equal(records[0].status, "canceled");
   assert.equal(records[0].subscriptionId, "sub_123");
+});
+
+test("credit Checkout shows the one-time purchase notes and changes nothing else", () => {
+  const redirects = { successUrl: "https://vibhavgpt.com/account?credits=success", cancelUrl: "https://vibhavgpt.com/account?credits=cancelled" };
+  const { custom_text: text, ...rest } = creditCheckoutSessionParams({ userId: "user-1", customerId: "cus_1", cents: 750, credits: 750, redirects });
+  assert.deepEqual(text, CHECKOUT_TEXT.credits);
+  assert.match(text.submit.message, /one-time/);
+  for (const { message } of Object.values(text)) {
+    assert.ok(message.length <= 300);
+    assert.doesNotMatch(message, /\u2014/);
+  }
+  // Every field but custom_text, exactly as it was before the notes were added.
+  assert.deepEqual(rest, {
+    mode: "payment",
+    customer: "cus_1",
+    client_reference_id: "user-1",
+    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: 750, product_data: { name: "VibhavGPT Flex Credits (750)" } } }],
+    metadata: { kind: "credit_purchase", userId: "user-1", credits: "750", amountCents: "750" },
+    payment_intent_data: { metadata: { kind: "credit_purchase", userId: "user-1", credits: "750" } },
+    success_url: redirects.successUrl,
+    cancel_url: redirects.cancelUrl,
+  });
 });

@@ -11,9 +11,13 @@ test("Vesper is normalized as Vesper instead of falling back to Lumen", () => {
   assert.equal(normalizeModelKey("vesper"), "vesper");
 });
 
-test("Lumen is canonical and both legacy lowest-tier keys normalize to it", () => {
-  for (const key of [undefined, "lumen", "spark", "qwen", "SPARK"]) assert.equal(normalizeModelKey(key), "lumen");
+test("Lumen is canonical and the legacy Spark key normalizes to it", () => {
+  for (const key of [undefined, "lumen", "spark", "SPARK"]) assert.equal(normalizeModelKey(key), "lumen");
   assert.equal(normalizeModelKey("nova"), "nova");
+});
+
+test("the retired qwen key gets the same Lumen fallback as any unknown key a client sends", () => {
+  for (const key of ["qwen", "QWEN", "not-a-model", ""]) assert.equal(normalizeModelKey(key), "lumen");
 });
 
 test("a token-limit response is rewritten before it can reach the chat", async () => {

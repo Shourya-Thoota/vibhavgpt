@@ -5,7 +5,7 @@ import { CODING_NUDGE_COPY, shouldSuggestNebula } from "../frontend/src/coding-n
 
 test("small coding requests suggest Nebula on every other model", () => {
   assert.equal(CODING_NUDGE_COPY, "Nebula writes better code.");
-  for (const model of ["lumen", "nova", "study", "vesper", "spark", "qwen"]) {
+  for (const model of ["lumen", "nova", "study", "vesper", "spark"]) {
     for (const prompt of ["Write a Python function to reverse a string", "Give me a small script to rename files", "Show a CSS snippet for a centered div", "can you give me the code for a small html pacman game", "Fix this short JavaScript snippet"]) {
       assert.equal(shouldSuggestNebula(prompt, model), true, `${model}: ${prompt}`);
     }

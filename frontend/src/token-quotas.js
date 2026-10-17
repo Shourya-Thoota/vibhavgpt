@@ -9,4 +9,4 @@ export const TOKEN_MODEL_NAMES = Object.freeze({ lumen: "Lumen", nova: "Nova", s
 export const ROLLING_TOKEN_WINDOW_MS = 5 * 60 * 60 * 1000;
 
 // Compatibility for persisted selections and historical usage, never a product name.
-export const canonicalModelKey = (key) => ["spark", "qwen"].includes(key) ? "lumen" : key === "ultra" ? "nebula" : key;
+export const canonicalModelKey = (key) => key === "spark" ? "lumen" : key === "ultra" ? "nebula" : key;

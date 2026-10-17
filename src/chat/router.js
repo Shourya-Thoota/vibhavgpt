@@ -24,7 +24,7 @@ import { buildActivitySummary } from "./activity.js";
 import { createConversationGroups, projectSystemPrompt } from "./groups.js";
 import { CHAT_INPUT_TOKEN_BUDGET, estimateChatMessageTokens, estimateChatPromptTokens, fitConversationContext } from "./context-window.js";
 
-const MODEL_ALIASES = { spark: "lumen", qwen: "lumen", lumen: "lumen", nova: "nova", nebula: "nebula", ultra: "nebula", vesper: "vesper" };
+const MODEL_ALIASES = { spark: "lumen", lumen: "lumen", nova: "nova", nebula: "nebula", ultra: "nebula", vesper: "vesper" };
 
 export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const groups = createConversationGroups(db);

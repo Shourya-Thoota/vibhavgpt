@@ -66,7 +66,7 @@ export const MODEL_CONFIGS = {
 };
 
 export function getModelConfig(modelKey) {
-  if (modelKey === "spark" || modelKey === "qwen") modelKey = "lumen";
+  if (modelKey === "spark") modelKey = "lumen";
   return MODEL_CONFIGS[modelKey] ?? MODEL_CONFIGS.lumen;
 }
 

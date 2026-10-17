@@ -27,11 +27,26 @@ test("fixed preference wins, with tier eligibility enforced", () => {
   assert.equal(choose({}, "pro"), "lumen");
 });
 
-test("legacy Lumen preferences retain their selection", () => {
-  for (const key of ["spark", "qwen"]) {
-    assert.equal(choose({ preferredModel: key, lastUsedModel: "nova" }, "free"), "lumen");
-    assert.equal(choose({ lastUsedModel: key }, "plus"), "lumen");
+test("legacy Spark preferences retain their Lumen selection", () => {
+  assert.equal(choose({ preferredModel: "spark", lastUsedModel: "nova" }, "free"), "lumen");
+  assert.equal(choose({ lastUsedModel: "spark" }, "plus"), "lumen");
+});
+
+test("a stale saved qwen preference falls back to Lumen like any unknown key", () => {
+  for (const tier of ["free", "plus", "pro"]) {
+    assert.equal(allowed("qwen", tier), false);
+    assert.equal(choose({ preferredModel: "qwen" }, tier), "lumen");
+    assert.equal(choose({ lastUsedModel: "qwen" }, tier), "lumen");
+    assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "qwen" }, tier), "lumen");
+    assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "not-a-model" }, tier), "lumen");
   }
+  // As with any unknown fixed preference, a valid last-used model is kept.
+  assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "nova" }, "free"), "nova");
+});
+
+test("a conversation saved with an unknown model reopens on Lumen", () => {
+  assert.match(source, /const restoredModel = result\.conversation\.model === "spark" \? "lumen" : result\.conversation\.model;/);
+  assert.match(source, /const conversationModel = modelAllowedForTier\(restoredModel, tier, creditBalance\) \? restoredModel : "lumen";/);
 });
 
 test("Vesper requires a paid plan even with credits", () => {

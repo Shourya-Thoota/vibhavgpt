@@ -28,22 +28,55 @@ async function withKey(run) {
   try { return await run(); } finally { config.providerKeys.paid = original; }
 }
 
-test("a long document that keeps streaming is never cut off by the idle timeout", () => withKey(async () => {
+// Runs a streaming call on a mocked clock: setTimeout and Date only move when
+// this ticks them, so the stream's chunk delays and the idle timer are
+// measured in exact simulated milliseconds and a busy machine cannot stretch
+// a gap. Between ticks it lets real I/O callbacks and promises settle, so
+// each chunk is read before the clock moves on.
+async function onMockClock(t, start, { stepMs = 10, maxMs = 10_000 } = {}) {
+  t.mock.timers.enable({ apis: ["setTimeout", "Date"] });
+  let settled = false;
+  const result = start();
+  result.then(() => { settled = true; }, () => { settled = true; });
+  for (let elapsed = 0; !settled && elapsed <= maxMs; elapsed += stepMs) {
+    for (let flush = 0; flush < 5 && !settled; flush += 1) await new Promise((resolve) => setImmediate(resolve));
+    if (!settled) t.mock.timers.tick(stepMs);
+  }
+  try { return await result; } finally { t.mock.timers.reset(); }
+}
+
+test("a long document that keeps streaming is never cut off by the idle timeout", (t) => withKey(async () => {
   let body;
-  const chunks = Array.from({ length: 8 }, (_, i) => ({ delay: 30, line: delta(`part${i} `) }));
+  // 8 x 90ms = 720ms in total, far past the 100ms idle limit, but no gap ever
+  // reaches it. The clock is mocked, so every gap is exactly 90ms.
+  const chunks = Array.from({ length: 8 }, (_, i) => ({ delay: 90, line: delta(`part${i} `) }));
   chunks.push({ line: delta("", { finish_reason: "stop" }) }, { line: `data: ${JSON.stringify({ choices: [], usage: { completion_tokens: 42 } })}` }, { line: "data: [DONE]" });
-  const { data } = await callModelStreaming("nebula", [{ role: "user", content: "doc" }], undefined, {
-    // 8 x 30ms = 240ms in total, well past the 100ms idle limit, but never idle that long.
+  const { data } = await onMockClock(t, () => callModelStreaming("nebula", [{ role: "user", content: "doc" }], undefined, {
     idleTimeoutMs: 100,
     overallTimeoutMs: 5_000,
     reasoning: false,
     fetchImpl: async (_url, init) => { body = JSON.parse(init.body); return sse(chunks); },
-  });
+  }));
   assert.equal(data.choices[0].message.content.trim(), "part0 part1 part2 part3 part4 part5 part6 part7");
   assert.equal(data.choices[0].finish_reason, "stop");
   assert.equal(data.usage.completion_tokens, 42);
   assert.equal(body.stream, true);
   assert.deepEqual(body.reasoning, { enabled: false, exclude: true });
+}));
+
+test("a stream that goes silent mid-document still hits the idle timeout", (t) => withKey(async () => {
+  // Same 100ms limit and 90ms rhythm, then one 150ms gap: that gap must stop it.
+  const chunks = [
+    ...Array.from({ length: 3 }, (_, i) => ({ delay: 90, line: delta(`part${i} `) })),
+    { delay: 150, line: delta("too late") },
+    { line: "data: [DONE]" },
+  ];
+  await assert.rejects(onMockClock(t, () => callModelStreaming("nebula", [{ role: "user", content: "doc" }], undefined, {
+    idleTimeoutMs: 100,
+    overallTimeoutMs: 5_000,
+    reasoning: false,
+    fetchImpl: async () => sse(chunks),
+  })), (error) => error.stageCode === "provider-stalled");
 }));
 
 test("a provider that goes quiet fails fast instead of holding the request", () => withKey(async () => {

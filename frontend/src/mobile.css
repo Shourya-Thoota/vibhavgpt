@@ -355,6 +355,7 @@
     font-weight: 600;
   }
   .composer__row .composer__add-trigger,
+  .composer__row .composer__mic,
   .composer__row .composer__send { flex: 0 0 auto; width: 40px; height: 40px; }
   .composer__row .pill-toggle {
     flex: 0 0 auto;

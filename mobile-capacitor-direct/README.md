@@ -7,10 +7,12 @@ and web/Stripe billing.
 This folder is the source of truth for the native project. Permissions, deep
 links and plugins live here, in particular:
 
-- `android/app/src/main/AndroidManifest.xml`: permissions (internet only; the
-  app does not request the microphone) and the `vibhavgpt://account` deep link
+- `android/app/src/main/AndroidManifest.xml`: permissions (internet, plus the
+  microphone permission merged in by the speech recognition plugin for
+  composer dictation) and the `vibhavgpt://account` deep link
   used by billing and Google sign-in returns.
-- `package.json`: Capacitor plugins (`@capacitor/app`, `@capacitor/browser`).
+- `package.json`: Capacitor plugins (`@capacitor/app`, `@capacitor/browser`,
+  `@capacitor-community/speech-recognition` for on-device dictation).
 
 `npx cap sync` does not modify the manifest, so edits here persist. Do not
 regenerate `android/` with `cap add`; that would discard them.
