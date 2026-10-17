@@ -164,8 +164,9 @@ test("settlement failure after a successful reply stops both paths", async () =>
   }
 });
 
-test("legacy keys use Lumen's direct primary in both response paths", async () => {
-  for (const key of ["spark", "qwen"]) for (const [call, success] of [[callModelWithFallback, answer], [callModelStreaming, streamAnswer]]) {
+test("the legacy Spark key and unknown keys use Lumen's direct primary in both response paths", async () => {
+  // "qwen" is a retired key with no alias left; it is routed like any unknown key.
+  for (const key of ["spark", "qwen", "not-a-model"]) for (const [call, success] of [[callModelWithFallback, answer], [callModelStreaming, streamAnswer]]) {
     let request;
     await call(key, messages, undefined, { fetchImpl: async (url, init) => { request = { url, body: JSON.parse(init.body) }; return success(); } });
     assert.equal(request.url, lumenEndpoints[0]);

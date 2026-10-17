@@ -22,6 +22,18 @@ const { workspaceNames, NAMELESS_GREETING } = await import("../frontend/src/disp
 
 const callMeLine = (name) => `<!-- vibhavgpt:personality -->\nHow I like answers written:\n- Call the user ${name} when addressing them by name is natural.\n- Use metric units (kilometres, kilograms, Celsius) unless the user asks otherwise.\n<!-- /vibhavgpt:personality -->`;
 
+// A moderation call that never answers and settles only when its signal
+// aborts. reviewDisplayName aborts with AbortSignal.timeout, whose timer is
+// unref'd and so never keeps the process alive by itself. A real fetch holds an
+// open socket while it waits; this fake holds a timer instead, or the event
+// loop empties before the abort fires and the test is cancelled.
+function hangingFetch(_url, init) {
+  return new Promise((_resolve, reject) => {
+    const keepAlive = setInterval(() => {}, 1_000);
+    init.signal.addEventListener("abort", () => { clearInterval(keepAlive); reject(init.signal.reason); }, { once: true });
+  });
+}
+
 function withoutModeration(t) {
   const saved = { key: config.moderationApiKey, primary: config.providerKeys.primaryFree };
   config.moderationApiKey = "";
@@ -106,8 +118,7 @@ test("the moderation layer can add a block, and a failure or timeout never block
   assert.deepEqual(await reviewDisplayName("Anna", { fetchImpl: reply("not json") }), { allowed: true, reason: "" });
   assert.deepEqual(await reviewDisplayName("Anna", { fetchImpl: reply('{"allowed":false}', false) }), { allowed: true, reason: "" });
   assert.deepEqual(await reviewDisplayName("Anna", { fetchImpl: async () => { throw new Error("offline"); } }), { allowed: true, reason: "" });
-  const hanging = (_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)));
-  assert.deepEqual(await reviewDisplayName("Anna", { fetchImpl: hanging, timeoutMs: 20 }), { allowed: true, reason: "" });
+  assert.deepEqual(await reviewDisplayName("Anna", { fetchImpl: hangingFetch, timeoutMs: 20 }), { allowed: true, reason: "" });
   let called = false;
   assert.equal((await reviewDisplayName("zorblax", { fetchImpl: async () => { called = true; } })).allowed, false);
   assert.equal(called, false, "a name the blocklist catches needs no second opinion");
@@ -128,8 +139,7 @@ test("the check never logs the name", async (t) => {
     checkDisplayName(name);
     safeDisplayName(name);
     await reviewDisplayName(name, { fetchImpl: async () => { throw new Error(`failed for ${name}`); } });
-    const timeout = (_url, init) => new Promise((_resolve, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason)));
-    await reviewDisplayName(name, { fetchImpl: timeout, timeoutMs: 10 });
+    await reviewDisplayName(name, { fetchImpl: hangingFetch, timeoutMs: 10 });
   }
   auditRows(names.map((name, index) => ({ id: `user-${index}`, name, custom_instructions: callMeLine(name) })));
   Object.assign(console, originals);

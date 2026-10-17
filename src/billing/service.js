@@ -101,6 +101,27 @@ export async function hadSubscriptionBefore({ userId, customerId }, { stripe, ex
   return Boolean(searched?.data?.length);
 }
 
+// Short notes shown on the Stripe Checkout page, above the pay button
+// (submit) and below it (after_submit). Every line must match what this file
+// and the Terms actually do: a first subscription gets a 7-day trial, plans
+// renew unless canceled, cancellation is in Plan and billing, and Flex
+// Credits are a one-time purchase added once the payment is confirmed.
+const CANCEL_NOTE = "You can cancel in VibhavGPT under Plan and billing. Billing terms are at vibhavgpt.com/terms.";
+export const CHECKOUT_TEXT = {
+  trial: {
+    submit: { message: "Your 7-day VibhavGPT trial starts today. When it ends, you are billed the price shown, and your plan renews unless you cancel." },
+    after_submit: { message: CANCEL_NOTE },
+  },
+  paid: {
+    submit: { message: "Your VibhavGPT plan starts today and you are billed the price shown. Your plan renews unless you cancel." },
+    after_submit: { message: CANCEL_NOTE },
+  },
+  credits: {
+    submit: { message: "This is a one-time purchase of VibhavGPT Flex Credits. It does not renew." },
+    after_submit: { message: "Your credits are added to your VibhavGPT account once the payment is confirmed. Credit terms are at vibhavgpt.com/terms." },
+  },
+};
+
 export async function createCheckoutSession({ userId, email, priceLookupKey, origin, returnToApp = false }, { stripe, executor = db, getCustomer = getOrCreateBillingCustomer } = {}) {
   if (!tierForPriceLookupKey(priceLookupKey ?? "")) throw new Error("Invalid price selection.");
   const client = stripe ?? stripeClient();
@@ -119,6 +140,7 @@ export async function createCheckoutSession({ userId, email, priceLookupKey, ori
     client_reference_id: userId,
     subscription_data: { ...(trial ? { trial_period_days: 7 } : {}), metadata: { userId } },
     metadata: { userId },
+    custom_text: trial ? CHECKOUT_TEXT.trial : CHECKOUT_TEXT.paid,
     success_url: redirects.successUrl,
     cancel_url: redirects.cancelUrl,
   });
@@ -169,6 +191,7 @@ export function creditCheckoutSessionParams({ userId, customerId, cents, credits
       amountCents: String(cents),
     },
     payment_intent_data: { metadata: { kind: "credit_purchase", userId, credits: String(credits) } },
+    custom_text: CHECKOUT_TEXT.credits,
     success_url: redirects.successUrl,
     cancel_url: redirects.cancelUrl,
   };

@@ -32,3 +32,18 @@ test("voice is gone: no dictation, Live Comet call, or voice module in the app",
     assert.equal(existsSync(new URL(path, import.meta.url)), false, `${path} should be removed`);
   }
 });
+
+test("composer dictation stays on the device: no server audio, mic in both layouts", () => {
+  const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
+  const dictation = read("../frontend/src/dictation.js");
+  const app = read("../frontend/src/App.jsx");
+  assert.doesNotMatch(dictation, /\/api\/|fetch\(|getUserMedia|MediaRecorder/);
+  assert.match(dictation, /webkitSpeechRecognition/);
+  assert.match(dictation, /Electron/);
+  assert.match(dictation, /registerPlugin\("SpeechRecognition"\)/);
+  assert.match(app, /\{composerInput\}\s*\{micButton\}\s*\{sendButton\}/);
+  assert.match(app, /\{micButton\}\s*\{sendButton\}\s*<\/div>\s*<\/div>\s*<\/form>/);
+  for (const shell of ["../mobile-capacitor/package.json", "../mobile-capacitor-direct/package.json"]) {
+    assert.match(read(shell), /"@capacitor-community\/speech-recognition"/);
+  }
+});

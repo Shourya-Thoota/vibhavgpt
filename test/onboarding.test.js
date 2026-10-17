@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   cleanPreferredName, defaultOnboarding, MANAGED_BLOCK_START, mergeInstructions, normalizeOnboarding,
-  ONBOARDING_STEPS, personalityInstructions, stripManagedInstructions,
+  ONBOARDING_STEPS, personalityInstructions, ROLE_OPTIONS, stripManagedInstructions,
 } from "../frontend/src/onboarding.js";
 
 test("older saved answers gain the new questions' defaults", () => {
@@ -14,6 +14,16 @@ test("older saved answers gain the new questions' defaults", () => {
   assert.equal(record.sky, "dark");
   assert.equal(record.theme, "nebula");
   assert.equal(record.personality.concise_detailed, 20);
+});
+
+test("the retired Code role is no longer offered, and a saved one is dropped safely", () => {
+  assert.equal(ROLE_OPTIONS.some((option) => option.value === "code"), false);
+  const roleStep = ONBOARDING_STEPS.find((step) => step.id === "role");
+  assert.equal(roleStep.options.some((option) => option.value === "code" || option.label === "Code"), false);
+  const record = normalizeOnboarding({ onboarding_completed: true, role: ["code", "study", "write", "not-a-role"] });
+  assert.deepEqual(record.role, ["study", "write"]);
+  assert.deepEqual(normalizeOnboarding({ role: ["code"] }).role, []);
+  assert.equal(record.onboarding_completed, true, "an older answer set still counts as finished");
 });
 
 test("unknown answers fall back instead of reaching the prompt", () => {

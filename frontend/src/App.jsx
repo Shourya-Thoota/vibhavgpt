@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   ArrowUp, BarChart3, Brain, Check, ChevronRight, Copy, CreditCard, Eye, EyeOff, FileText, Fingerprint,
-  Globe, Image as ImageIcon, LogOut, Mail, Menu as MenuIcon,
+  Globe, Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
   Moon, Paperclip, Plus, RotateCw, Settings as SettingsIcon,
   Download, Lock, MessageSquareText, Palette, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
 } from "lucide-react";
@@ -28,6 +28,7 @@ import { passkeysSupported, signInWithPasskey as runPasskeySignIn } from "./pass
 import { BottomSheet, ChoiceCards, dismissTopOverlay, Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal, NARROW_QUERY, Segmented, Select, SettingsSelect, useMediaQuery } from "./components/ui.jsx";
 import { RevealWords, TypingDots, useTypewriter } from "./components/Typing.jsx";
 import { copyText } from "./clipboard.js";
+import { joinDictation, useDictation } from "./dictation.js";
 import { protectPlainDollarSigns, normalizeTexDelimiters } from "./markdown.js";
 import { emailOtpVerificationRequest } from "./auth-code-endpoint.js";
 import { api, apiRequest, responseError } from "./api.js";
@@ -1526,7 +1527,7 @@ function modelAllowedForTier(model, tier, creditBalance = 0) {
 }
 
 function preferredModelForProfile(preferences, tier, creditBalance = 0) {
-  const currentKey = (key) => ["spark", "qwen"].includes(key) ? "lumen" : key === "ultra" ? "nebula" : key;
+  const currentKey = (key) => key === "spark" ? "lumen" : key === "ultra" ? "nebula" : key;
   const candidates = [currentKey(preferences?.preferredModel), currentKey(preferences?.lastUsedModel), "lumen"];
   return candidates.find((model) => modelAllowedForTier(model, tier, creditBalance)) ?? "lumen";
 }
@@ -2035,9 +2036,9 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           }} onDismiss={() => setAccessNotice(null)} />
         {page === "chat" && <div className="mode-tabs-bar">{modeTabs}</div>}
         {modeError && <p className="banner banner--error" role="alert">{modeError}</p>}
-        {upgradeConfirmation === "confirming" && <p className="banner" role="status">Confirming your upgrade…</p>}
-        {upgradeConfirmation === "confirmed" && <p className="banner" role="status">Your plan upgrade is confirmed.</p>}
-        {upgradeConfirmation === "delayed" && <p className="banner banner--error" role="status">This is taking longer than expected. Refresh in a moment, or contact support if this persists.</p>}
+        {upgradeConfirmation === "confirming" && <p className="banner" role="status">Confirming your plan…</p>}
+        {upgradeConfirmation === "confirmed" && <p className="banner" role="status">Your new plan is ready to use.</p>}
+        {upgradeConfirmation === "delayed" && <p className="banner banner--error" role="status">Your payment is still being confirmed. Refresh this page in a minute. If your plan has not changed, email support@pansophy.com.</p>}
         {directUpdate && (
           <div className="banner direct-update" role="status">
             <span><strong>VibhavGPT {directUpdate.versionName} is available.</strong>{directUpdate.releaseNotes ? ` ${directUpdate.releaseNotes}` : ""}</span>
@@ -2238,6 +2239,13 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const mountedRef = useRef(true);
+  // Text already in the field when dictation started; what's heard is
+  // appended to it, so speaking never erases what was typed.
+  const dictationBaseRef = useRef("");
+  const dictation = useDictation({
+    onTranscript: (spoken) => setDraft(joinDictation(dictationBaseRef.current, spoken)),
+    onError: (message) => setError(message),
+  });
   const [quickPreferences, setQuickPreferences] = useState({ responseStyle: "balanced", customInstructions: "", thinkingEffort: "normal" });
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [modelSaving, setModelSaving] = useState(false);
@@ -2271,7 +2279,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         if (cancelled) return;
         setConversationId(result.conversation.id);
         setConversationTitle(result.conversation.title ?? "");
-        const restoredModel = ["spark", "qwen"].includes(result.conversation.model) ? "lumen" : result.conversation.model;
+        const restoredModel = result.conversation.model === "spark" ? "lumen" : result.conversation.model;
         const conversationModel = modelAllowedForTier(restoredModel, tier, creditBalance) ? restoredModel : "lumen";
         setModel(conversationModel);
         onModelChange?.(conversationModel);
@@ -2602,6 +2610,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       return;
     }
     const selectedAttachments = attachments;
+    if (dictation.listening) dictation.stop();
     setDraft("");
     setAttachments([]);
     // A reply is still coming in: queue this one instead. The stream is left
@@ -2794,6 +2803,27 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       <span>Web</span>
     </button>
   );
+  const micButton = dictation.supported && (
+    <button
+      type="button"
+      className="composer__mic"
+      aria-label={dictation.listening ? "Stop dictation" : "Dictate a message"}
+      title={dictation.listening ? "Stop dictation" : "Dictate a message"}
+      aria-pressed={dictation.listening}
+      onClick={() => {
+        if (dictation.listening) {
+          dictation.stop();
+          inputRef.current?.focus();
+          return;
+        }
+        setError("");
+        dictationBaseRef.current = draft;
+        dictation.start();
+      }}
+    >
+      <Mic size={18} strokeWidth={2} />
+    </button>
+  );
   const sendButton = (
     <button className="composer__send" aria-label={busy ? "Add to queue" : "Send message"} title={busy ? "Add to queue" : "Send message"} disabled={!draft.trim() && !attachments.length}>
       <ArrowUp size={18} strokeWidth={2.4} />
@@ -2971,6 +3001,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
               <div className="composer__row">
                 {addSheetButton}
                 {composerInput}
+                {micButton}
                 {sendButton}
               </div>
               {fileInputs}
@@ -3015,6 +3046,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                   renderValue={(option) => <><ModelOrb model={option.value} size="sm" /><span>{option.label}</span></>}
                   renderOption={(option, { selected }) => <ModelRow entry={option} allowed={!option.disabled} selected={selected} />}
                 />}
+                {micButton}
                 {sendButton}
               </div>
             </div>
@@ -4265,8 +4297,8 @@ function UsageDashboard({ onOpenSettings, onLegal }) {
       </header>
 
       {error && <p className="note note--error" role="alert">{error}</p>}
-      {creditResult === "success" && <p className="note note--good">Payment completed. Your balance will refresh as soon as the payment is confirmed.</p>}
-      {creditResult === "cancelled" && <p className="note">Credit purchase cancelled. You were not charged.</p>}
+      {creditResult === "success" && <p className="note note--good">Thanks for your purchase. Your credits will show in your balance once the payment is confirmed.</p>}
+      {creditResult === "cancelled" && <p className="note">Purchase canceled. You were not charged.</p>}
       {!usage && !error ? <TypingDots label="Loading usage" /> : usage && (
         <>
           <article className="usage-hero">

@@ -1253,6 +1253,29 @@ p { margin: 0; }
 }
 .composer__send:hover:not(:disabled) { background: var(--accent-hover); transform: scale(1.06); }
 .composer__send:disabled { opacity: 0.35; }
+.composer__mic {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-round);
+  color: var(--ink-2);
+  transition: background-color 160ms var(--ease), color 160ms var(--ease);
+}
+.composer__mic:hover { background: var(--surface-2); color: var(--accent); }
+/* Listening: filled accent ring that breathes, so it's obvious the mic is on. */
+.composer__mic[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  animation: composer-mic-pulse 1.4s var(--ease) infinite;
+}
+@keyframes composer-mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-soft); }
+  50% { box-shadow: 0 0 0 6px var(--accent-soft); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .composer__mic[aria-pressed="true"] { animation: none; }
+}
 
 .pill-toggle {
   display: inline-flex;

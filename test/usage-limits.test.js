@@ -97,7 +97,7 @@ test("historical Spark tokens and holds share the Lumen pool and new alias reser
     assert.equal(usage.rollingReservedTokenBreakdown.lumen, 17000);
     assert.equal(usage.tokenBreakdown.spark, undefined);
     await assert.rejects(reserveUsage("a", "lumen", "normal", 1001, f.db, now), /Lumen limit/);
-    for (const key of ["spark", "qwen", "lumen"]) {
+    for (const key of ["spark", "lumen"]) {
       const event = await reserveUsage("b", key, "normal", 100, f.db, now);
       const stored = (await f.db.select().from(usageEvents)).find((row) => row.id === event.id);
       assert.equal(stored.model, "lumen");
@@ -105,6 +105,29 @@ test("historical Spark tokens and holds share the Lumen pool and new alias reser
     assert.deepEqual(LIMITS.free.lumen, { monthly: 1e6, rolling: 1e5 });
     assert.deepEqual(LIMITS.plus.lumen, { monthly: 8e6, rolling: 8e5 });
     assert.deepEqual(LIMITS.pro.lumen, { monthly: 12e6, rolling: 1.2e6 });
+  } finally { await f.client.close(); }
+});
+test("Lumen usage counts lumen and spark rows, and the retired qwen key is treated as unknown", async () => {
+  const f = await fixture();
+  try {
+    const now = new Date("2026-10-04T12:00:00Z");
+    await f.db.insert(usageEvents).values([
+      { userId: "a", model: "lumen", inputTokens: 3000, outputTokens: 500, createdAt: now },
+      { userId: "a", model: "lumen", inputTokens: 1000, outputTokens: 250, createdAt: now },
+      { userId: "a", model: "spark", inputTokens: 2000, outputTokens: 250, createdAt: now },
+      { userId: "a", model: "nova", inputTokens: 700, outputTokens: 300, createdAt: now },
+      { userId: "a", model: "qwen", inputTokens: 9000, outputTokens: 900, createdAt: now },
+      { userId: "a", model: "not-a-model", inputTokens: 8000, outputTokens: 800, createdAt: now },
+    ]);
+    const usage = await getCurrentUsage("a", f.db, now);
+    assert.deepEqual(usage.tokenBreakdown.lumen, { input: 6000, output: 1000, total: 7000 });
+    assert.equal(usage.rollingTokenBreakdown.lumen.total, 7000);
+    assert.equal(usage.tokenBreakdown.nova.total, 1000);
+    assert.equal(usage.tokenBreakdown.qwen, undefined);
+    for (const key of ["qwen", "not-a-model"]) {
+      await assert.rejects(reserveUsage("b", key, "normal", 100, f.db, now), (error) => error.code === "plan-required" && error.status === 403);
+    }
+    assert.equal((await f.db.select().from(usageEvents)).filter((row) => row.userId === "b").length, 0);
   } finally { await f.client.close(); }
 });
 test("failed generations refund reserved credits exactly once", async () => {

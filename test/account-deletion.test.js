@@ -72,6 +72,22 @@ test("deleting an account removes everything it owns and nothing else", async (t
   assert.equal(await count(client, `"verification"`, "identifier", "sign-in-otp-ba@b.com"), 1);
 });
 
+test("the legacy Google Play tables are dropped, and deletion no longer refers to them", async (t) => {
+  const client = new PGlite();
+  t.after(() => client.close());
+  await applyMigrations(client);
+  for (const table of ["google_play_purchases", "google_play_accounts", "google_play_notifications"]) {
+    const { rows: [row] } = await client.query(`SELECT to_regclass($1) AS name`, [`public.${table}`]);
+    assert.equal(row.name, null, `${table} should not exist after migrations`);
+  }
+  // The drop is idempotent: running it again on a database without the tables is a no-op.
+  await client.exec(await readFile(new URL("../drizzle/0025_drop_google_play_tables.sql", import.meta.url), "utf8"));
+  const source = await readFile(new URL("../src/account/deletion.js", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /googlePlay|google_play/);
+  const schema = await readFile(new URL("../src/db/schema.js", import.meta.url), "utf8");
+  assert.doesNotMatch(schema, /googlePlay|google_play/);
+});
+
 test("a failed deletion rolls back and leaves the account whole", async (t) => {
   const client = new PGlite();
   t.after(() => client.close());

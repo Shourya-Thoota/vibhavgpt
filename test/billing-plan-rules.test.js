@@ -10,7 +10,7 @@ process.env.DATABASE_URL ||= "postgresql://unused:unused@127.0.0.1:9/unused";
 const { config } = await import("../src/config.js");
 config.databaseUrl ||= process.env.DATABASE_URL;
 const {
-  applySubscriptionEvent, changeSubscriptionPlan, createCheckoutSession, saveSubscription, subscriptionRecordFor, DOWNGRADE_PAUSED,
+  applySubscriptionEvent, changeSubscriptionPlan, createCheckoutSession, saveSubscription, subscriptionRecordFor, DOWNGRADE_PAUSED, CHECKOUT_TEXT,
 } = await import("../src/billing/service.js");
 
 const DAY = 86_400;
@@ -227,4 +227,52 @@ test("replayed and out-of-order webhook events cannot raise a tier or end the cu
   const stale = updatedEvent("sub_new", { status: "active", items: { data: [{ price: { lookup_key: "vibhavgpt_pro_monthly" } }] } });
   for (let replay = 0; replay < 3; replay += 1) await applySubscriptionEvent(stale, { persist, retrieveSubscription: provider.retrieve });
   assert.equal((await row(client)).tier, "plus", "replays re-apply the provider's current state, never the payload");
+});
+
+test("subscription Checkout shows trial or non-trial notes and changes nothing else", async (t) => {
+  const { client, db } = await database(t);
+  const getCustomer = async () => "cus_member";
+  const baseUrl = config.clientOrigins.includes("https://vibhavgpt.com") ? "https://vibhavgpt.com" : config.clientOrigins[0];
+  // Every field but custom_text, exactly as it was before the notes were added.
+  const expected = (userId, trial) => ({
+    mode: "subscription",
+    line_items: [{ price: "price_vibhavgpt_plus_monthly", quantity: 1 }],
+    customer: "cus_member",
+    client_reference_id: userId,
+    subscription_data: { ...(trial ? { trial_period_days: 7 } : {}), metadata: { userId } },
+    metadata: { userId },
+    success_url: `${baseUrl}/account?upgraded=true`,
+    cancel_url: `${baseUrl}/account`,
+  });
+
+  const first = fakeProvider(providerSubscription());
+  await createCheckoutSession({ userId: "first", email: "member@example.invalid", priceLookupKey: "vibhavgpt_plus_monthly", origin: "https://vibhavgpt.com" }, { stripe: first.client, executor: db, getCustomer });
+  const { custom_text: trialText, ...trialRest } = first.calls.find(([name]) => name === "checkout")[1];
+  assert.deepEqual(trialText, CHECKOUT_TEXT.trial);
+  assert.deepEqual(trialRest, expected("first", true));
+
+  await client.query("INSERT INTO subscriptions (user_id, subscription_id, tier, status) VALUES ('again', 'sub_old', 'free', 'canceled')");
+  const again = fakeProvider(providerSubscription());
+  await createCheckoutSession({ userId: "again", email: "member@example.invalid", priceLookupKey: "vibhavgpt_plus_monthly", origin: "https://vibhavgpt.com" }, { stripe: again.client, executor: db, getCustomer });
+  const { custom_text: paidText, ...paidRest } = again.calls.find(([name]) => name === "checkout")[1];
+  assert.deepEqual(paidText, CHECKOUT_TEXT.paid);
+  assert.deepEqual(paidRest, expected("again", false));
+
+  assert.notEqual(trialText.submit.message, paidText.submit.message, "the trial and non-trial notes differ");
+  assert.match(trialText.submit.message, /7-day/);
+  assert.doesNotMatch(paidText.submit.message, /trial/i);
+});
+
+test("Checkout notes are short, plain, and promise nothing the Terms do not", () => {
+  for (const [variant, text] of Object.entries(CHECKOUT_TEXT)) {
+    assert.deepEqual(Object.keys(text).sort(), ["after_submit", "submit"], variant);
+    assert.equal("terms_of_service_acceptance" in text, false, variant);
+    for (const [slot, { message }] of Object.entries(text)) {
+      const label = `${variant}.${slot}`;
+      assert.ok(message.length > 0 && message.length <= 300, `${label} is ${message.length} characters`);
+      assert.doesNotMatch(message, /\u2014|\u2013|!/, `${label} has no dashes or exclamation marks`);
+      assert.doesNotMatch(message, /refund|uptime|never expire|do not expire|seamless|unlock|elevate|supercharge|leverage|delve|game-changer|journey/i, label);
+      assert.match(message, /VibhavGPT|vibhavgpt\.com/, `${label} names the product`);
+    }
+  }
 });

@@ -185,63 +185,6 @@ export const subscriptions = pgTable(
   ],
 );
 
-// Legacy: Android in-app subscription records from before VibhavGPT moved to
-// web billing only. Nothing writes to these tables any more; they stay so
-// existing rows remain readable and are deleted with their account (see
-// account/router.js). Dropping them would be a separate migration.
-// Purchase tokens were only ever stored as SHA-256 hashes.
-export const googlePlayPurchases = pgTable(
-  "google_play_purchases",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id").notNull(),
-    purchaseTokenHash: text("purchase_token_hash").notNull(),
-    linkedPurchaseTokenHash: text("linked_purchase_token_hash"),
-    productId: text("product_id").notNull(),
-    basePlanId: text("base_plan_id").notNull(),
-    orderId: text("order_id"),
-    providerStatus: text("provider_status").notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true }),
-    autoRenewEnabled: boolean("auto_renew_enabled").default(false).notNull(),
-    acknowledgementState: text("acknowledgement_state"),
-    isTestPurchase: boolean("is_test_purchase").default(false).notNull(),
-    lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }).defaultNow().notNull(),
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("google_play_purchases_token_hash_unique").on(table.purchaseTokenHash),
-    index("google_play_purchases_user_idx").on(table.userId, table.createdAt),
-    index("google_play_purchases_linked_token_idx").on(table.linkedPurchaseTokenHash),
-  ],
-);
-
-// Legacy (see above): the hashed account identifier used at purchase time.
-export const googlePlayAccounts = pgTable(
-  "google_play_accounts",
-  {
-    id: uuid("id").defaultRandom().primaryKey(),
-    userId: text("user_id").notNull(),
-    obfuscatedAccountIdHash: text("obfuscated_account_id_hash").notNull(),
-    ...timestamps,
-  },
-  (table) => [
-    uniqueIndex("google_play_accounts_user_unique").on(table.userId),
-    uniqueIndex("google_play_accounts_account_hash_unique").on(table.obfuscatedAccountIdHash),
-  ],
-);
-
-// Legacy (see above): processed store notification IDs.
-export const googlePlayNotifications = pgTable(
-  "google_play_notifications",
-  {
-    messageId: text("message_id").primaryKey(),
-    purchaseTokenHash: text("purchase_token_hash"),
-    notificationType: text("notification_type"),
-    processedAt: timestamp("processed_at", { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [index("google_play_notifications_token_idx").on(table.purchaseTokenHash)],
-);
-
 // A billing customer belongs to an app user even when they have never had a
 // subscription. This prevents one-time credit Checkouts from becoming
 // anonymous Stripe guest purchases.
