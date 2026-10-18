@@ -4,6 +4,8 @@ VibhavGPT is a private AI workspace for chat, image creation and study, with mem
 
 🌐 Live at [vibhavgpt.com](https://vibhavgpt.com)
 
+💻 GitHub: [Shourya-Thoota/vibhavgpt](https://github.com/Shourya-Thoota/vibhavgpt)
+
 ## ✨ Features
 
 * 💬 **Chat**: fast streaming conversations with saved history
@@ -26,7 +28,7 @@ VibhavGPT is a private AI workspace for chat, image creation and study, with mem
 * 📵 **No ads.**
 * 🧠 **Memory you control.** You can see, edit and delete what it remembers.
 * 🗑️ **You can leave.** You can delete your account and its data from the app.
-* 🔍 **Check it yourself.** The code is open source under AGPL-3.0, so you can read how your data is handled.
+* 🔍 **Check it yourself.** The [code is open source](https://github.com/Shourya-Thoota/vibhavgpt) under AGPL-3.0, so you can read how your data is handled.
 
 ## 🗂️ What's in this repo
 
@@ -75,6 +77,6 @@ npm run build --prefix frontend
 
 Copyright (C) 2026 Pansophy LLC
 
-VibhavGPT is licensed under the GNU Affero General Public License, version 3 only. See [LICENSE](LICENSE) for the full text.
+VibhavGPT is licensed under the GNU Affero General Public License, version 3 only (AGPL-3.0-only). See [LICENSE](LICENSE) for the full text. The source code is published at [github.com/Shourya-Thoota/vibhavgpt](https://github.com/Shourya-Thoota/vibhavgpt).
 
 VibhavGPT and Pansophy are trademarks of Pansophy LLC. The names and logos are not covered by the license, so you may not use them to name or promote a modified version.

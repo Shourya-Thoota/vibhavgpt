@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import {
-  BarChart3, Brain, ChevronDown, CreditCard, FileText,
+  BarChart3, Brain, ChevronDown, Code, CreditCard, FileText,
   LogOut, MessageSquare, Monitor, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Plus,
   Settings as SettingsIcon, Smartphone, Sun, Trash2, X,
 } from "lucide-react";
+import { SOURCE_REPO_URL } from "../source-repo.js";
 import { Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "./ui.jsx";
 import { AccountBillingMenu } from "./AccountBillingMenu.jsx";
 import ConversationLibrary from "./ConversationLibrary.jsx";
@@ -123,10 +124,12 @@ const CHAT_LINKS = () => [
   { id: "billing", label: "Plan", icon: <CreditCard size={17} strokeWidth={1.9} /> },
 ];
 
-// The native apps' public download pages: plain links, outside the app.
+// The native apps' public download pages: plain links, outside the app. The
+// public source code opens in a new tab.
 const APP_LINKS = [
   { href: "/android", label: "Android", icon: <Smartphone size={17} strokeWidth={1.9} /> },
   { href: "/vibhavgpt-windows", label: "Windows", icon: <Monitor size={17} strokeWidth={1.9} /> },
+  { href: SOURCE_REPO_URL, label: "Source code", icon: <Code size={17} strokeWidth={1.9} />, external: true },
 ];
 
 /**
@@ -230,7 +233,8 @@ export default function Sidebar({
         <nav className="sidebar__nav sidebar__apps" aria-label="Apps">
           {!rail && <span className="sidebar__apps-label">Apps</span>}
           {APP_LINKS.map((link) => (
-            <a key={link.href} href={link.href} className="sidebar__link" title={rail ? link.label : undefined}>
+            <a key={link.href} href={link.href} className="sidebar__link" title={rail ? link.label : undefined}
+              {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
               {link.icon}
               {!rail && <span>{link.label}</span>}
             </a>
