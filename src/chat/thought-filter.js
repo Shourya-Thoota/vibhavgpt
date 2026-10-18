@@ -210,9 +210,48 @@ const STRICT_META = [
   /\b(?:system\s+prompt|system\s+message|system\s+instructions?|developer\s+(?:message|instructions?))\b/i,
   /\bthird[- ]party\s+model\b/i,
   // "Must not name the provider", "Don't mention the model", "Never reveal upstream".
-  new RegExp(String.raw`\b(?:must\s+not|mustn't|should\s+not|shouldn't|do\s+not|don't|never|can't|cannot|not\s+to)\s+${NAMING_VERB}\b[^.!?\n]{0,60}\b${PLATFORM}\b`, "i"),
-  new RegExp(String.raw`^(?:not|no|never)\s+${NAMING_VERB}\b[^.!?\n]{0,60}\b${PLATFORM}\b`, "i"),
+  // A decimal point ("Kimi K2.6") does not end the gap.
+  new RegExp(String.raw`\b(?:must\s+not|mustn't|should\s+not|shouldn't|do\s+not|don't|never|can't|cannot|not\s+to)\s+${NAMING_VERB}\b(?:[^.!?\n]|\.(?=\d)){0,60}\b${PLATFORM}\b`, "i"),
+  new RegExp(String.raw`^(?:not|no|never)\s+${NAMING_VERB}\b(?:[^.!?\n]|\.(?=\d)){0,60}\b${PLATFORM}\b`, "i"),
+  // "According to the identity instructions", "the memory rules".
+  /\b(?:identity|persona|memory)\s+(?:instructions?|rules?|guidelines?|prompt|directives?|constraints?)\b/i,
+  // "I am currently operating as VibhavGPT Nebula", "So I'll answer: I'm VibhavGPT".
+  /^(?:i'm|i\s+am)\s+(?:currently\s+|now\s+)?(?:operating|running|acting|serving|working|functioning|deployed)\s+as\b/i,
+  /\b(?:i'm|i\s+am|identify\s+(?:myself|yourself)\s+as|introduce\s+myself\s+as|operating\s+as)\s+(?:currently\s+)?vibhavgpt\b/i,
+  /\bidentify\s+(?:myself|yourself)\s+as\b/i,
+  // The saved memory, read back: "The saved account facts mention ...",
+  // "the user wants to be addressed as 'Vibhav'".
+  /\bsaved\s+(?:account\s+|user\s+)?(?:facts?|memor(?:y|ies))\b/i,
+  /\baccount\s+facts?\b/i,
+  /\b(?:wants?|prefers?|asked|would\s+like)\s+to\s+be\s+(?:addressed|called|referred\s+to)\b/i,
 ];
+
+// Thinking that quotes the request's private text (its instructions or the
+// user's saved facts) word for word is never shown, wherever it appears. The
+// private text is indexed as runs of QUOTE_WORDS words; a short fact is also
+// matched whole when it has at least MIN_FACT_WORDS words.
+const QUOTE_WORDS = 6;
+const MIN_FACT_WORDS = 4;
+const words = (text) => String(text ?? "").toLowerCase().replace(/[’']/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+
+export function createPrivateTextIndex(texts = []) {
+  const runs = new Set();
+  const phrases = [];
+  for (const text of [texts].flat()) {
+    const list = words(text);
+    for (let i = 0; i + QUOTE_WORDS <= list.length; i += 1) runs.add(list.slice(i, i + QUOTE_WORDS).join(" "));
+    if (list.length >= MIN_FACT_WORDS && list.length < QUOTE_WORDS) phrases.push(` ${list.join(" ")} `);
+  }
+  if (!runs.size && !phrases.length) return null;
+  return {
+    quotes(sentence) {
+      const list = words(sentence);
+      for (let i = 0; i + QUOTE_WORDS <= list.length; i += 1) if (runs.has(list.slice(i, i + QUOTE_WORDS).join(" "))) return true;
+      const joined = ` ${list.join(" ")} `;
+      return phrases.some((phrase) => joined.includes(phrase));
+    },
+  };
+}
 
 const OPENING_META = new RegExp([
   // Restating the request.
@@ -260,10 +299,12 @@ export function isMetaDeliberation(sentence) {
 const SENTENCE_END = /[.!?](?=\s|$)|\n/;
 const MAX_SENTENCE_HOLD = 600;
 
-export function createMetaThoughtFilter() {
+export function createMetaThoughtFilter({ privateText = [] } = {}) {
+  const quoted = createPrivateTextIndex(privateText);
   let opening = true;
   let held = "";
   const judgeOne = (sentence) => {
+    if (quoted?.quotes(sentence)) return /\n\s*$/.test(sentence) && !opening ? "\n" : "";
     if (opening) {
       if (isMetaDeliberation(sentence)) return "";
       // The first real reasoning ends the opening.
@@ -278,7 +319,10 @@ export function createMetaThoughtFilter() {
     let out = "";
     for (;;) {
       const end = SENTENCE_END.exec(held);
-      if (!end) {
+      // A stop after a digit at the very end of what has arrived may be a
+      // decimal point ("K2.6"); it is judged once the next character shows which.
+      const waiting = end && !final && end[0] === "." && end.index + 1 === held.length && /\d$/.test(held.slice(0, -1));
+      if (!end || waiting) {
         if (!held || (!final && held.length < MAX_SENTENCE_HOLD)) return out;
         out += judgeOne(held);
         held = "";
@@ -307,8 +351,8 @@ export function createMetaThoughtFilter() {
 }
 
 // The filter over a whole block: "" when it is all rule-checking.
-export function stripMetaThoughts(text) {
-  const filter = createMetaThoughtFilter();
+export function stripMetaThoughts(text, { privateText = [] } = {}) {
+  const filter = createMetaThoughtFilter({ privateText });
   const out = filter.push(String(text ?? "")) + filter.flush();
   return out.trim() ? out : "";
 }
