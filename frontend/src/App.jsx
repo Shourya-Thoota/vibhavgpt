@@ -1504,7 +1504,7 @@ function ModelRow({ entry, allowed, selected }) {
 }
 const THINKING_MODELS = ["nova", "nebula", "vesper"];
 const THINKING_OPTIONS = [
-  { value: "normal", label: "Normal", description: "Use the model’s standard reasoning effort." },
+  { value: "normal", label: "Normal", description: "Balanced reasoning for most questions." },
   { value: "low", label: "Low", description: "Think less for a faster response." },
   { value: "high", label: "High", description: "More deliberate reasoning." },
   { value: "xhigh", label: "Extra High", description: "Deep reasoning; uses more output tokens." },

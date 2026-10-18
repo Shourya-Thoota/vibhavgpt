@@ -52,7 +52,9 @@ export function normalizeThinkingEffort(value) {
 export function thinkingUsageFor(modelKey, requestedEffort = "normal") {
   if (modelKey === "study") return { effort: "normal", providerEffort: "none" };
   const effort = PAID_THINKING_MODELS.has(modelKey) ? normalizeThinkingEffort(requestedEffort) : "normal";
-  return { effort, providerEffort: effort === "normal" ? null : effort };
+  // The level is sent as chosen, Normal included; the provider layer turns it
+  // into what the model accepts (chat/reasoning-effort.js).
+  return { effort, providerEffort: effort };
 }
 
 async function getActiveSubscription(userId, executor = db) {

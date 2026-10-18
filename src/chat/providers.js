@@ -2,6 +2,7 @@ import { config } from "../config.js";
 import { redactSensitive } from "../../frontend/src/sentry-scrub.js";
 import { replyTokenEstimate, requestTokenEstimate } from "./context-window.js";
 import { stripThoughts } from "./thought-filter.js";
+import { reasoningParameter } from "./reasoning-effort.js";
 
 // Each stage's endpoint is its configured base URL plus the standard
 // chat-completions path; an unconfigured stage is skipped like a missing key.
@@ -187,7 +188,7 @@ export const MODEL_CONFIGS = {
   }] },
   study: { displayName: "VibhavGPT Study", supportsVision: true, chain: [{ provider: "study", get model() { return config.chatModels.study; } }] },
   nebula: { displayName: "VibhavGPT Nebula", supportsVision: true, chain: [{
-    provider: "paid", get model() { return config.chatModels.nebula; }, defaultReasoning: false,
+    provider: "paid", get model() { return config.chatModels.nebula; },
     get providerRouting() { return privateRoute(config.routeProviders.nebula); },
     approved: () => config.nebulaDataPolicyVerified && config.routeProviders.nebula.length > 0,
   }] },
@@ -230,10 +231,15 @@ function requestBody(entry, messages, tools, maxTokens, reasoning, extraBody = {
   } else {
     body.max_tokens = outputTokenCeiling(entry.model, compatibleMessages, entry.supportsTools === false ? undefined : tools, maxTokens);
     if (entry.providerRouting) body.provider = entry.providerRouting;
-    if (entry.provider === "paid" && (reasoning === false || (reasoning == null && entry.defaultReasoning === false))) body.reasoning = { enabled: false, exclude: true };
-    // A chosen thinking effort is billed whether or not its thinking is
-    // returned, so it is returned: it streams to the user as live thinking.
-    else if (entry.provider === "paid" && reasoning) body.reasoning = { effort: reasoning };
+    // The paid tiers always send a reasoning setting the model accepts (see
+    // reasoning-effort.js); Normal is a real level, never left to the model.
+    // Thinking is billed whether or not it is returned, so it is returned and
+    // streams to the user as live thinking; only internal steps that pass
+    // reasoning: false hide it. Other routes send no reasoning parameter.
+    if (entry.provider === "paid") {
+      const parameter = reasoningParameter(entry.model, reasoning);
+      if (parameter) body.reasoning = parameter;
+    }
   }
   if (tools?.length && entry.supportsTools !== false) { body.tools = tools; body.tool_choice = "auto"; }
   return body;
