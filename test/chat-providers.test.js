@@ -257,7 +257,7 @@ test("Study uses its configured direct API route, image input, function calls, a
   assert.equal(request.body.provider, undefined);
 });
 
-test("Nebula normal effort disables hidden reasoning in both response paths, while explicit effort is preserved", async () => {
+test("Nebula normal effort is a real level in both response paths, and an explicit effort is preserved", async () => {
   for (const streaming of [false, true]) for (const reasoning of [null, "high"]) {
     let body;
     const fetchImpl = async (_url, init) => {
@@ -266,7 +266,9 @@ test("Nebula normal effort disables hidden reasoning in both response paths, whi
     };
     const call = streaming ? callModelStreaming : callModelWithFallback;
     await call("nebula", messages, undefined, { reasoning, fetchImpl, onDelta: () => true });
-    assert.deepEqual(body.reasoning, reasoning === null ? { enabled: false, exclude: true } : { effort: "high" });
+    // Normal is sent as the balanced level, never left unset or turned off
+    // (a model with its own supported levels is covered in chat-reasoning-effort).
+    assert.deepEqual(body.reasoning, reasoning === null ? { effort: "medium" } : { effort: "high" });
     assert.deepEqual(body.provider.only, NEBULA_PROVIDERS);
     assert.equal(body.provider.data_collection, "deny");
   }
@@ -281,8 +283,8 @@ test("a chosen thinking effort is requested with its thinking returned on every 
         return streamResponse([{ choices: [{ delta: { content: "OK" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 2 } }]);
       } });
       if (reasoning === null) {
-        // Normal effort: Nebula keeps thinking off; the others use the model's default.
-        assert.deepEqual(body.reasoning, key === "nebula" ? { enabled: false, exclude: true } : undefined, `${key} normal`);
+        // Normal is the balanced level on every paid tier, never left unset.
+        assert.deepEqual(body.reasoning, { effort: "medium" }, `${key} normal`);
       } else {
         assert.deepEqual(body.reasoning, { effort: reasoning }, `${key} ${reasoning}`);
       }
