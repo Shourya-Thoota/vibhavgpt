@@ -37,11 +37,12 @@ export function createReasoningForwarder(emit, { pattern = null, maxTermLength =
 // several model calls (tool steps); thoughtSeconds is measured on the call
 // that answers: from its start to its first visible text, and only when the
 // model streamed thinking on that call.
-export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTermLength = 0, now = Date.now }) {
+export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTermLength = 0, privateText = [], now = Date.now }) {
   const forwarder = createReasoningForwarder((text) => onDelta({ reasoning: text }), { pattern, maxTermLength });
   // Thinking that deliberates about instructions or persona at the start of
-  // a block is not shown (see createMetaThoughtFilter).
-  const meta = createMetaThoughtFilter();
+  // a block, or quotes the instructions or saved facts (privateText), is not
+  // shown (see createMetaThoughtFilter).
+  const meta = createMetaThoughtFilter({ privateText });
   let shown = false;
   let separate = false;
   let callStartedAt = null;

@@ -9,10 +9,11 @@ import { requireSession } from "../middleware/require-session.js";
 import { checkModeration } from "./moderation.js";
 import { callModelStreaming, callModelWithFallback, getModelConfig, IMAGE_DISPLAY_NAME, InferenceUnavailableError } from "./providers.js";
 import { buildIdentitySystemPrompt, buildPreferenceSystemPrompt } from "./prompts.js";
-import { buildProductKnowledgeAddendum } from "../../frontend/src/product-knowledge.js";
+import { buildProductKnowledgeAddendum, buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
 import { deleteConversation, listConversations, loadConversation, markReplyMissing, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
 import { buildMemorySystemPrompt, buildRelevantMemoryContext, extractAndSaveFacts, getFacts, saveMemoryFromChat, vendorNamePattern } from "../memory/service.js";
 import { config } from "../config.js";
+import { providerNameTerms } from "../security/provider-names.js";
 import { reportChatReplyFailure } from "../sentry.js";
 import { createThinkingRelay } from "./reasoning-stream.js";
 import { createThoughtFilter, stripThoughts } from "./thought-filter.js";
@@ -633,12 +634,20 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
     onUserMessageSaved?.({ conversationId, messageId: userMessageId });
 
     let data;
+    const productKnowledgeText = buildProductKnowledgeSystemPrompt();
     // The model's live thinking: streamed to the client, never saved.
     const thinking = createThinkingRelay({
       onDelta: (delta) => onDelta?.(delta),
       onStatus,
       pattern: vendorNamePattern(),
-      maxTermLength: Math.max(0, ...(config.providerNameTerms ?? []).map((term) => term.length)),
+      maxTermLength: Math.max(0, ...providerNameTerms().map((term) => term.length)),
+      // The instructions and saved facts are never quoted in the thinking;
+      // the product knowledge is public and may be.
+      privateText: [
+        ...systemMessages.map((message) => message.content).filter((text) => typeof text === "string" && text !== productKnowledgeContext)
+          .map((text) => text.split(productKnowledgeText).join("\n")),
+        ...facts.map((fact) => fact.content ?? fact),
+      ],
     });
     try {
       const maxTokens = responseTokenBudget(usageEvent.thinkingEffort, content, modelKey);

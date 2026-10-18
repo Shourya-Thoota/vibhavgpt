@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { memoryFacts, userProfiles } from "../db/schema.js";
 import { withoutBlockedNameFacts } from "../security/display-name.js";
+import { providerNameTerms } from "../security/provider-names.js";
 import { primaryProviderApproved } from "../chat/providers.js";
 
 // Extraction runs on the primary inference stage with MEMORY_EXTRACTION_MODEL.
@@ -16,14 +17,17 @@ Each fact must be a specific third-person sentence beginning with "User". Classi
 
 const ASSISTANT_IDENTITY_PATTERN =
   /\b(vibhavgpt|the assistant|this ai|the ai(?: assistant)?|the chatbot|the model|the bot)\b[\s\S]{0,40}\b(made|created|developed|built|trained|designed|owned|powered)\b|\b(made|created|developed|built|trained|designed|owned|powered)\b[\s\S]{0,40}\b(vibhavgpt|the assistant|this ai|the chatbot|the model|the bot)\b/i;
-// PROVIDER_NAME_TERMS, matched as whole words; a space in a term also
-// matches no space ("acme ai" matches "acmeai").
+// PROVIDER_NAME_TERMS plus the names of the models and providers actually
+// configured (see security/provider-names.js), matched as whole words and
+// longest first, so "kimi k2.6" is replaced whole rather than as "kimi". A
+// space in a term also matches no space ("acme ai" matches "acmeai").
 const escapeTerm = (term) => term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, " ?");
 let vendorPattern = { terms: null, pattern: null };
 export function vendorNamePattern() {
-  const terms = config.providerNameTerms ?? [];
-  if (vendorPattern.terms !== terms) {
-    vendorPattern = { terms, pattern: terms.length ? new RegExp(`\\b(${terms.map(escapeTerm).join("|")})\\b`, "i") : null };
+  const terms = providerNameTerms().sort((a, b) => b.length - a.length);
+  const key = terms.join("|");
+  if (vendorPattern.terms !== key) {
+    vendorPattern = { terms: key, pattern: terms.length ? new RegExp(`\\b(${terms.map(escapeTerm).join("|")})\\b`, "i") : null };
   }
   return vendorPattern.pattern;
 }
