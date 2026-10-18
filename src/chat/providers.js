@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { redactSensitive } from "../../frontend/src/sentry-scrub.js";
 import { replyTokenEstimate, requestTokenEstimate } from "./context-window.js";
+import { stripThoughts } from "./thought-filter.js";
 
 // Each stage's endpoint is its configured base URL plus the standard
 // chat-completions path; an unconfigured stage is skipped like a missing key.
@@ -245,12 +246,9 @@ function requestHeaders(entry, apiKey) {
 
 function visibleText(content) {
   if (typeof content !== "string") return "";
-  const trimmed = content.trim();
-  if (!trimmed.startsWith("<think>")) return trimmed;
-  const closing = trimmed.indexOf("</think>");
-  // An unfinished reasoning block is not a user-facing answer. Treat it as
-  // unusable so the fallback chain can provide a proper final response.
-  return closing === -1 ? "" : trimmed.slice(closing + "</think>".length).trim();
+  // A reply that is only reasoning (in any envelope; see thought-filter.js)
+  // is not a usable answer, so the chain can provide a proper one.
+  return stripThoughts(content).trim();
 }
 
 function hasUsableResponse(data) {

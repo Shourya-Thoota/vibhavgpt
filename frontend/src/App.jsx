@@ -2589,7 +2589,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
               return;
             }
             if (delta.reasoningReset) { reasoningSoFar = ""; setLiveReasoning(""); return; }
-            if (delta.reset) { previousStream = visibleStream || previousStream; visibleStream = ""; setStreamText(""); return; }
+            // A withdrawn stream was the model's reasoning: keep no copy of it,
+            // so a failed reply can never show it as a partial answer.
+            if (delta.reset) { previousStream = delta.withdraw ? "" : (visibleStream || previousStream); visibleStream = ""; setStreamText(""); return; }
             if (typeof delta.text !== "string") return;
             if (!streamedAny && reasoningSoFar) setLiveThought(elapsedSeconds(thinkingStartedAt));
             streamedAny = true;
