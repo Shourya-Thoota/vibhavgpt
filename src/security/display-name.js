@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { moderationClassifierKey } from "../chat/moderation.js";
 
 // One check for every display name the app stores or shows: the account name
 // (sign-up, social sign-in, update-user) and the survey's "Call me" name.
@@ -154,8 +155,10 @@ function parseReview(raw) {
 export async function reviewDisplayName(name, { fetchImpl = fetch, timeoutMs = 3_000 } = {}) {
   const local = checkDisplayName(name);
   if (!local.allowed || !cleanDisplayName(name)) return local;
-  const apiKey = config.moderationApiKey || config.providerKeys?.primaryFree;
-  if (!apiKey || !config.moderationApiUrl || !config.moderationModel) return local;
+  // The name goes to the classifier only on an approved provider (see
+  // moderationClassifierKey); otherwise the local result stands.
+  const apiKey = moderationClassifierKey();
+  if (!apiKey) return local;
   try {
     const response = await fetchImpl(config.moderationApiUrl, {
       method: "POST",

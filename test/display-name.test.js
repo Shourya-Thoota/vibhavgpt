@@ -106,9 +106,11 @@ test("with no blocklist only the sanity rules apply, and one warning is logged",
 });
 
 test("the moderation layer can add a block, and a failure or timeout never blocks", async (t) => {
-  const saved = config.moderationApiKey;
+  const saved = { key: config.moderationApiKey, approved: config.moderationDataPolicyApproved };
   config.moderationApiKey = "placeholder-key";
-  t.after(() => { config.moderationApiKey = saved; });
+  // A dedicated moderation key is used only once its data policy is approved.
+  config.moderationDataPolicyApproved = true;
+  t.after(() => { config.moderationApiKey = saved.key; config.moderationDataPolicyApproved = saved.approved; });
   const reply = (content, ok = true) => async () => ({ ok, json: async () => ({ choices: [{ message: { content } }] }) });
   const sent = [];
   const recording = async (url, init) => { sent.push(JSON.parse(init.body)); return reply('{"allowed":false}')(); };
@@ -126,14 +128,16 @@ test("the moderation layer can add a block, and a failure or timeout never block
 
 test("the check never logs the name", async (t) => {
   const saved = config.moderationApiKey;
+  const savedApproved = config.moderationDataPolicyApproved;
   config.moderationApiKey = "placeholder-key";
+  config.moderationDataPolicyApproved = true;
   const logged = [];
   const originals = {};
   for (const level of ["log", "info", "warn", "error", "debug"]) {
     originals[level] = console[level];
     console[level] = (...args) => logged.push(args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "));
   }
-  t.after(() => { Object.assign(console, originals); config.moderationApiKey = saved; });
+  t.after(() => { Object.assign(console, originals); config.moderationApiKey = saved; config.moderationDataPolicyApproved = savedApproved; });
   const names = ["Zorblax The Great", "Unique Person Name", "g.r.u.x"];
   for (const name of names) {
     checkDisplayName(name);

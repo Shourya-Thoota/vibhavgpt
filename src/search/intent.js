@@ -82,7 +82,11 @@ export async function interpretSearchIntent(message, history = [], { callModel =
     const content = data?.choices?.[0]?.message?.content;
     return validateSearchIntent(parseJsonObject(content));
   } catch (error) {
-    console.warn(JSON.stringify({ event: "search_intent_unavailable", errorType: error?.name ?? "Error", code: error?.code ?? "unknown" }));
+    // An unapproved provider is not a failure: the built-in search rules
+    // (the deterministic plan) are used, as they are for any message here.
+    if (error?.code !== "route-not-configured") {
+      console.warn(JSON.stringify({ event: "search_intent_unavailable", errorType: error?.name ?? "Error", code: error?.code ?? "unknown" }));
+    }
     return null;
   }
 }

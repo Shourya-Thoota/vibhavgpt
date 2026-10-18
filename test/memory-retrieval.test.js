@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { approveLumenStages } from "./lumen-approvals.js";
 process.env.DATABASE_URL ??= "postgres://test:test@localhost:5432/test";
 const { buildMemorySystemPrompt, buildRelevantMemoryContext } = await import("../src/memory/service.js");
 const { buildIdentitySystemPrompt, buildPreferenceSystemPrompt } = await import("../src/chat/prompts.js");
@@ -72,7 +73,7 @@ for (const [name, call] of [["streaming", callModelStreaming], ["non-streaming",
   test(`saved facts reach every Lumen fallback in the ${name} wire payload`, async () => {
     for (const key of ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"]) config.providerKeys[key] = "fixture";
     for (const key of ["lumen", "lumenFallback1", "lumenFallback2", "lumenFallback3"]) config.chatModels[key] = "fixture";
-    config.lumenPrimaryApproved = true;
+    approveLumenStages(config);
     let calls = 0;
     const result = await call("lumen", context("what school do i go to").messages, undefined, {
       fetchImpl: async (_url, init) => {
