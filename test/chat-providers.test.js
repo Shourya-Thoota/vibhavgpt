@@ -4,6 +4,7 @@ import { config } from "../src/config.js";
 import { MODEL_CONFIGS, callModelWithFallback, callModelStreaming } from "../src/chat/providers.js";
 import { buildIdentitySystemPrompt } from "../src/chat/prompts.js";
 import { providerTermsPattern } from "./provider-terms.js";
+import { approveLumenStages } from "./lumen-approvals.js";
 
 const NOVA_PROVIDERS = config.routeProviders.nova;
 const NEBULA_PROVIDERS = config.routeProviders.nebula;
@@ -16,6 +17,7 @@ beforeEach(() => {
   config.lumenPrimaryApproved = true;
   for (const key of ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"]) config.providerKeys[key] = "fixture-key";
   for (const key of ["lumenFallback1", "lumenFallback2", "lumenFallback3"]) config.chatModels[key] = `fixture-${key}`;
+  approveLumenStages(config);
   config.nebulaDataPolicyVerified = true;
 });
 const messages = [{ role: "user", content: "Reply with OK" }];

@@ -10,6 +10,9 @@ test("search interpreter uses the configured lightweight model", async () => {
   config.providerKeys.primaryFree = "test-key";
   const originalModel = config.searchIntentModel;
   config.searchIntentModel = "fixture-search";
+  // Search intent runs on the primary provider only once it is approved.
+  const originalApproved = config.lumenPrimaryApproved;
+  config.lumenPrimaryApproved = true;
   let request;
   try {
     await callSearchIntentModel([{ role: "user", content: "Return JSON" }], {
@@ -26,6 +29,7 @@ test("search interpreter uses the configured lightweight model", async () => {
   } finally {
     config.providerKeys.primaryFree = originalKey;
     config.searchIntentModel = originalModel;
+    config.lumenPrimaryApproved = originalApproved;
   }
 });
 

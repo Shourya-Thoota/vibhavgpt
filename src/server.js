@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import { auth } from "./auth.js";
 import { config } from "./config.js";
+import { logInferencePolicy } from "./chat/policy-report.js";
 import { chatRouter } from "./chat/router.js";
 import { memoryRouter } from "./memory/router.js";
 import { usageRouter } from "./usage/router.js";
@@ -219,6 +220,7 @@ export function startServer() {
   warnIfNameBlocklistMissing();
   const server = app.listen(config.port, () => {
     console.log(`VibhavGPT API listening on port ${config.port}`);
+    logInferencePolicy();
   });
   startLiveUsageReconciliationJob();
 

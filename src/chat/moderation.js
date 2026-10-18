@@ -1,4 +1,20 @@
 import { config } from "../config.js";
+import { primaryProviderApproved } from "./providers.js";
+
+const hostOf = (url) => { try { return new URL(url).host; } catch { return null; } };
+
+// The classifier receives each message, so it runs only on an approved
+// provider: a dedicated key needs MODERATION_DATA_POLICY_APPROVED; the shared
+// primary key follows the primary's approval, and only at the primary's own
+// host, so that key is never sent anywhere else. Otherwise only the local
+// rules apply. Returns the key to use, or null.
+export function moderationClassifierKey() {
+  if (!config.moderationApiUrl || !config.moderationModel) return null;
+  if (config.moderationApiKey) return config.moderationDataPolicyApproved ? config.moderationApiKey : null;
+  const sharedKey = config.providerKeys.primaryFree;
+  const sameHost = hostOf(config.moderationApiUrl) !== null && hostOf(config.moderationApiUrl) === hostOf(config.providerBaseUrls.primaryFree);
+  return sharedKey && sameHost && primaryProviderApproved() ? sharedKey : null;
+}
 
 const CATEGORIES = new Set([
   "illegal_activity",
@@ -88,10 +104,8 @@ export async function checkModeration(userMessage, { fetchImpl = fetch } = {}) {
   const deterministic = checkDeterministicModeration(userMessage);
   if (deterministic.flagged) return deterministic;
 
-  const apiKey = config.moderationApiKey || config.providerKeys.primaryFree;
-  if (!apiKey || !config.moderationApiUrl || !config.moderationModel) {
-    return { flagged: false, category: "" };
-  }
+  const apiKey = moderationClassifierKey();
+  if (!apiKey) return { flagged: false, category: "" };
 
   try {
     const response = await fetchImpl(config.moderationApiUrl, {

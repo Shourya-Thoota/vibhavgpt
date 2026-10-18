@@ -122,11 +122,59 @@ const privateRoute = (providers) => ({ only: [...providers], sort: "price", allo
 const lumenRoute = (provider, key, extra = {}) => ({
   provider,
   get model() { return config.chatModels[key]; },
+  approved: () => lumenStageApproval(provider).approved,
   ...extra,
 });
+
+/* Data-policy gates for Lumen's stages. Each stage's provider receives the
+   whole conversation, so it is used only after its training and retention
+   terms have been reviewed, and only for the model that was reviewed: a
+   fallback's approval names that model (CHAT_LUMEN_<STAGE>_APPROVED_MODEL),
+   and changing the configured model revokes it. A model the provider picks
+   for itself (auto, auto:free) can never be approved, since its terms cannot
+   be known in advance. An unapproved stage is skipped without a request; with
+   none approved, Lumen fails closed as unavailable. */
+const LUMEN_STAGES = {
+  primaryFree: { modelKey: "lumen", approval: () => ({ approved: config.lumenPrimaryApproved, model: config.lumenApprovals.primaryModel, pinRequired: false }) },
+  gatewayFree: { modelKey: "lumenFallback1", approval: () => ({ ...config.lumenApprovals.gateway, pinRequired: true }) },
+  secondaryFree: { modelKey: "lumenFallback2", approval: () => ({ ...config.lumenApprovals.secondary, pinRequired: true }) },
+  reserveFree: { modelKey: "lumenFallback3", approval: () => ({ ...config.lumenApprovals.reserve, pinRequired: true }) },
+};
+const PROVIDER_SELECTED_MODEL = /^auto(?:$|[:/-])/i;
+
+export function lumenStageApproval(stage) {
+  const definition = LUMEN_STAGES[stage];
+  const model = definition && config.chatModels[definition.modelKey];
+  if (!model) return { approved: false, reason: "not-configured" };
+  if (PROVIDER_SELECTED_MODEL.test(model)) return { approved: false, reason: "provider-selected-model" };
+  const { approved, model: pinned, pinRequired } = definition.approval();
+  if (!approved) return { approved: false, reason: "not-approved" };
+  if (!pinned) return pinRequired ? { approved: false, reason: "model-not-pinned" } : { approved: true, reason: "approved-unpinned" };
+  if (pinned !== model) return { approved: false, reason: "pinned-model-mismatch" };
+  return { approved: true, reason: "approved" };
+}
+
+// The primary stage's provider also runs search intent, memory extraction
+// and (on the shared key) moderation. Those send user text there too, so
+// they need the same approval. Only the provider is approved here, not a
+// model: each of those tasks uses a model of its own.
+export function primaryProviderApproved() {
+  return config.lumenPrimaryApproved === true;
+}
+
+// Each Lumen stage's policy state, for the boot log. Names only: no keys,
+// URLs or model ids.
+export function lumenPolicySummary() {
+  return Object.keys(LUMEN_STAGES).map((stage) => ({
+    stage,
+    configured: Boolean(config.providerKeys[stage] && config.providerBaseUrls[stage] && config.chatModels[LUMEN_STAGES[stage].modelKey]),
+    ...lumenStageApproval(stage),
+  }));
+}
+
 export const MODEL_CONFIGS = {
   lumen: { displayName: "VibhavGPT Lumen", supportsVision: false, chain: [
-    lumenRoute("primaryFree", "lumen", { approved: () => config.lumenPrimaryApproved, supportsTools: false }),
+    lumenRoute("primaryFree", "lumen", { supportsTools: false }),
     lumenRoute("gatewayFree", "lumenFallback1"),
     lumenRoute("secondaryFree", "lumenFallback2"),
     lumenRoute("reserveFree", "lumenFallback3"),
@@ -297,6 +345,9 @@ export async function callSearchIntentModel(
   messages,
   { fetchImpl = fetch, maxTokens = 320, timeoutMs = 7_000, signal, requestId = "unknown" } = {},
 ) {
+  // The message and its context go to the primary provider: only once its
+  // data policy is approved. The caller falls back to the built-in rules.
+  if (!primaryProviderApproved()) throw new ProviderStageError("route-not-configured");
   const data = await callProvider(
     { provider: "primaryFree", model: config.searchIntentModel },
     messages,

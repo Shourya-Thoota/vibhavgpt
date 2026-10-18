@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { memoryFacts, userProfiles } from "../db/schema.js";
 import { withoutBlockedNameFacts } from "../security/display-name.js";
+import { primaryProviderApproved } from "../chat/providers.js";
 
 // Extraction runs on the primary inference stage with MEMORY_EXTRACTION_MODEL.
 const MAX_FACTS = 50;
@@ -440,6 +441,10 @@ export async function extractAndSaveFacts(userId, userMessage, existingFacts, { 
   const apiKey = config.providerKeys.primaryFree;
   const baseUrl = config.providerBaseUrls.primaryFree;
   if (!userMessage?.trim() || !apiKey || !baseUrl || !config.memoryExtractionModel) return [];
+  // The message goes to the primary provider: only once its data policy is
+  // approved. Without it nothing is extracted; the save_memory tool, which
+  // runs through the gated chat model, still saves what the user asks for.
+  if (!primaryProviderApproved()) return [];
 
   try {
     const existingBlock = existingFacts.length

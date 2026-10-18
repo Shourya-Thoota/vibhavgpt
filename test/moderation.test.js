@@ -4,6 +4,8 @@ import test from "node:test";
 process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:5432/test";
 process.env.BETTER_AUTH_SECRET = "a".repeat(48);
 process.env.MODERATION_API_KEY = "test-key";
+// A dedicated moderation key is used only once its data policy is approved.
+process.env.MODERATION_DATA_POLICY_APPROVED = "true";
 
 const { checkDeterministicModeration, checkModeration } =
   await import("../src/chat/moderation.js");

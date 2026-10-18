@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+import { approveLumenStages } from "./lumen-approvals.js";
 
 // A streamed reply that stalls or fails before any output is tried again, and
 // only the try that answers is counted. The usage tracker is the real one, on
@@ -69,6 +70,7 @@ beforeEach(() => {
   config.lumenPrimaryApproved = true;
   for (const key of ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"]) config.providerKeys[key] = "fixture-key";
   for (const key of ["lumen", "lumenFallback1", "lumenFallback2", "lumenFallback3"]) config.chatModels[key] = `fixture-${key}`;
+  approveLumenStages(config);
 });
 
 test("a stall before any output is retried, and the reply that answers counts exactly once", async (t) => {

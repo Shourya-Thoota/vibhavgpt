@@ -74,6 +74,18 @@ export const config = {
     vesper: process.env.CHAT_MODEL_VESPER?.trim(),
   },
   lumenPrimaryApproved: process.env.CHAT_LUMEN_PRIMARY_APPROVED === "true",
+  // Data-policy approval for Lumen's fallback stages, each pinned to the exact
+  // model that was reviewed (see lumenStageApproval in chat/providers.js).
+  // The primary's pin is optional; the fallbacks' pins are required.
+  lumenApprovals: {
+    primaryModel: env("CHAT_LUMEN_PRIMARY_APPROVED_MODEL"),
+    gateway: { approved: process.env.CHAT_LUMEN_GATEWAY_APPROVED === "true", model: env("CHAT_LUMEN_GATEWAY_APPROVED_MODEL") },
+    secondary: { approved: process.env.CHAT_LUMEN_SECONDARY_APPROVED === "true", model: env("CHAT_LUMEN_SECONDARY_APPROVED_MODEL") },
+    reserve: { approved: process.env.CHAT_LUMEN_RESERVE_APPROVED === "true", model: env("CHAT_LUMEN_RESERVE_APPROVED_MODEL") },
+  },
+  // A dedicated moderation key needs its own approval; on the shared primary
+  // key, moderation follows the primary's.
+  moderationDataPolicyApproved: process.env.MODERATION_DATA_POLICY_APPROVED === "true",
   nebulaDataPolicyVerified: process.env.CHAT_NEBULA_DATA_POLICY_VERIFIED === "true",
   searchIntentModel: process.env.SEARCH_INTENT_MODEL?.trim(),
   // Comma-separated provider allow-lists for the routed tiers.
