@@ -146,10 +146,17 @@ function fitContinuationMessages(messages, additions) {
   return estimate() <= CHAT_INPUT_TOKEN_BUDGET ? [...fitted, ...additions] : null;
 }
 
-export function responseTokenBudget(effort, content = "") {
-  if (["xhigh", "max"].includes(effort)) return 8_192;
-  if (effort === "high" || /\b(code|html|css|javascript|python|program|script|implement)\b/i.test(content)) return 4_096;
-  return 2_048;
+// The output budget (max_tokens) for one reply. On a model that thinks, the
+// thinking is counted inside the same budget, so a tier that thinks at every
+// level gets room for both: Nebula's thinking is on at every level (see
+// chat/reasoning-effort.js), so its budget is doubled, at least 8,192.
+const THINKING_HEADROOM_TIERS = new Set(["nebula"]);
+
+export function responseTokenBudget(effort, content = "", modelKey = null) {
+  let budget = 2_048;
+  if (["xhigh", "max"].includes(effort)) budget = 8_192;
+  else if (effort === "high" || /\b(code|html|css|javascript|python|program|script|implement)\b/i.test(content)) budget = 4_096;
+  return THINKING_HEADROOM_TIERS.has(modelKey) ? Math.max(8_192, budget * 2) : budget;
 }
 
 export async function completeResponse(modelKey, messages, data, { callModel = callModelWithFallback, providerOptions = {} } = {}) {
@@ -634,7 +641,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
       maxTermLength: Math.max(0, ...(config.providerNameTerms ?? []).map((term) => term.length)),
     });
     try {
-      const maxTokens = responseTokenBudget(usageEvent.thinkingEffort, content);
+      const maxTokens = responseTokenBudget(usageEvent.thinkingEffort, content, modelKey);
       const providerOptions = {
         maxTokens,
         reasoning: usageEvent.providerEffort,

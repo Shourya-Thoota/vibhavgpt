@@ -1,4 +1,5 @@
 import { callModelStreaming, callModelWithFallback } from "../chat/providers.js";
+import { stripThoughts } from "../chat/thought-filter.js";
 
 export const DOCUMENT_WRITER_MODEL = "nebula";
 // These are deliberately text/document formats that can be generated safely
@@ -10,7 +11,12 @@ function invalid(message) {
   return Object.assign(new Error(message), { status: 502, code: "document-content-invalid" });
 }
 
+// Every text field of a document passes through the reasoning filter
+// (chat/thought-filter.js): a <think>, <thought>, <thinking> or <reasoning>
+// block a model left inside a field never reaches the file. Code fences are
+// kept, as in chat.
 function text(value, label, limit) {
+  if (typeof value === "string") value = stripThoughts(value);
   if (typeof value !== "string" || !value.trim() || value.length > limit
     || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffd]/u.test(value)) {
     throw invalid(`The generated document has invalid ${label}.`);
@@ -77,15 +83,21 @@ export function parseJsonObject(content) {
 function parseResponse(data) {
   const choice = data?.choices?.[0];
   if (choice?.finish_reason && choice.finish_reason !== "stop") throw invalid("Document generation did not finish completely.");
-  return parseJsonObject(choice?.message?.content);
+  // Reasoning around the JSON (a <think> block before it, or one closed
+  // without being opened) would otherwise be read as the object's start.
+  const content = choice?.message?.content;
+  return parseJsonObject(typeof content === "string" ? stripThoughts(content) : content);
 }
 
 // When the writer can't produce a document, a request like "put it in a
 // Google Docs format" is still answerable: it refers to the assistant's last
 // reply. Its headings become sections; without headings it is one section.
 export function planFromLastReply(history = [], prompt = "") {
-  const reply = [...history].reverse().find((item) => item?.role === "assistant" && typeof item.content === "string" && item.content.trim().length >= 40)?.content;
-  if (!reply) return null;
+  // A reply saved before reasoning was filtered from replies may still hold
+  // a thinking block: it is removed before the reply becomes a document.
+  const saved = [...history].reverse().find((item) => item?.role === "assistant" && typeof item.content === "string" && stripThoughts(item.content).trim().length >= 40)?.content;
+  if (!saved) return null;
+  const reply = stripThoughts(saved);
   const clean = (value) => value.replace(/\*\*|__|`/g, "").replace(/^\s*>\s?/gm, "").trim();
   const lines = reply.replace(/\r/g, "").split("\n");
   const sections = [];
