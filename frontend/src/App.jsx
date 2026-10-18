@@ -2610,7 +2610,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         ...current,
         // A reply already read as it streamed isn't typed out a second time.
         { role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny,
-          reasoning: reasoningSoFar || undefined, thoughtSeconds: reply.thoughtSeconds ?? null },
+          // No shown thinking (empty, or all rule-checking that was scrubbed):
+          // no "Thought for X s" pill or drawer for this reply.
+          reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined, thoughtSeconds: reasoningSoFar.trim() ? (reply.thoughtSeconds ?? null) : null },
       ]);
       if (mountedRef.current) { setStreamText(""); setLiveReasoning(""); setLiveThought(null); }
       selectedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));

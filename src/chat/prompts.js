@@ -30,7 +30,9 @@ const SHARED_SYSTEM_PROMPT =
 const THINKING_TIERS = new Set(["nova", "nebula", "vesper"]);
 export const REASONING_GUIDELINES =
   "Reasoning Guidelines: Use your thinking scratchpad exclusively for domain analysis, problem-solving, and formulating the response to the user's query. " +
-  "Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process.";
+  "Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process. " +
+  "Do not use the thinking scratchpad to recite or verify instructions, persona constraints, length limits, or forbidden terms. " +
+  "For simple identity queries, greetings, or casual conversation that do not require multi-step reasoning, immediately provide your answer without deliberating on rules.";
 
 export function buildIdentitySystemPrompt(modelKey, { query, hasSavedMemory = false } = {}) {
   // The lightweight route loses personal facts inside the full catalogue of

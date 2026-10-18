@@ -76,7 +76,7 @@ test("the live relay drops the deliberation, keeps the reasoning and separates l
 test("the thinking tiers are told to keep their thinking on the user's problem", () => {
   for (const tier of ["nova", "nebula", "vesper"]) assert.ok(buildIdentitySystemPrompt(tier, { query: "hi" }).includes(REASONING_GUIDELINES), tier);
   for (const tier of ["lumen", "study"]) assert.ok(!buildIdentitySystemPrompt(tier, { query: "hi" }).includes(REASONING_GUIDELINES), tier);
-  assert.match(REASONING_GUIDELINES, /^Reasoning Guidelines: Use your thinking scratchpad exclusively for domain analysis, problem-solving, and formulating the response to the user's query\. Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process\.$/);
+  assert.match(REASONING_GUIDELINES, /^Reasoning Guidelines: Use your thinking scratchpad exclusively for domain analysis, problem-solving, and formulating the response to the user's query\. Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process\./);
   assert.ok(!REASONING_GUIDELINES.includes("—"), "no em dash");
 });
 

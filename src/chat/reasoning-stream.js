@@ -50,6 +50,9 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
   let thoughtSeconds = null;
   const show = (text) => {
     if (!text) return;
+    // Only thinking that is shown counts: a block that was all rule-checking
+    // gets no "Thought for X s" (thoughtSeconds stays null).
+    if (firstVisibleAt === null) thoughtThisCall = true;
     // Thinking from an earlier tool step stays on screen; a blank line keeps
     // the next call's thinking apart from it, once that call shows any.
     if (separate) forwarder.push("\n\n");
@@ -76,13 +79,13 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
     },
     reasoning(text) {
       if (typeof text !== "string" || !text) return;
-      if (firstVisibleAt === null) thoughtThisCall = true;
       show(meta.push(text));
     },
     visible() {
       if (firstVisibleAt !== null) return;
-      firstVisibleAt = now();
+      // Held thinking is judged before the answer starts, so it still counts.
       show(meta.flush());
+      firstVisibleAt = now();
       forwarder.flush();
     },
     retry({ attempt, maxAttempts }) {

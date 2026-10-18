@@ -179,80 +179,136 @@ export function stripThoughts(content) {
 
    The thinking shown to the user should be about the user's problem, the way
    it reads in other assistants: "Defining the problem", "Checking the
-   units". Models sometimes open their thinking by talking to themselves about
-   their instructions instead ("The user asks...", "I should answer as...",
-   "my instructions say...", "keep it short"). createMetaThoughtFilter() drops
-   those sentences from the START of a thinking block, until the first
-   sentence of real reasoning; from there everything passes unchanged, so
-   domain reasoning is never cut. Text is held only while the block is still
-   in that opening, and only until a sentence ends. */
+   units". Models sometimes spend their thinking checking their own rules
+   instead: "I identify as VibhavGPT Nova. Must not name provider or
+   third-party model. Short answer, 1-3 sentences. No em dashes." None of
+   that may be shown.
 
-const META_OPENING = new RegExp([
-  String.raw`the user(?:'s)? (?:is |was )?(?:asks?|asking|asked|wants?|wanted|says?|said|requests?|requesting|requested|would like|needs?|question is)\b`,
-  String.raw`(?:i|we) (?:should|must|need to|have to|will|am going to|'m going to|am supposed to|'m supposed to|ought to) (?:answer|respond|reply|keep|stay|not|avoid|follow|comply|remember|be careful|identify|introduce|mention|make sure|adhere|stick|refer|present|frame|act)\b`,
-  String.raw`(?:i'm|i am|as) (?:vibhavgpt|an ai|the assistant|an assistant|a helpful assistant|lumen|nova|nebula|vesper)\b`,
-  String.raw`(?:according to|per|following|based on|given) (?:the|my) (?:system|developer|instructions?|guidelines?|rules?|persona|prompt)\b`,
-  String.raw`(?:the|my) (?:system prompt|system message|system instructions?|developer (?:message|instructions?)|instructions?|guidelines?|persona|rules)\b`,
-  String.raw`(?:do not|don't|never|must not|mustn't|shouldn't|should not|can't|cannot) (?:disclose|mention|reveal|name|share|discuss|expose)\b`,
-  String.raw`keep (?:it|the answer|the reply|the response|this|things) (?:short|brief|concise)\b`,
-  String.raw`(?:memory|identity) (?:rules?|instructions?|directives?|constraints?)\b`,
-  String.raw`let me (?:check|recall|review|consider|re-?read) (?:the|my) (?:instructions?|guidelines?|rules?|system|persona)\b`,
-  String.raw`(?:considering|reviewing|checking|recalling|following|re-?reading|weighing) (?:the|my) (?:instructions?|guidelines?|rules?|system|persona|constraints?|identity)\b`,
+   createMetaThoughtFilter() judges the thinking one sentence (or line) at a
+   time, at two strengths:
+   - STRICT patterns are rule-checking that is never real reasoning (identity
+     declarations, "no em dashes", "1-3 sentences", the system prompt or
+     developer instructions, "must not name the provider"). Those sentences
+     are dropped wherever they appear.
+   - OPENING patterns are broader (restating the request, length and format
+     rules, "my instructions", "keep it short"). They are dropped only at the
+     start of a block, until the first sentence of real reasoning, so that a
+     later sentence of domain reasoning is never cut ("Apply the product
+     rule", "You cannot divide by zero").
+   A block that is all rule-checking shows nothing at all, so no drawer
+   appears for it. Text is held only until its sentence ends. */
+
+const NAMING_VERB = String.raw`(?:nam(?:e|ing)|mention(?:ing)?|reveal(?:ing)?|disclos(?:e|ing)|confirm(?:ing)?|deny(?:ing)?|say(?:ing)?|stat(?:e|ing)|discuss(?:ing)?|expos(?:e|ing)|shar(?:e|ing))`;
+const PLATFORM = String.raw`(?:provider|providers|third[- ]party|model|company|vendor|upstream|openrouter|groq|identity|architecture)`;
+const STRICT_META = [
+  // Identity declarations.
+  /^(?:i\s+identify\s+as|i\s+am\s+(?:vibhavgpt|an\s+ai)|i'm\s+(?:vibhavgpt|an\s+ai)|as\s+(?:vibhavgpt|an\s+ai))\b/i,
+  // Formatting and length rules that are never part of a problem.
+  /\bno\s+(?:em|en)[\s-]?dash(?:es)?\b/i,
+  /\b\d+\s*(?:-|to)\s*\d+\s+sentences?\b/i,
+  // The instructions themselves.
+  /\b(?:system\s+prompt|system\s+message|system\s+instructions?|developer\s+(?:message|instructions?))\b/i,
+  /\bthird[- ]party\s+model\b/i,
+  // "Must not name the provider", "Don't mention the model", "Never reveal upstream".
+  new RegExp(String.raw`\b(?:must\s+not|mustn't|should\s+not|shouldn't|do\s+not|don't|never|can't|cannot|not\s+to)\s+${NAMING_VERB}\b[^.!?\n]{0,60}\b${PLATFORM}\b`, "i"),
+  new RegExp(String.raw`^(?:not|no|never)\s+${NAMING_VERB}\b[^.!?\n]{0,60}\b${PLATFORM}\b`, "i"),
+];
+
+const OPENING_META = new RegExp([
+  // Restating the request.
+  String.raw`(?:the\s+)?user(?:'s)?\s+(?:is\s+|was\s+)?(?:asks?|asking|asked|wants?|wanted|says?|said|requests?|requesting|requested|would\s+like|needs?)\b`,
+  String.raw`(?:the\s+)?user(?:'s)?\s+(?:query|question|request|message)\b`,
+  // Talking to itself about how to answer.
+  String.raw`(?:i|we)\s+(?:should|must|need\s+to|have\s+to|will|am\s+going\s+to|'m\s+going\s+to|am\s+supposed\s+to|'m\s+supposed\s+to|ought\s+to)\s+(?:answer|respond|reply|keep|stay|not|avoid|follow|comply|remember|be\s+careful|identify|introduce|mention|make\s+sure|adhere|stick|refer|present|frame|act|give|provide)\b`,
+  String.raw`(?:answer|respond|reply)(?:\s+(?:directly|briefly|concisely|now|simply|plainly|shortly|warmly|politely|kindly))?\s*[.:,]`,
+  String.raw`(?:give|provide)\s+(?:a|the)\s+(?:short|brief|direct|concise|simple)\s+(?:answer|reply|response)\b`,
+  String.raw`(?:short|brief|concise|direct)\s+(?:answer|reply|response)\b`,
+  String.raw`keep\s+(?:it|the\s+answer|the\s+reply|the\s+response|this|things)\s+(?:short|brief|concise|simple)\b`,
+  String.raw`(?:no|without|avoid)\s+(?:markdown|headings?|lists?|bullets?|bullet\s+points|tables?|emojis?)\b`,
+  // Its own rules and persona.
+  String.raw`(?:according\s+to|per|following|based\s+on|given)\s+(?:the|my)\s+(?:system|developer|instructions?|guidelines?|rules?|persona|prompt)\b`,
+  String.raw`(?:the|my|these)\s+(?:instructions?|guidelines?|rules|persona|constraints?)\b`,
+  String.raw`(?:considering|reviewing|checking|recalling|following|re-?reading|weighing)\s+(?:the|my)\s+(?:instructions?|guidelines?|rules?|system|persona|constraints?|identity)\b`,
+  String.raw`let\s+me\s+(?:check|recall|review|consider|re-?read)\s+(?:the|my)\s+(?:instructions?|guidelines?|rules?|system|persona)\b`,
+  String.raw`(?:memory|identity)\s+(?:rules?|instructions?|directives?|constraints?)\b`,
+  String.raw`(?:must\s+not|mustn't|should\s+not|shouldn't|do\s+not|don't|never|cannot|can't)\s+(?:disclose|mention|reveal|name|share|discuss|expose|use\s+(?:em|en)\s+dash|use\s+markdown)\b`,
+  String.raw`(?:upstream|openrouter|groq)\b`,
 ].map((pattern) => `(?:${pattern})`).join("|"), "i");
-// Mentions that mark a sentence as meta wherever they appear in it.
-const META_ANYWHERE = /\b(?:system prompt|system message|developer (?:message|instructions?)|my instructions|the instructions say|persona (?:rules|boundaries)|memory (?:rules|directives|constraints))\b/i;
+// Marks a whole sentence as rule-checking wherever it appears in the opening.
+const OPENING_ANYWHERE = /\b(?:my\s+instructions|the\s+instructions\s+say|persona\s+(?:rules|boundaries)|memory\s+(?:rules|directives|constraints)|guidelines\s+say)\b/i;
 const OPENING_MARKUP = /^[\s>*_#-]*(?:\d+[.)]\s*)?/;
 
-export function isMetaDeliberation(sentence) {
-  const text = String(sentence ?? "").replace(OPENING_MARKUP, "").trim();
-  if (!text) return false;
-  return META_OPENING.test(text.slice(0, 160)) && META_OPENING.exec(text).index === 0 || META_ANYWHERE.test(text);
+const bare = (sentence) => String(sentence ?? "").replace(OPENING_MARKUP, "").replace(/\*\*/g, "").trim();
+
+// Rule-checking that is never reasoning: dropped anywhere in the thinking.
+export function isStrictMeta(sentence) {
+  const text = bare(sentence);
+  return Boolean(text) && STRICT_META.some((pattern) => pattern.test(text));
 }
 
-// Holds text until a sentence or line ends; a very long unterminated opening
+// Rule-checking, the broad way: dropped at the start of a thinking block.
+export function isMetaDeliberation(sentence) {
+  const text = bare(sentence);
+  if (!text) return false;
+  if (isStrictMeta(text)) return true;
+  const opening = OPENING_META.exec(text);
+  return (opening !== null && opening.index === 0) || OPENING_ANYWHERE.test(text);
+}
+
+// Holds text until a sentence or line ends; a very long unterminated sentence
 // is judged as it stands rather than held back.
 const SENTENCE_END = /[.!?](?=\s|$)|\n/;
-const MAX_OPENING_HOLD = 600;
+const MAX_SENTENCE_HOLD = 600;
 
 export function createMetaThoughtFilter() {
   let opening = true;
   let held = "";
+  const judgeOne = (sentence) => {
+    if (opening) {
+      if (isMetaDeliberation(sentence)) return "";
+      // The first real reasoning ends the opening.
+      opening = false;
+      return sentence.replace(/^\s+/, "");
+    }
+    if (!isStrictMeta(sentence)) return sentence;
+    // A dropped sentence keeps its line break, so the steps around it stay apart.
+    return /\n\s*$/.test(sentence) ? "\n" : "";
+  };
   const judge = (final) => {
     let out = "";
-    while (opening) {
+    for (;;) {
       const end = SENTENCE_END.exec(held);
       if (!end) {
-        if (!final && held.length < MAX_OPENING_HOLD) return out;
-        // No sentence end: judge what there is.
-        if (isMetaDeliberation(held)) { held = ""; return out; }
-        opening = false;
-        out += held;
+        if (!held || (!final && held.length < MAX_SENTENCE_HOLD)) return out;
+        out += judgeOne(held);
         held = "";
         return out;
       }
       const cut = end.index + end[0].length;
       const sentence = held.slice(0, cut);
-      if (isMetaDeliberation(sentence)) {
-        held = held.slice(cut).replace(/^[ \t]+/, "");
-        continue;
-      }
-      // The first real reasoning: it and everything after pass unchanged.
-      opening = false;
-      out += held.replace(/^\s+/, "");
-      held = "";
+      held = held.slice(cut);
+      const kept = judgeOne(sentence);
+      // After a dropped opening sentence, the space before the next one goes too.
+      if (opening && !kept) held = held.replace(/^[ \t]+/, "");
+      out += kept;
     }
-    return out;
   };
   return {
     push(text) {
       if (typeof text !== "string" || !text) return "";
-      if (!opening) return text;
       held += text;
       return judge(false);
     },
     // End of a block: whatever is still held is judged now.
-    flush() { return opening ? judge(true) : ""; },
+    flush() { return judge(true); },
     // A new thinking block (the next model call) starts with its own opening.
     reset() { opening = true; held = ""; },
   };
+}
+
+// The filter over a whole block: "" when it is all rule-checking.
+export function stripMetaThoughts(text) {
+  const filter = createMetaThoughtFilter();
+  const out = filter.push(String(text ?? "")) + filter.flush();
+  return out.trim() ? out : "";
 }
