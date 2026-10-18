@@ -1,6 +1,7 @@
 // Streams the model's thinking to the client while a reply is prepared.
 // Thinking text is shown live and never stored; only how long the model
 // thought (thoughtSeconds) is kept with the saved reply.
+import { createMetaThoughtFilter } from "./thought-filter.js";
 
 const NAME_REPLACEMENT = "the model";
 
@@ -38,23 +39,36 @@ export function createReasoningForwarder(emit, { pattern = null, maxTermLength =
 // model streamed thinking on that call.
 export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTermLength = 0, now = Date.now }) {
   const forwarder = createReasoningForwarder((text) => onDelta({ reasoning: text }), { pattern, maxTermLength });
+  // Thinking that deliberates about instructions or persona at the start of
+  // a block is not shown (see createMetaThoughtFilter).
+  const meta = createMetaThoughtFilter();
   let shown = false;
   let separate = false;
   let callStartedAt = null;
   let thoughtThisCall = false;
   let firstVisibleAt = null;
   let thoughtSeconds = null;
+  const show = (text) => {
+    if (!text) return;
+    // Thinking from an earlier tool step stays on screen; a blank line keeps
+    // the next call's thinking apart from it, once that call shows any.
+    if (separate) forwarder.push("\n\n");
+    separate = false;
+    shown = true;
+    forwarder.push(text);
+  };
   const reset = () => {
     forwarder.reset();
+    meta.reset();
     if (shown) onDelta({ reasoningReset: true });
     shown = false;
     separate = false;
   };
   return {
     startCall() {
+      show(meta.flush());
       forwarder.flush();
-      // Thinking from an earlier tool step stays on screen; a blank line
-      // keeps the next call's thinking apart from it.
+      meta.reset();
       separate = shown;
       callStartedAt = now();
       thoughtThisCall = false;
@@ -63,14 +77,12 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
     reasoning(text) {
       if (typeof text !== "string" || !text) return;
       if (firstVisibleAt === null) thoughtThisCall = true;
-      if (separate) forwarder.push("\n\n");
-      separate = false;
-      shown = true;
-      forwarder.push(text);
+      show(meta.push(text));
     },
     visible() {
       if (firstVisibleAt !== null) return;
       firstVisibleAt = now();
+      show(meta.flush());
       forwarder.flush();
     },
     retry({ attempt, maxAttempts }) {
@@ -84,6 +96,7 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
     // `answered` is true when the call returned the reply's text rather than
     // a tool request.
     endCall({ answered }) {
+      show(meta.flush());
       forwarder.flush();
       if (answered && thoughtThisCall && callStartedAt !== null) {
         thoughtSeconds = Math.max(0, Math.round(((firstVisibleAt ?? now()) - callStartedAt) / 1000));

@@ -25,6 +25,13 @@ const SHARED_SYSTEM_PROMPT =
   "Do not claim that you searched, checked, or looked something up unless a web-search result was actually supplied on this turn. " +
   "Give only a clear final answer for the user. Never expose private reasoning, scratch work, tool-call planning, or internal deliberation.";
 
+// The paid tiers think, and their thinking is shown to the user, so it must
+// be about the user's problem, not about these instructions.
+const THINKING_TIERS = new Set(["nova", "nebula", "vesper"]);
+export const REASONING_GUIDELINES =
+  "Reasoning Guidelines: Use your thinking scratchpad exclusively for domain analysis, problem-solving, and formulating the response to the user's query. " +
+  "Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process.";
+
 export function buildIdentitySystemPrompt(modelKey, { query, hasSavedMemory = false } = {}) {
   // The lightweight route loses personal facts inside the full catalogue of
   // pricing and policies. Keep that catalogue for product questions; ordinary
@@ -34,7 +41,7 @@ export function buildIdentitySystemPrompt(modelKey, { query, hasSavedMemory = fa
   if (modelKey === "lumen" && hasSavedMemory && memoryQuestion && !productQuestion) {
     return `${MODEL_IDENTITIES.lumen} Your fixed identity is VibhavGPT, created by Vibhav Thoota and operated by Pansophy LLC. Never name underlying AI companies, providers, or models. Answer the current question directly using the supplied saved account facts, not your training data. Never infer personal facts or invent missing details. If a saved fact says the user likes an artist, answer that they have told you they like that artist; do not deny all knowledge because it does not explicitly say "favorite". Saved facts describe the user, not your own preferences. Do not introduce yourself unless asked who you are. Keep a simple recall answer to one or two sentences, without a greeting, a list of unrelated memories, or an offer of more help. Never expose private reasoning or raw tool syntax. Do not use em dashes or en dashes.`;
   }
-  const identity = `${MODEL_IDENTITIES[modelKey] ?? MODEL_IDENTITIES.lumen} ${SHARED_SYSTEM_PROMPT}`;
+  const identity = `${MODEL_IDENTITIES[modelKey] ?? MODEL_IDENTITIES.lumen} ${SHARED_SYSTEM_PROMPT}${THINKING_TIERS.has(modelKey) ? ` ${REASONING_GUIDELINES}` : ""}`;
   return `${identity}\n${buildProductKnowledgeSystemPrompt()}`;
 }
 

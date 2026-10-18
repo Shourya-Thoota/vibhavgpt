@@ -174,3 +174,85 @@ export function stripThoughts(content) {
   }
   return text;
 }
+
+/* Meta-deliberation in streamed thinking.
+
+   The thinking shown to the user should be about the user's problem, the way
+   it reads in other assistants: "Defining the problem", "Checking the
+   units". Models sometimes open their thinking by talking to themselves about
+   their instructions instead ("The user asks...", "I should answer as...",
+   "my instructions say...", "keep it short"). createMetaThoughtFilter() drops
+   those sentences from the START of a thinking block, until the first
+   sentence of real reasoning; from there everything passes unchanged, so
+   domain reasoning is never cut. Text is held only while the block is still
+   in that opening, and only until a sentence ends. */
+
+const META_OPENING = new RegExp([
+  String.raw`the user(?:'s)? (?:is |was )?(?:asks?|asking|asked|wants?|wanted|says?|said|requests?|requesting|requested|would like|needs?|question is)\b`,
+  String.raw`(?:i|we) (?:should|must|need to|have to|will|am going to|'m going to|am supposed to|'m supposed to|ought to) (?:answer|respond|reply|keep|stay|not|avoid|follow|comply|remember|be careful|identify|introduce|mention|make sure|adhere|stick|refer|present|frame|act)\b`,
+  String.raw`(?:i'm|i am|as) (?:vibhavgpt|an ai|the assistant|an assistant|a helpful assistant|lumen|nova|nebula|vesper)\b`,
+  String.raw`(?:according to|per|following|based on|given) (?:the|my) (?:system|developer|instructions?|guidelines?|rules?|persona|prompt)\b`,
+  String.raw`(?:the|my) (?:system prompt|system message|system instructions?|developer (?:message|instructions?)|instructions?|guidelines?|persona|rules)\b`,
+  String.raw`(?:do not|don't|never|must not|mustn't|shouldn't|should not|can't|cannot) (?:disclose|mention|reveal|name|share|discuss|expose)\b`,
+  String.raw`keep (?:it|the answer|the reply|the response|this|things) (?:short|brief|concise)\b`,
+  String.raw`(?:memory|identity) (?:rules?|instructions?|directives?|constraints?)\b`,
+  String.raw`let me (?:check|recall|review|consider|re-?read) (?:the|my) (?:instructions?|guidelines?|rules?|system|persona)\b`,
+  String.raw`(?:considering|reviewing|checking|recalling|following|re-?reading|weighing) (?:the|my) (?:instructions?|guidelines?|rules?|system|persona|constraints?|identity)\b`,
+].map((pattern) => `(?:${pattern})`).join("|"), "i");
+// Mentions that mark a sentence as meta wherever they appear in it.
+const META_ANYWHERE = /\b(?:system prompt|system message|developer (?:message|instructions?)|my instructions|the instructions say|persona (?:rules|boundaries)|memory (?:rules|directives|constraints))\b/i;
+const OPENING_MARKUP = /^[\s>*_#-]*(?:\d+[.)]\s*)?/;
+
+export function isMetaDeliberation(sentence) {
+  const text = String(sentence ?? "").replace(OPENING_MARKUP, "").trim();
+  if (!text) return false;
+  return META_OPENING.test(text.slice(0, 160)) && META_OPENING.exec(text).index === 0 || META_ANYWHERE.test(text);
+}
+
+// Holds text until a sentence or line ends; a very long unterminated opening
+// is judged as it stands rather than held back.
+const SENTENCE_END = /[.!?](?=\s|$)|\n/;
+const MAX_OPENING_HOLD = 600;
+
+export function createMetaThoughtFilter() {
+  let opening = true;
+  let held = "";
+  const judge = (final) => {
+    let out = "";
+    while (opening) {
+      const end = SENTENCE_END.exec(held);
+      if (!end) {
+        if (!final && held.length < MAX_OPENING_HOLD) return out;
+        // No sentence end: judge what there is.
+        if (isMetaDeliberation(held)) { held = ""; return out; }
+        opening = false;
+        out += held;
+        held = "";
+        return out;
+      }
+      const cut = end.index + end[0].length;
+      const sentence = held.slice(0, cut);
+      if (isMetaDeliberation(sentence)) {
+        held = held.slice(cut).replace(/^[ \t]+/, "");
+        continue;
+      }
+      // The first real reasoning: it and everything after pass unchanged.
+      opening = false;
+      out += held.replace(/^\s+/, "");
+      held = "";
+    }
+    return out;
+  };
+  return {
+    push(text) {
+      if (typeof text !== "string" || !text) return "";
+      if (!opening) return text;
+      held += text;
+      return judge(false);
+    },
+    // End of a block: whatever is still held is judged now.
+    flush() { return opening ? judge(true) : ""; },
+    // A new thinking block (the next model call) starts with its own opening.
+    reset() { opening = true; held = ""; },
+  };
+}

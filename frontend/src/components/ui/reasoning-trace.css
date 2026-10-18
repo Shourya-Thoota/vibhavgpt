@@ -1,4 +1,13 @@
 /* The thinking block: a hairline border and muted text. The "Thought for X s"
    pill itself uses the orb pill from thinking-tool.css. */
 .reasoning-trace{display:flex;flex-direction:column;gap:6px;width:100%;margin:6px 0 10px;color:var(--muted)}
-.reasoning-trace__body{max-height:220px;overflow:auto;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:transparent;color:var(--muted);font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+.reasoning-trace__body{max-height:260px;overflow:auto;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:transparent;color:var(--muted);font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+/* Steps: a numbered badge and a title per phase, its text indented under it. */
+.reasoning-trace__steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.reasoning-trace__step-head{display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.reasoning-trace__badge{flex:none;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid var(--accent-line, var(--line));background:var(--surface-2, transparent);color:var(--accent);font-size:11px;font-weight:600;line-height:1}
+.reasoning-trace__step-title{color:var(--ink);font-size:13px;font-weight:600}
+.reasoning-trace__step .reasoning-trace__para{margin-left:26px}
+.reasoning-trace__para{margin:0 0 6px;white-space:pre-wrap}
+.reasoning-trace__para:last-child{margin-bottom:0}
+.reasoning-trace__para strong{color:var(--ink);font-weight:600}
