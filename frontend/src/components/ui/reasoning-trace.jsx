@@ -1,6 +1,7 @@
 import * as React from "react";
 import { IconChevronRight } from "@tabler/icons-react";
 import { liveStatusLabel, thoughtLabel } from "../../live-status.js";
+import { thinkingSteps } from "../../thinking-steps.js";
 import "./thinking-tool.css";
 import "./reasoning-trace.css";
 
@@ -15,6 +16,31 @@ export function LiveStatusLabel({ phase, attempt, maxAttempts, startedAt }) {
     return () => clearInterval(timer);
   }, [counting, startedAt]);
   return <span aria-live="polite">{liveStatusLabel({ phase, attempt, maxAttempts, seconds: startedAt ? (now - startedAt) / 1000 : 0 })}</span>;
+}
+
+// The thinking itself, as titled steps: each titled phase gets a small
+// numbered badge, and its text sits under it. Untitled thinking is shown as
+// plain paragraphs. No HTML is rendered from the model's text.
+function ThinkingSteps({ text }) {
+  const steps = thinkingSteps(text);
+  const paragraphs = (step) => step.paragraphs.map((parts, index) => (
+    <p key={index} className="reasoning-trace__para">
+      {parts.map((part, partIndex) => (part.strong ? <strong key={partIndex}>{part.text}</strong> : <React.Fragment key={partIndex}>{part.text}</React.Fragment>))}
+    </p>
+  ));
+  if (!steps.some((step) => step.title)) return <>{steps.map((step, index) => <React.Fragment key={index}>{paragraphs(step)}</React.Fragment>)}</>;
+  let number = 0;
+  return <ol className="reasoning-trace__steps">
+    {steps.map((step, index) => (
+      <li key={index} className="reasoning-trace__step">
+        {step.title && <div className="reasoning-trace__step-head">
+          <span className="reasoning-trace__badge" aria-hidden="true">{(number += 1)}</span>
+          <span className="reasoning-trace__step-title">{step.title}</span>
+        </div>}
+        {paragraphs(step)}
+      </li>
+    ))}
+  </ol>;
 }
 
 // The orb from the live thinking pill, at rest.
@@ -34,7 +60,7 @@ export function ReasoningTrace({ text = "", live = false, seconds = null }) {
   if (live) {
     if (!hasText) return null;
     return <div className="reasoning-trace" data-live="">
-      <div ref={bodyRef} className="reasoning-trace__body" aria-label="Model thinking">{text}</div>
+      <div ref={bodyRef} className="reasoning-trace__body" aria-label="Model thinking"><ThinkingSteps text={text} /></div>
     </div>;
   }
   if (seconds === null && !hasText) return null;
@@ -46,6 +72,6 @@ export function ReasoningTrace({ text = "", live = false, seconds = null }) {
       <span>{label}</span>
       <IconChevronRight size={14} aria-hidden="true" className={open ? "thinking-tool__chevron thinking-tool__chevron--open" : "thinking-tool__chevron"} />
     </button>
-    {open && <div id={contentId} className="reasoning-trace__body">{text}</div>}
+    {open && <div id={contentId} className="reasoning-trace__body"><ThinkingSteps text={text} /></div>}
   </div>;
 }
