@@ -15,6 +15,7 @@ import { buildMemorySystemPrompt, buildRelevantMemoryContext, extractAndSaveFact
 import { config } from "../config.js";
 import { reportChatReplyFailure } from "../sentry.js";
 import { createThinkingRelay } from "./reasoning-stream.js";
+import { createThoughtFilter, stripThoughts } from "./thought-filter.js";
 import { composeImagePrompt, createStoredAttachment, documentLabel, generateDocument, generateImage } from "../generation/service.js";
 import { cancelUsageReservation, createUsageTracker, reserveUsage } from "../usage/service.js";
 import { searchWeb } from "../search/service.js";
@@ -45,12 +46,9 @@ const DOCUMENT_GROUNDING_RULE = "When the user asks about an attached document, 
 
 export function visibleReply(content) {
   if (typeof content !== "string") return "";
-  // A few compatible endpoints return their private reasoning inside the content
-  // field. It is never part of the response VibhavGPT should show or save.
-  const trimmed = stripRawToolCalls(content).trim();
-  if (!trimmed.toLowerCase().startsWith("<think>")) return /[\p{L}\p{N}]/u.test(trimmed) ? trimmed : "";
-  const closing = trimmed.toLowerCase().indexOf("</think>");
-  const answer = closing === -1 ? "" : trimmed.slice(closing + "</think>".length).trim();
+  // Some endpoints return their private reasoning inside the content field
+  // (see thought-filter.js). It is never part of what VibhavGPT shows or saves.
+  const answer = stripThoughts(stripRawToolCalls(content)).trim();
   return /[\p{L}\p{N}]/u.test(answer) ? answer : "";
 }
 
@@ -658,18 +656,33 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
       let streamed = false;
       const deltaSink = () => {
         let plain = null;
-        return (text, full) => {
+        let visible = "";
+        // Reasoning inside the reply text never reaches the client, even when
+        // a tag is split across chunks (see thought-filter.js).
+        const thoughts = createThoughtFilter();
+        return (text) => {
+          const { text: shown, discardEarlier } = thoughts.push(text);
+          if (discardEarlier) {
+            // What streamed so far was reasoning whose opening tag the model
+            // never sent: withdraw it, and keep no copy on the client.
+            visible = "";
+            plain = null;
+            if (streamed) onDelta({ reset: true, withdraw: true });
+            streamed = false;
+          }
+          if (!shown) return false;
+          visible += shown;
           if (plain === false) return false;
           if (plain === null) {
-            const head = full.trimStart();
+            const head = visible.trimStart();
             if (!head) return false;
-            // Reasoning tags or raw tool syntax are never shown.
+            // Raw tool syntax is never shown.
             plain = !/^[<{]/.test(head);
             if (!plain) return false;
             thinking.visible();
             onDelta({ text: head });
           } else {
-            onDelta({ text });
+            onDelta({ text: shown });
           }
           streamed = true;
           return true;
