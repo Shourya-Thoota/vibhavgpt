@@ -23,7 +23,7 @@ import { uploadRouter } from "./uploads/router.js";
 import { disableTwoFactorWithReauth } from "./middleware/require-two-factor-password.js";
 import { createNativeOAuthRouter } from "./auth/native-oauth.js";
 import { pool } from "./db/client.js";
-import { Sentry } from "./sentry.js";
+import { Sentry, reportServerError } from "./sentry.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -206,11 +206,12 @@ app.use(async (error, _req, res, _next) => {
   } else {
     console.error("Unhandled API error", error);
   }
-  if (config.sentryDsn) {
-    Sentry.captureException(error);
+  const status = error.status ?? 500;
+  // Only server errors (5xx) are reported, tagged with the chat reference id
+  // when there is one; client errors are answered and not reported.
+  if (config.sentryDsn && reportServerError(error, { status, requestId: _req.chatRequestId ?? null, route: _req.baseUrl || null })) {
     await Sentry.flush(2000).catch(() => {});
   }
-  const status = error.status ?? 500;
   res.status(status).json({ error: status < 500 ? (error.message ?? "Request could not be completed.") : "Something went wrong. Please try again.", code: status < 500 ? error.code : undefined });
 });
 

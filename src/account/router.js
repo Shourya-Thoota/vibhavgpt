@@ -3,8 +3,10 @@ import { Router } from "express";
 import { db } from "../db/client.js";
 import { attachments, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, messages, subscriptions, usageEvents, userProfiles } from "../db/schema.js";
 import { deleteAccountData, deletionBlock } from "./deletion.js";
+import { auth } from "../auth.js";
+import { expressCookieOptions } from "../auth/native-oauth.js";
 import { requireSession } from "../middleware/require-session.js";
-import { deleteUserUploads } from "../uploads/service.js";
+import { removeFiles } from "../uploads/service.js";
 
 export const accountRouter = Router();
 accountRouter.use(requireSession);
@@ -51,20 +53,34 @@ accountRouter.get("/export", async (req, res, next) => {
   }
 });
 
+// The browser's sign-in cookies. The sessions behind them are deleted with
+// the account, so they no longer work; clearing them signs the browser out
+// at once instead of on its next request.
+async function signInCookies() {
+  const ctx = await auth.$context;
+  const { sessionToken, sessionData, accountData, dontRememberToken } = ctx.authCookies;
+  return [sessionToken, sessionData, accountData, dontRememberToken].filter(Boolean);
+}
+
 // Deleting an account never cancels a plan. While the account has a plan
 // that could still renew or charge, the request is refused with 409 and
 // nothing is deleted; the person cancels it first and tries again. A web plan
 // whose cancellation is already scheduled does not block (see deletionBlock).
-export function deleteAccountHandler({ database = db, deleteUploads = deleteUserUploads } = {}) {
+export function deleteAccountHandler({ database = db, removeStoredFiles = removeFiles, cookiesToClear = signInCookies } = {}) {
   return async (req, res, next) => {
     const userId = req.authSession.user.id;
     try {
       const [subscription] = await database.select().from(subscriptions).where(eq(subscriptions.userId, userId)).limit(1);
       const block = deletionBlock(subscription);
       if (block) return res.status(409).json(block);
-      // Stored files go before their rows, and their rows before image folders.
-      await deleteUploads(userId);
-      await deleteAccountData(database, userId);
+      // Every row goes in one transaction; the stored files only after it
+      // commits, so a failed deletion leaves the account whole.
+      const { storedFiles } = await deleteAccountData(database, userId);
+      const failed = await removeStoredFiles(storedFiles);
+      if (failed) console.warn(JSON.stringify({ event: "account_deletion_files_left", failed, total: storedFiles.length }));
+      for (const cookie of await cookiesToClear()) {
+        res.clearCookie(cookie.name, expressCookieOptions({ ...cookie.attributes, maxAge: undefined }));
+      }
       return res.status(204).end();
     } catch (error) {
       return next(error);

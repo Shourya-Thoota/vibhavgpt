@@ -81,15 +81,19 @@ test("a stream that goes silent mid-document still hits the idle timeout", (t) =
 
 test("a provider that goes quiet fails fast instead of holding the request", () => withKey(async () => {
   const started = Date.now();
+  let calls = 0;
   await assert.rejects(callModelStreaming("nebula", [{ role: "user", content: "doc" }], undefined, {
     idleTimeoutMs: 80,
     overallTimeoutMs: 5_000,
+    // A stall before any output is tried three times; no pause between them here.
+    startRetryDelaysMs: [0, 0],
     // Keep-alive comments are not progress.
-    fetchImpl: async (_url, init) => new Promise((resolve, reject) => {
+    fetchImpl: async (_url, init) => (calls += 1, new Promise((resolve, reject) => {
       init.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })));
       setTimeout(() => resolve(sse([{ line: ": ROUTER PROCESSING" }, { delay: 2_000, line: delta("late") }])), 10);
-    }).then((response) => response),
-  }), (error) => error.stageCode === "provider-stalled");
+    }).then((response) => response)),
+  }), (error) => error.stageCode === "provider-stalled" && error.exhausted === true);
+  assert.equal(calls, 3);
   assert.ok(Date.now() - started < 1_500);
 }));
 

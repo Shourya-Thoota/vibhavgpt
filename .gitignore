@@ -56,10 +56,14 @@ keystore.properties
 signing.properties
 direct-signing.properties
 local.properties
-# Release binaries. Downloads are published outside git; new files under
-# frontend/public/downloads/ stay untracked.
+# Release binaries are never committed. Installers and APKs are published
+# in the separate vibhavgpt-releases repository (see desktop/README.md and
+# mobile-capacitor-direct/README.md); the site only redirects to them.
+# Any installer or package, in any directory:
 *.aab
 *.apk
 *.exe
 *.blockmap
-frontend/public/downloads/*
+# The old local download folder (the site once served files from here). Kept
+# ignored as a whole, so nothing placed in it can be committed by accident.
+frontend/public/downloads/

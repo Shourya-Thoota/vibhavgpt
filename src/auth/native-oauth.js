@@ -44,7 +44,7 @@ function parseCookies(header = "") {
 }
 
 // Better Auth expresses maxAge in seconds; Express wants milliseconds.
-function expressCookieOptions(attributes) {
+export function expressCookieOptions(attributes) {
   const { maxAge, sameSite, ...rest } = attributes;
   return {
     ...rest,

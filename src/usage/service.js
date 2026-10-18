@@ -3,6 +3,7 @@ import { and, desc, eq, gt, gte, inArray, lte, ne, or, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { creditLedger, subscriptions, usageEvents } from "../db/schema.js";
 import { accessError } from "../../frontend/src/access-status.js";
+import { requestTokenEstimate } from "../chat/context-window.js";
 
 import { TOKEN_QUOTAS, TOKEN_MODEL_NAMES, ROLLING_TOKEN_WINDOW_MS, canonicalModelKey } from "../../frontend/src/token-quotas.js";
 export const LIMITS = { ...TOKEN_QUOTAS, paid: TOKEN_QUOTAS.pro };
@@ -254,13 +255,19 @@ export async function getCurrentUsage(userId, executor = db, now = new Date()) {
     : tier === "pro"
       ? proMonth.end
       : proMonth.end;
-  const [usage, rollingUsage, voiceExchangesThisPeriod, creditBalance, generationCount] = await Promise.all([
-    countUsage(userId, textWindow.start, executor, now),
-    countUsage(userId, rollingWindow.start, executor, now, true),
-    countVoiceUsage(userId, monthlyPeriodStart, executor),
-    getCreditBalance(userId, executor),
-    countGenerationUsage(userId, monthlyPeriodStart, executor),
-  ]);
+  const reads = [
+    () => countUsage(userId, textWindow.start, executor, now),
+    () => countUsage(userId, rollingWindow.start, executor, now, true),
+    () => countVoiceUsage(userId, monthlyPeriodStart, executor),
+    () => getCreditBalance(userId, executor),
+    () => countGenerationUsage(userId, monthlyPeriodStart, executor),
+  ];
+  // The pool can run these side by side. A transaction is one client, which
+  // must run one query at a time.
+  const results = [];
+  if (executor === db) results.push(...await Promise.all(reads.map((read) => read())));
+  else for (const read of reads) results.push(await read());
+  const [usage, rollingUsage, voiceExchangesThisPeriod, creditBalance, generationCount] = results;
   return {
     tier,
     tokensThisPeriod: usage.total,
@@ -387,11 +394,11 @@ export async function cancelUsageReservation(eventId, creditReservationId = null
 }
 
 export function inferenceTokenBudget(messages, tools, maxTokens) {
-  // A byte per text token is a conservative reservation, not the final charge.
-  // Uploaded images are normalized to a bounded size before reaching inference.
-  const text = JSON.stringify({ messages, tools }, (key, value) => key === "image_url" ? { url: "[image]" } : value);
-  const images = messages.flatMap((message) => Array.isArray(message.content) ? message.content : []).filter((part) => part.type === "image_url").length;
-  return Buffer.byteLength(text, "utf8") + images * 16_384 + maxTokens + 512;
+  // A hold, not the final charge: the reply settles at the provider's real
+  // counts. Text and images use the same estimates as the context window
+  // (UTF-8 bytes / 3, a fixed size per image); uploads are normalized to a
+  // bounded size before reaching inference.
+  return requestTokenEstimate(messages, tools) + maxTokens + 512;
 }
 
 export function createUsageTracker(userId, modelKey, effort, executor = db) {

@@ -28,7 +28,6 @@ body { background: var(--paper); }
 .ui-modal { background: var(--surface); }
 .ui-eyebrow { color: var(--accent); letter-spacing: .16em; font-size: .67rem; }
 .chat { background: transparent; }
-.chat__header { background: transparent; }
 .opening { padding-top: 24px; padding-bottom: 26px; width: min(100%, 760px); }
 /* The hero planet on every empty chat/study screen was left with zero
    motion while everything around it (small orbit planets, the header

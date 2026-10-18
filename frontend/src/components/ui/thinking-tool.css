@@ -2,6 +2,8 @@
 .thinking-tool{display:flex;flex-direction:column;gap:8px;width:100%;margin:8px 0;color:var(--muted)}
 .thinking-tool__toggle{display:flex;align-items:center;gap:9px;width:fit-content;max-width:100%;padding:8px 13px 8px 9px;border:1px solid #254461;border-radius:var(--radius-pill);background:linear-gradient(120deg,#111e30,#091424);color:#bcdcff;font:450 13px/1.5 var(--font-body,sans-serif);text-align:left;cursor:pointer}
 .thinking-tool__toggle:disabled{cursor:default;opacity:1}
+.thinking-tool__toggle:not(:disabled):hover{border-color:#3a6690}
+:root[data-theme="light"] .thinking-tool__toggle:not(:disabled):hover{border-color:#8fb0cc}
 .thinking-tool__toggle:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 :root[data-theme="light"] .thinking-tool__toggle{border-color:#b7c9dc;background:linear-gradient(120deg,#ffffff,#edf4fb);color:#17304b;box-shadow:0 3px 12px rgb(25 67 102 / 12%)}
 :root[data-theme="light"] .thinking-tool__orb{background:radial-gradient(circle at 35% 25%,#e4fbff,#1688bb 43%,#17488f 76%);box-shadow:0 0 0 2px rgb(22 136 187 / 12%),0 0 16px rgb(22 136 187 / 38%)}

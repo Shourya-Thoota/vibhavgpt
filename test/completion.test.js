@@ -95,6 +95,7 @@ test("activity summaries persist with a completed message alongside sources", ()
   assert.deepEqual(messageActivityMetadata(metadata), {
     sources: [{ title: "NASA", url: "https://www.nasa.gov/" }],
     activitySummary: ["Searched the web", "Prepared response"],
+    thoughtSeconds: null,
   });
 });
 

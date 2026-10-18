@@ -3,13 +3,28 @@
 // ordinary English while remaining much safer than raw character counts for
 // non-Latin text. Image payloads are counted as vision tokens, not base64.
 export const CHAT_INPUT_TOKEN_BUDGET = 24_000;
-const VISION_IMAGE_TOKEN_ESTIMATE = 4_096;
+export const VISION_IMAGE_TOKEN_ESTIMATE = 4_096;
 const MAX_REFERENCE_TOKENS = 8_000;
 const MAX_HISTORY_TOKENS = 7_000;
 const MAX_HISTORY_SUMMARY_TOKENS = 1_200;
 
 function textTokenEstimate(value) {
   return Math.ceil(Buffer.byteLength(String(value ?? ""), "utf8") / 3);
+}
+
+// The input tokens of a whole request (messages and tool definitions) as the
+// provider receives it: its JSON text, with each image counted as a fixed
+// vision estimate instead of its base64.
+export function requestTokenEstimate(messages, tools) {
+  const text = JSON.stringify({ messages, tools }, (key, value) => key === "image_url" ? { url: "[image]" } : value);
+  const images = (messages ?? []).flatMap((message) => Array.isArray(message.content) ? message.content : []).filter((part) => part.type === "image_url").length;
+  return textTokenEstimate(text) + images * VISION_IMAGE_TOKEN_ESTIMATE;
+}
+
+// The output tokens of a finished reply: its text and any tool calls.
+export function replyTokenEstimate(message) {
+  const calls = Array.isArray(message?.tool_calls) ? message.tool_calls.map((call) => call?.function ?? {}) : [];
+  return textTokenEstimate(message?.content ?? "") + (calls.length ? textTokenEstimate(JSON.stringify(calls)) : 0);
 }
 
 function contentTokenEstimate(content) {

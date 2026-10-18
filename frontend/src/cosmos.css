@@ -70,17 +70,6 @@
 .ui-menu__label { color: var(--color-faint); font-weight: 500; }
 .tag { letter-spacing: 0; text-transform: none; font-size: 0.7rem; }
 
-/* --- Chat header ---------------------------------------------------------- */
-
-.chat__header-title strong {
-  min-width: 0;
-  max-width: 46ch;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.chat__header-title span { flex: 0 0 auto; }
-
 /* --- Greeting ------------------------------------------------------------- */
 
 /* The name is part of the sentence, not a highlighted word. */

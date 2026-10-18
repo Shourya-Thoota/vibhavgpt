@@ -4,17 +4,23 @@ import { db } from "../db/client.js";
 import { attachments, conversations, messages } from "../db/schema.js";
 import { removeFiles } from "../uploads/service.js";
 
+const wholeSeconds = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
+
 export function messageActivityMetadata(metadata) {
   return {
     sources: Array.isArray(metadata?.sources) ? metadata.sources : [],
     activitySummary: Array.isArray(metadata?.activitySummary) ? metadata.activitySummary : [],
+    thoughtSeconds: wholeSeconds(metadata?.thoughtSeconds),
   };
 }
 
-export function assistantMessageMetadata({ sources = [], activitySummary = [] } = {}) {
+// Only these fields are stored with a reply. The model's thinking text is
+// shown live and never saved; how long it thought is the one thing kept.
+export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null } = {}) {
   return {
     ...(sources.length ? { sources } : {}),
     ...(activitySummary.length ? { activitySummary } : {}),
+    ...(wholeSeconds(thoughtSeconds) !== null ? { thoughtSeconds } : {}),
   };
 }
 
@@ -62,6 +68,7 @@ export async function loadConversation(userId, conversationId) {
     // private reasoning. Keeping it with the message makes the disclosure
     // available after a reload just like sources.
     message.activitySummary = persisted.activitySummary;
+    message.thoughtSeconds = persisted.thoughtSeconds;
     delete message.metadata;
   }
 
@@ -145,7 +152,58 @@ export function makeTitle(content) {
   return compact.length > 60 ? `${compact.slice(0, 57)}...` : compact;
 }
 
-export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [] }) {
+// The user's message, saved as soon as a chat request is accepted, before any
+// reply is made. A reply that fails or is interrupted then never takes the
+// message with it. A first message creates its conversation here. A retry of
+// the conversation's last message, still unanswered, reuses that message
+// instead of adding it again.
+export async function saveUserMessage({ userId, conversationId, modelKey, content, mode }) {
+  modelKey = canonicalModelKey(modelKey);
+  return db.transaction(async (tx) => {
+    let id = conversationId;
+    if (!id) {
+      const [created] = await tx
+        .insert(conversations)
+        .values({ userId, title: makeTitle(content), model: modelKey, ...(mode ? { mode } : {}) })
+        .returning({ id: conversations.id });
+      id = created.id;
+    } else {
+      const [last] = await tx
+        .select({ id: messages.id, role: messages.role, content: messages.content })
+        .from(messages)
+        .where(eq(messages.conversationId, id))
+        .orderBy(desc(messages.createdAt), sql`case when ${messages.role} = 'assistant' then 0 else 1 end`)
+        .limit(1);
+      if (last?.role === "user" && last.content === content) {
+        await tx.update(messages).set({ metadata: {} }).where(eq(messages.id, last.id));
+        return { conversationId: id, messageId: last.id, reused: true };
+      }
+    }
+    const [saved] = await tx
+      .insert(messages)
+      .values({ conversationId: id, role: "user", content, createdAt: new Date() })
+      .returning({ id: messages.id });
+    return { conversationId: id, messageId: saved.id, reused: false };
+  });
+}
+
+// Marks a saved user message whose reply never arrived: "failed" or
+// "interrupted" (the user left), with the request's reference id. The message
+// itself is kept. A message that was answered after all (a step after the
+// reply was saved failed) is left alone.
+export async function markReplyMissing(messageId, replyStatus, requestId) {
+  await db.update(messages)
+    .set({ metadata: { replyStatus, requestId } })
+    .where(and(eq(messages.id, messageId), sql`not exists (
+      select 1 from messages answer
+      where answer.conversation_id = messages.conversation_id and answer.role = 'assistant' and answer.created_at > messages.created_at
+    )`));
+}
+
+// Saves a finished exchange. With userMessageId, the user's message was
+// already saved by saveUserMessage: only the reply is added (and the
+// message's missing-reply mark cleared). Without it, both are saved together.
+export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null }) {
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
@@ -175,18 +233,28 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
     // history, rather than relying on arbitrary order for equal timestamps.
     const userCreatedAt = new Date();
     const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
-    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary });
-    const saved = await tx
-      .insert(messages)
-      .values([
-        { conversationId: id, role: "user", content: userContent, createdAt: userCreatedAt },
-        // Sources ride along in the assistant row's metadata so a reloaded
-        // conversation can still show what an answer was grounded in. They
-        // were previously returned on the live response only, which meant
-        // every citation vanished the moment the page was refreshed.
-        { conversationId: id, role: "assistant", content: reply, createdAt: assistantCreatedAt, ...(Object.keys(assistantMetadata).length ? { metadata: assistantMetadata } : {}) },
-      ])
-      .returning({ id: messages.id, role: messages.role, content: messages.content });
+    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds });
+    // Sources ride along in the assistant row's metadata so a reloaded
+    // conversation can still show what an answer was grounded in. They
+    // were previously returned on the live response only, which meant
+    // every citation vanished the moment the page was refreshed.
+    const assistantRow = { conversationId: id, role: "assistant", content: reply, createdAt: assistantCreatedAt, ...(Object.keys(assistantMetadata).length ? { metadata: assistantMetadata } : {}) };
+    let saved;
+    if (userMessageId) {
+      const [userRow] = await tx
+        .update(messages)
+        .set({ metadata: {} })
+        .where(and(eq(messages.id, userMessageId), eq(messages.conversationId, id)))
+        .returning({ id: messages.id, role: messages.role, content: messages.content });
+      if (!userRow) throw new Error("The message being answered is no longer in this conversation.");
+      const [assistant] = await tx.insert(messages).values(assistantRow).returning({ id: messages.id, role: messages.role, content: messages.content });
+      saved = [userRow, assistant];
+    } else {
+      saved = await tx
+        .insert(messages)
+        .values([{ conversationId: id, role: "user", content: userContent, createdAt: userCreatedAt }, assistantRow])
+        .returning({ id: messages.id, role: messages.role, content: messages.content });
+    }
 
     if (attachmentIds.length) {
       await tx
