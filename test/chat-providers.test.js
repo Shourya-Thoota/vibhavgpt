@@ -144,13 +144,16 @@ test("Lumen rejects an unapproved primary and skips missing routes without reque
   assert.deepEqual(requests, [lumenEndpoints[2]]);
 });
 
-test("unconfirmed usage prevents a Lumen fallback in both paths", async () => {
+test("a failed try without confirmed usage is released, never settled, and the Lumen fallback continues in both paths", async () => {
   for (const call of [callModelWithFallback, callModelStreaming]) {
-    let calls = 0, releases = 0;
-    await assert.rejects(call("lumen", messages, undefined, { fetchImpl: async () => { calls++; throw new Error("transport interrupted"); },
-      usageTracker: { beforeCall: async () => {}, record: async () => { throw new Error("confirm usage fixture"); }, release: async () => releases++ },
-    }), /confirm usage fixture/);
-    assert.equal(calls, 1); assert.equal(releases, 0);
+    const urls = [];
+    let reserves = 0, releases = 0;
+    await assert.rejects(call("lumen", messages, undefined, { fetchImpl: async (url) => { urls.push(url); throw new Error("transport interrupted"); },
+      usageTracker: { beforeCall: async () => { reserves++; }, record: async () => assert.fail("no usage was confirmed, so nothing is settled"), release: async () => releases++ },
+    }), /temporarily unavailable/);
+    // Every route is tried (a retry each), instead of stopping at the first.
+    assert.deepEqual([...new Set(urls)], lumenEndpoints);
+    assert.equal(releases, reserves, "every reservation is released");
   }
 });
 
@@ -261,9 +264,27 @@ test("Nebula normal effort disables hidden reasoning in both response paths, whi
     };
     const call = streaming ? callModelStreaming : callModelWithFallback;
     await call("nebula", messages, undefined, { reasoning, fetchImpl, onDelta: () => true });
-    assert.deepEqual(body.reasoning, reasoning === null ? { enabled: false, exclude: true } : { effort: "high", exclude: true });
+    assert.deepEqual(body.reasoning, reasoning === null ? { enabled: false, exclude: true } : { effort: "high" });
     assert.deepEqual(body.provider.only, NEBULA_PROVIDERS);
     assert.equal(body.provider.data_collection, "deny");
+  }
+});
+
+test("a chosen thinking effort is requested with its thinking returned on every paid tier", async () => {
+  for (const key of ["nova", "nebula", "vesper"]) {
+    for (const reasoning of [null, "low", "medium", "high", "xhigh", "max"]) {
+      let body;
+      await callModelStreaming(key, messages, undefined, { reasoning, onDelta: () => true, fetchImpl: async (_url, init) => {
+        body = JSON.parse(init.body);
+        return streamResponse([{ choices: [{ delta: { content: "OK" }, finish_reason: "stop" }], usage: { prompt_tokens: 10, completion_tokens: 2 } }]);
+      } });
+      if (reasoning === null) {
+        // Normal effort: Nebula keeps thinking off; the others use the model's default.
+        assert.deepEqual(body.reasoning, key === "nebula" ? { enabled: false, exclude: true } : undefined, `${key} normal`);
+      } else {
+        assert.deepEqual(body.reasoning, { effort: reasoning }, `${key} ${reasoning}`);
+      }
+    }
   }
 });
 
@@ -298,6 +319,51 @@ test("all public identities and product facts contain only branded model names a
     assert.doesNotMatch(prompt, /Halo|\u2014/);
     assert.doesNotMatch(prompt, providerTermsPattern);
   }
+});
+
+for (const [name, call, success] of [["non-streaming", callModelWithFallback, answer], ["streaming", callModelStreaming, streamAnswer]]) {
+  test(`Lumen ${name}: a small-context primary gets an output ceiling that fits its window, or is not asked at all`, async () => {
+    const { requestTokenEstimate } = await import("../src/chat/context-window.js");
+    config.chatModels.lumen = "allam-2-7b";
+    const send = async (prompt, maxTokens) => {
+      const requests = [];
+      await call("lumen", prompt, undefined, { maxTokens, maxRetries: 0, fetchImpl: async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return success(); } });
+      return requests;
+    };
+    // Plenty of room: the configured budget is kept.
+    let [request] = await send(messages, 2_048);
+    assert.equal(request.url, lumenEndpoints[0]);
+    assert.equal(request.body.max_tokens, 2_048);
+    // Input plus output may not pass 4,096: the budget shrinks to what is left after a margin.
+    const medium = [{ role: "system", content: "x".repeat(9_000) }, ...messages];
+    [request] = await send(medium, 2_048);
+    assert.equal(request.body.max_tokens, 4_096 - requestTokenEstimate(medium) - 256);
+    assert.ok(request.body.max_tokens >= 256 && request.body.max_tokens < 2_048);
+    // A prompt that cannot fit is not sent; the next route answers with its full budget.
+    const large = [{ role: "system", content: "x".repeat(18_000) }, ...messages];
+    const requests = await send(large, 2_048);
+    assert.deepEqual(requests.map((r) => r.url), [lumenEndpoints[1]]);
+    assert.equal(requests[0].body.max_tokens, 2_048);
+    // Other models keep whatever budget they are given.
+    config.chatModels.lumen = "fixture-lumen";
+    [request] = await send(large, 6_000);
+    assert.equal(request.body.max_tokens, 6_000);
+  });
+}
+
+test("the generated-image byline follows the model naming and is never a model key", async () => {
+  const { IMAGE_DISPLAY_NAME, getModelConfig } = await import("../src/chat/providers.js");
+  assert.equal(IMAGE_DISPLAY_NAME, "VibhavGPT Image");
+  for (const model of Object.values(MODEL_CONFIGS)) assert.match(model.displayName, /^VibhavGPT [A-Z][a-z]+$/);
+  assert.match(IMAGE_DISPLAY_NAME, /^VibhavGPT [A-Z][a-z]+$/);
+  assert.doesNotMatch(IMAGE_DISPLAY_NAME, providerTermsPattern);
+  // A chat that asks for "image" is routed like any unknown key, never to an image model.
+  assert.equal(Object.keys(MODEL_CONFIGS).includes("image"), false);
+  assert.equal(getModelConfig("image"), MODEL_CONFIGS.lumen);
+  const { readFile } = await import("node:fs/promises");
+  const router = await readFile(new URL("../src/chat/router.js", import.meta.url), "utf8");
+  assert.match(router, /model: IMAGE_DISPLAY_NAME,/);
+  assert.doesNotMatch(router, /"VibhavGPT Image"/, "the label is defined once, beside the model names");
 });
 
 test("every actual attempt reserves and settles its own API usage, including empty-response retries", async () => {
@@ -338,22 +404,23 @@ test("Nebula passes structured output schemas without exposing the backing route
   assert.deepEqual(body.response_format, schema);
   assert.deepEqual(body.provider.only, NEBULA_PROVIDERS);
 });
-test("an interrupted transport retains its reservation when token usage cannot be confirmed", async () => {
+test("an interrupted transport with no confirmed usage releases its reservation and reports the provider failure", async () => {
   for (const call of [callModelWithFallback, callModelStreaming]) {
     let calls = 0;
+    let reserves = 0;
     let releases = 0;
     let records = 0;
     await assert.rejects(call("study", messages, undefined, {
       fetchImpl: async () => { calls++; throw Object.assign(new Error("interrupted"), { name: "TimeoutError" }); },
       usageTracker: {
-        beforeCall: async () => {},
-        record: async (usage) => { assert.ok(!usage || !Object.keys(usage).length); records++; throw new Error("Token usage could not be confirmed."); },
+        beforeCall: async () => { reserves++; },
+        record: async () => { records++; throw new Error("Token usage could not be confirmed."); },
         release: async () => { releases++; },
       },
-    }), /Token usage could not be confirmed/);
-    assert.equal(calls, 1);
-    assert.equal(records, 1);
-    assert.equal(releases, 0);
+    }), (error) => error.code === "inference-unavailable", "the provider failure is reported, not usage-unavailable");
+    assert.ok(calls >= 1);
+    assert.equal(records, 0, "nothing is settled without confirmed counts");
+    assert.equal(releases, reserves, "every reservation is released");
   }
 });
 
@@ -458,11 +525,15 @@ test("metadata recovery shares the inference deadline and never estimates missin
   assert.deepEqual(result.data.usage, {});
 });
 
-test("running or unavailable metadata never turns unconfirmed consumption into free inference", async () => {
+test("running or unavailable metadata never turns unconfirmed consumption into free inference: a delivered reply is settled at an estimate", async () => {
+  const { replyTokenEstimate, requestTokenEstimate } = await import("../src/chat/context-window.js");
   for (const data of [{ native_tokens_prompt: 30, native_tokens_completion: 8 }, { finish_reason: "stop", native_tokens_prompt: null, native_tokens_completion: null }]) {
-    await assert.rejects(callModelStreaming("vesper", messages, undefined, {
-      usageTracker: { beforeCall: async () => {}, record: async (usage) => { assert.deepEqual(usage, {}); throw new Error("usage remains pending"); } },
+    const settled = [];
+    const result = await callModelStreaming("vesper", messages, undefined, {
+      usageTracker: { beforeCall: async () => {}, record: async (usage) => { settled.push(usage); }, release: async () => assert.fail("a delivered reply is settled, not released") },
       fetchImpl: async (url) => url.includes("/generation?") ? Response.json({ data }) : streamResponse([{ id: "gen-pending", choices: [{ delta: { content: "partial" }, finish_reason: "stop" }] }]),
-    }), /usage remains pending/);
+    });
+    assert.equal(result.data.choices[0].message.content, "partial");
+    assert.deepEqual(settled, [{ prompt_tokens: requestTokenEstimate(messages), completion_tokens: replyTokenEstimate({ content: "partial" }), estimated: true }]);
   }
 });

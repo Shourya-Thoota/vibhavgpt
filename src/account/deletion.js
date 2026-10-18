@@ -1,6 +1,6 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import {
-  billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, subscriptions,
+  attachments, billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, subscriptions,
   usageEvents, userProfiles, voiceLiveSessions,
 } from "../db/schema.js";
 
@@ -15,8 +15,10 @@ import {
    nothing left. If any step fails the whole deletion rolls back and the
    account stays intact, so a retry starts clean.
 
-   Uploaded files are removed by the caller before this runs; their rows
-   must be gone before image folders can be.
+   Attachment rows (uploads and generated images) are deleted here too, so
+   no row outlives the account and nothing is half deleted. The stored
+   files behind them are returned for the caller to remove once this has
+   committed: a rollback then never leaves rows pointing at missing files.
    ========================================================================== */
 
 /* Deletion never cancels a plan. While a plan could still renew or charge,
@@ -55,6 +57,11 @@ async function tableExists(tx, name) {
 export async function deleteAccountData(db, userId) {
   if (typeof userId !== "string" || !userId) throw new Error("A user id is required to delete an account.");
   return db.transaction(async (tx) => {
+    // Attachments go before the image folders they are filed in. Their
+    // stored files are collected here and removed after the commit.
+    const storedFiles = (await tx.delete(attachments).where(eq(attachments.userId, userId)).returning({ storedName: attachments.storedName }))
+      .map((row) => row.storedName)
+      .filter(Boolean);
     // Conversations take their messages with them (cascade), and must go
     // before the projects and folders they are filed in.
     await tx.delete(conversations).where(eq(conversations.userId, userId));
@@ -81,6 +88,6 @@ export async function deleteAccountData(db, userId) {
       await tx.execute(sql`delete from "verification" where identifier = ${email} or identifier like ${`%-${email}`}`);
     }
     const deleted = rows(await tx.execute(sql`delete from "user" where id = ${userId} returning id`));
-    return { userDeleted: deleted.length > 0 };
+    return { userDeleted: deleted.length > 0, storedFiles };
   });
 }

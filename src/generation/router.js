@@ -13,7 +13,6 @@ import { createImageLibraryRouter } from "./image-library-router.js";
 import { saveExchange, addAssistantReply, loadConversation } from "../chat/repository.js";
 import { uploadRoot, findConversationDocuments, attachmentContext } from "../uploads/service.js";
 import { readFile } from "node:fs/promises";
-import { Sentry } from "../sentry.js";
 
 export const generationRouter = Router();
 generationRouter.use(requireSession);
@@ -116,7 +115,7 @@ generationRouter.post("/image", async (req, res, next) => {
     const referenceApplied = referenceImage ? images.every((image) => image.meta.referenceApplied) : null;
     return res.status(201).json({ conversationId: savedConversationId, images, cost: lastCost, referenceApplied });
   } catch (error) {
-    if (config.sentryDsn) Sentry.captureException(error);
+    // The app's error handler reports server errors once.
     return next(error);
   }
 });

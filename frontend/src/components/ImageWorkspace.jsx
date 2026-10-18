@@ -1,10 +1,25 @@
-import { useLayoutEffect, useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   ArrowUp, Download, FolderInput, FolderPlus, ImageOff, ImagePlus, Lightbulb, Lock, MoreHorizontal, Pencil, RefreshCw, Wand2, X,
 } from "lucide-react";
 import { IconButton, Menu, MenuItem, Modal, Select } from "./ui.jsx";
 import { PrivateDownloadButton, PrivateImage } from "./PrivateMedia.jsx";
+import { generatingLabel, imageJobs, progressLabel } from "../image-jobs.js";
 import "../studio.css";
+
+// "Generating... X%" for the pending plate: an estimate from elapsed time
+// (see image-jobs.js), refreshed often enough to climb smoothly.
+function GeneratingPercent({ startedAt }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, []);
+  return generatingLabel(startedAt, now);
+}
+
+// How long a finished image holds at 100% before it appears.
+const LANDING_MS = 300;
 
 /* ==========================================================================
    Image studio.
@@ -94,10 +109,16 @@ export default function ImageWorkspace({ api }) {
   const referenceInput = useRef(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
   const [ideaCategory, setIdeaCategory] = useState("all");
-  // The placeholder plate while a request runs: { shape }.
-  const [pending, setPending] = useState(null);
+  // The generation job lives in a store outside this component, so it keeps
+  // running when another tab is open and is still here on return.
+  const { job } = useSyncExternalStore(imageJobs.subscribe, imageJobs.get);
+  const running = job?.status === "generating" ? job : null;
+  // The placeholder plate while a request runs: { shape, startedAt }.
+  const pending = running ? { shape: running.shape, startedAt: running.startedAt } : null;
   const [inspecting, setInspecting] = useState(null);
-  const [variationBusy, setVariationBusy] = useState(false);
+  // A finished image's plate, held at 100% for a moment before it appears.
+  const [landing, setLanding] = useState(null);
+  const variationBusy = running?.kind === "variation";
   const [recentOnly, setRecentOnly] = useState(false);
   const [folders, setFolders] = useState([]);
   const [selectedFolder, setSelectedFolder] = useState("all");
@@ -213,31 +234,52 @@ export default function ImageWorkspace({ api }) {
   // New images belong at the head of All images; from a folder, the view
   // returns to All so they are visible at once.
   function landImages(created) {
-    if (activeFolder.current === "all") setImages((current) => [...created, ...current]);
+    // A reloaded gallery may already hold an image that finished while
+    // another tab was open, so each lands once.
+    if (activeFolder.current === "all") setImages((current) => [...created.filter((image) => !current.some((item) => item.id === image.id)), ...current]);
     else setSelectedFolder("all");
     setRecentOnly(false);
     scrollRef.current?.scrollTo?.({ top: 0, behavior: "smooth" });
   }
 
-  async function submitComposer(event) {
+  // A finished job lands once: here, or on return if it finished while
+  // another tab was open. A success shows 100% for a moment first; a failure
+  // clears the plate at once and shows the error.
+  useEffect(() => {
+    if (!job || job.status === "generating") return undefined;
+    if (job.status === "failed") {
+      setError(job.error);
+      imageJobs.acknowledge(job.id);
+      return undefined;
+    }
+    setLanding({ shape: job.shape });
+    const timer = setTimeout(() => {
+      setLanding(null);
+      landImages(job.images);
+      if (job.kind === "variation") setInspecting(job.images[0] ?? null);
+      else {
+        if (job.hadReference && job.referenceApplied === false) setNotice("The reference image couldn't be used this time, so this one was made from your description alone.");
+        setPrompt("");
+        setIdeasOpen(false);
+      }
+      imageJobs.acknowledge(job.id);
+    }, LANDING_MS);
+    return () => clearTimeout(timer);
+  }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function submitComposer(event) {
     event.preventDefault();
     const text = prompt.trim();
     if (!text || busy) return;
     if (reference?.uploading) return;
-    setPending({ shape }); setError(""); setNotice("");
-    try {
-      const result = await api("/api/generation/image", {
-        method: "POST",
-        // standalone marks a brand-new conversation from the Image page (not
-        // an image made mid-chat) so it lands in the Image sessions list.
-        body: JSON.stringify({ prompt: text, aspectRatio: shape, style, ...(reference?.id ? { referenceAttachmentId: reference.id } : {}), standalone: true }),
-      });
-      landImages(result.images);
-      if (reference?.id && result.referenceApplied === false) setNotice("The reference image couldn't be used this time, so this one was made from your description alone.");
-      setPrompt("");
-      setIdeasOpen(false);
-    } catch (err) { setError(err.message); }
-    finally { setPending(null); }
+    setError(""); setNotice("");
+    imageJobs.start(api, {
+      kind: "create",
+      shape,
+      // standalone marks a brand-new conversation from the Image page (not
+      // an image made mid-chat) so it lands in the Image sessions list.
+      body: { prompt: text, aspectRatio: shape, style, ...(reference?.id ? { referenceAttachmentId: reference.id } : {}), standalone: true },
+    });
   }
 
   async function chooseReference(file) {
@@ -284,18 +326,13 @@ export default function ImageWorkspace({ api }) {
     requestAnimationFrame(() => promptInput.current?.focus());
   }
 
-  async function generateVariation(image) {
-    setVariationBusy(true); setError("");
-    setPending({ shape: image.meta?.aspectRatio ?? "square" });
-    try {
-      const result = await api("/api/generation/image", {
-        method: "POST",
-        body: JSON.stringify({ prompt: image.prompt, aspectRatio: image.meta?.aspectRatio ?? "square", style: image.meta?.style ?? "", variations: 1, parentAttachmentId: image.id, referenceAttachmentId: image.id, standalone: true }),
-      });
-      landImages(result.images);
-      setInspecting(result.images[0]);
-    } catch (err) { setError(err.message); }
-    finally { setVariationBusy(false); setPending(null); }
+  function generateVariation(image) {
+    setError("");
+    imageJobs.start(api, {
+      kind: "variation",
+      shape: image.meta?.aspectRatio ?? "square",
+      body: { prompt: image.prompt, aspectRatio: image.meta?.aspectRatio ?? "square", style: image.meta?.style ?? "", variations: 1, parentAttachmentId: image.id, referenceAttachmentId: image.id, standalone: true },
+    });
   }
 
   // This gallery is private; no cross-user popularity signal is collected.
@@ -425,7 +462,7 @@ export default function ImageWorkspace({ api }) {
 
         {loading ? (
           <p className="studio-empty" role="status">Loading your images…</p>
-        ) : images.length === 0 && !pending ? (
+        ) : images.length === 0 && !pending && !landing ? (
           <div className="studio-empty">
             <strong>{selectedFolder === "all" ? "Your first image will develop here" : "Nothing in this folder yet"}</strong>
             <span>{selectedFolder === "all" ? "Describe something above, or pick one of the ideas." : "Open All images and use Move to folder on any image."}</span>
@@ -433,10 +470,10 @@ export default function ImageWorkspace({ api }) {
         ) : (
           <>
             <div className="studio-gallery">
-              {pending && (
-                <div className="studio-tile studio-tile--pending" data-aspect={pending.shape} role="status" aria-label="Generating image">
+              {(pending || landing) && (
+                <div className="studio-tile studio-tile--pending" data-aspect={(pending ?? landing).shape} role="status" aria-label="Generating image">
                   <span className="studio-tile__developing" />
-                  <span className="studio-tile__pending-label">Generating</span>
+                  <span className="studio-tile__pending-label">{pending ? <GeneratingPercent startedAt={pending.startedAt} /> : progressLabel(100)}</span>
                 </div>
               )}
               {visibleImages.map((image) => (
@@ -466,7 +503,7 @@ export default function ImageWorkspace({ api }) {
                 </figure>
               ))}
             </div>
-            {recentOnly && visibleImages.length === 0 && !pending && <p className="studio-empty">Nothing from the past seven days. Turn off Recent to see everything.</p>}
+            {recentOnly && visibleImages.length === 0 && !pending && !landing && <p className="studio-empty">Nothing from the past seven days. Turn off Recent to see everything.</p>}
             {nextCursor && <button type="button" className="btn btn--secondary studio-more" disabled={loadingMore} onClick={loadMore}>{loadingMore ? "Loading…" : "Load more"}</button>}
           </>
         )}

@@ -906,26 +906,6 @@ p { margin: 0; }
   min-height: 0;
 }
 
-.chat__header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  height: 58px;
-  padding: 0 22px;
-  border-bottom: 1px solid transparent;
-  background: color-mix(in srgb, var(--paper) 82%, transparent);
-  backdrop-filter: blur(12px);
-  transition: border-color 200ms var(--ease);
-}
-.chat__header-title { display: flex; align-items: baseline; gap: 9px; min-width: 0; }
-.chat__header-title strong { font-size: 0.93rem; font-weight: 600; }
-.chat__header-title span { color: var(--faint); font-size: 0.78rem; }
-.chat__header-actions { display: flex; align-items: center; gap: 4px; }
-
 /* No scroll-behavior here: the reveal pins the view by assigning scrollTop each
    frame, and smooth scrolling would turn every assignment into its own
    animation. The one place that wants easing asks for it on the call. */
@@ -1886,7 +1866,6 @@ p { margin: 0; }
   }
   .topbar-mobile .brand { justify-self: center; font-size: 0.95rem; }
   .chat { height: calc(100vh - 56px); height: calc(100dvh - 56px); }
-  .chat__header { display: none; }
   .chat__thread { padding: 20px 16px; gap: 18px; }
   .composer-wrap { padding: 8px 12px 12px; }
   .composer__bar { gap: 4px; padding: 6px 7px 8px 8px; }

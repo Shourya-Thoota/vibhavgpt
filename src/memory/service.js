@@ -19,7 +19,7 @@ const ASSISTANT_IDENTITY_PATTERN =
 // matches no space ("acme ai" matches "acmeai").
 const escapeTerm = (term) => term.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, " ?");
 let vendorPattern = { terms: null, pattern: null };
-function vendorNamePattern() {
+export function vendorNamePattern() {
   const terms = config.providerNameTerms ?? [];
   if (vendorPattern.terms !== terms) {
     vendorPattern = { terms, pattern: terms.length ? new RegExp(`\\b(${terms.map(escapeTerm).join("|")})\\b`, "i") : null };

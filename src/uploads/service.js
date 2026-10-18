@@ -167,15 +167,19 @@ async function currentStoredBytes(userId) {
   return Number(row?.total ?? 0);
 }
 
+// Removes stored files, never throwing. Returns how many could not be
+// removed (a file that is already gone is not a failure).
 export async function removeFiles(records) {
-  await Promise.all(
+  const failed = await Promise.all(
     records.map(async (record) => {
       const filename = typeof record === "string" ? record : record.storedName;
-      if (!filename) return;
-      await rm(path.join(uploadRoot, filename), { force: true }).catch(() => {});
+      if (!filename) return false;
+      const stored = await rm(path.join(uploadRoot, filename), { force: true }).then(() => false, () => true);
       await rm(path.join(incomingDirectory, filename), { force: true }).catch(() => {});
+      return stored;
     }),
   );
+  return failed.filter(Boolean).length;
 }
 
 export async function cleanupUnattachedUploads() {
@@ -290,12 +294,6 @@ export async function imageContentParts(files) {
       url: `data:${file.mimeType};base64,${(await readFile(path.join(uploadRoot, file.storedName))).toString("base64")}`,
     },
   })));
-}
-
-export async function deleteUserUploads(userId) {
-  const records = await db.select({ id: attachments.id, storedName: attachments.storedName }).from(attachments).where(eq(attachments.userId, userId));
-  await removeFiles(records);
-  await db.delete(attachments).where(eq(attachments.userId, userId));
 }
 
 export function formatMegabytes(bytes) {

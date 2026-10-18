@@ -1,0 +1,10 @@
+/* Matches the quiet "Thought for X s" pill: hairline border, muted text. */
+.sources-disclosure{display:flex;flex-direction:column;gap:8px;width:100%;margin:10px 0 0;color:var(--muted)}
+.sources-disclosure__tag{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:3px 10px;border:1px solid var(--line);border-radius:var(--r-pill);background:transparent;color:var(--muted);font:450 12.5px/1.5 var(--font-body,sans-serif);cursor:pointer}
+.sources-disclosure__tag:hover{color:var(--ink-2)}
+.sources-disclosure__tag:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.sources-disclosure__chevron{flex-shrink:0;transition:transform 150ms ease-out}
+.sources-disclosure__chevron[data-open]{transform:rotate(90deg)}
+.sources-disclosure__panel{display:flex;flex-direction:column;gap:8px;padding:2px 0 2px 12px;border-left:1px solid var(--line);font-size:13px;line-height:1.6}
+.sources-disclosure__steps{margin:0;padding-left:16px;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.sources-disclosure__chevron{transition:none}}

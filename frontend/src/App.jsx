@@ -1,4 +1,4 @@
-import { Children, isValidElement, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Children, isValidElement, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import SecurityPanel from "./components/SecurityPanel.jsx";
 import ImageWorkspace from "./components/ImageWorkspace.jsx";
+import { imageJobs } from "./image-jobs.js";
 import Sidebar from "./components/Sidebar.jsx";
 import { useDrawerSwipe } from "./components/useDrawerSwipe.js";
 import "./study.css";
@@ -35,6 +36,9 @@ import { api, apiRequest, responseError } from "./api.js";
 import { accessStatus } from "./access-status.js";
 import { PrivateFileLink, PrivateImage, ResourceLink, saveFile } from "./components/PrivateMedia.jsx";
 import { ThinkingTool } from "./components/ui/thinking-tool.jsx";
+import { LiveStatusLabel, ReasoningTrace } from "./components/ui/reasoning-trace.jsx";
+import { SourcesDisclosure } from "./components/ui/sources-disclosure.jsx";
+import { elapsedSeconds } from "./live-status.js";
 import { applyPageMetadata } from "./seo.js";
 import { DELETION_PLAN_NOTICE } from "./public-pages.js";
 import { PublicFaq } from "./components/PublicPageDetails.jsx";
@@ -441,7 +445,7 @@ function MobileTurnstileBridge({ theme }) {
 /* -- Transport ------------------------------------------------------------ */
 
 
-async function streamChat(payload, onStatus, { signal, onDelta } = {}) {
+async function streamChat(payload, onStatus, { signal, onDelta, onConversation } = {}) {
   let response;
   try {
     response = await apiRequest("/api/chat/stream", {
@@ -480,6 +484,8 @@ async function streamChat(payload, onStatus, { signal, onDelta } = {}) {
     }
     if (event === "status") onStatus(data.phase, data);
     if (event === "delta") onDelta?.(data);
+    // The message was saved before any reply: the conversation it is in.
+    if (event === "conversation") onConversation?.(data);
     if (event === "error") throw responseError(data, data.status);
     if (event === "complete") complete = data;
   }
@@ -1609,6 +1615,10 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   const narrow = useMediaQuery(NARROW_QUERY);
   const workspaceRef = useRef(null);
   const [backgroundTask, setBackgroundTask] = useState(null);
+  // An image being made (or finished) while another tab is open.
+  const { job: imageJob } = useSyncExternalStore(imageJobs.subscribe, imageJobs.get);
+  // Signing out ends this workspace; its image job must not carry over.
+  useEffect(() => () => imageJobs.clear(), []);
   const [upgradeConfirmation, setUpgradeConfirmation] = useState(() => new URLSearchParams(window.location.search).get("upgraded") === "true" ? "confirming" : null);
   const [directUpdate, setDirectUpdate] = useState(null);
   // The survey runs in front of the workspace rather than above sign-in, so it
@@ -1933,6 +1943,12 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           onClick={() => void switchMode(tab.value)}
         >
           {tab.label}
+          {tab.value === "image" && imageJob && !(productMode === "image" && page === "chat") && (
+            <>
+              <span className="mode-tabs__dot" data-state={imageJob.status} aria-hidden="true" />
+              <span className="sr-only">{imageJob.status === "generating" ? " (generating)" : imageJob.status === "done" ? " (image ready)" : " (image failed)"}</span>
+            </>
+          )}
         </button>
       ))}
     </div>
@@ -1986,7 +2002,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     );
   }
 
-  const renderChat = (studyProps = {}) => <Chat key={chatKey} userName={firstName} tier={tier} creditBalance={creditBalance} initialConversationId={activeConversationId} initialModel={lastSelectedModel} onModelChange={setLastSelectedModel} onUsageChanged={refreshUsageAccess} onNewChat={newChat} onOpenSettings={() => go("settings")} onConversationSaved={saveSession} onBackgroundTask={setBackgroundTask} autoPrompt={pendingRecap} onAutoPromptSent={() => setPendingRecap(null)} group={pendingGroup} {...studyProps} />;
+  const renderChat = (studyProps = {}) => <Chat key={chatKey} userName={firstName} tier={tier} creditBalance={creditBalance} initialConversationId={activeConversationId} initialModel={lastSelectedModel} onModelChange={setLastSelectedModel} onUsageChanged={refreshUsageAccess} onOpenSettings={() => go("settings")} onConversationSaved={saveSession} onBackgroundTask={setBackgroundTask} autoPrompt={pendingRecap} onAutoPromptSent={() => setPendingRecap(null)} group={pendingGroup} {...studyProps} />;
 
   return (
     <div className="workspace" ref={workspaceRef} data-collapsed={rail} data-page={page}>
@@ -2193,7 +2209,7 @@ function CopyButton({ text }) {
   );
 }
 
-function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onNewChat, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null }) {
+function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null }) {
   const [model, setModel] = useState(initialModel || "lumen");
   const studyMode = mode === "study";
   const sentModel = studyMode ? STUDY_MODEL : model;
@@ -2201,7 +2217,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const [conversationId, setConversationId] = useState(initialConversationId);
   // Shown in the header once a saved conversation loads; a new chat's first
   // reply does not return its title, so it keeps the generic label.
-  const [conversationTitle, setConversationTitle] = useState("");
   const [loadingConversation, setLoadingConversation] = useState(Boolean(initialConversationId));
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
@@ -2215,6 +2230,10 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const [activity, setActivity] = useState("");
   // The reply as it streams in, shown until the saved reply replaces it.
   const [streamText, setStreamText] = useState("");
+  const [livePhase, setLivePhase] = useState({ phase: "thinking", startedAt: 0 });
+  // The model's thinking for the reply in progress: shown live, never saved.
+  const [liveReasoning, setLiveReasoning] = useState("");
+  const [liveThought, setLiveThought] = useState(null);
   const [liveSources, setLiveSources] = useState([]);
   const narrow = useMediaQuery(NARROW_QUERY);
   // Phone composer sheets: "add" is the "+" sheet; "model" and "effort" are
@@ -2278,7 +2297,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       .then((result) => {
         if (cancelled) return;
         setConversationId(result.conversation.id);
-        setConversationTitle(result.conversation.title ?? "");
         const restoredModel = result.conversation.model === "spark" ? "lumen" : result.conversation.model;
         const conversationModel = modelAllowedForTier(restoredModel, tier, creditBalance) ? restoredModel : "lumen";
         setModel(conversationModel);
@@ -2289,6 +2307,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           attachment: message.attachment ?? null,
           sources: message.sources ?? [],
           activitySummary: message.activitySummary ?? [],
+          thoughtSeconds: message.thoughtSeconds ?? null,
           createdAt: message.createdAt,
           fresh: false,
         })));
@@ -2501,6 +2520,12 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     let uploaded = [];
     let visibleStream = "";
     let previousStream = "";
+    let currentPhase = selectedAttachments.length ? "attachments" : "thinking";
+    let thinkingStartedAt = Date.now();
+    let reasoningSoFar = "";
+    setLivePhase({ phase: currentPhase, startedAt: thinkingStartedAt });
+    setLiveReasoning("");
+    setLiveThought(null);
     try {
       if (selectedAttachments.length) {
         const formData = new FormData();
@@ -2510,6 +2535,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       }
       setActivity(webSearch ? "Searching the web" : "Thinking");
       setStreamText("");
+      currentPhase = "thinking";
+      thinkingStartedAt = Date.now();
+      setLivePhase({ phase: currentPhase, startedAt: thinkingStartedAt });
       let streamedAny = false;
       const reply = await streamChat(
         {
@@ -2531,14 +2559,39 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           if (mountedRef.current && details?.sources) setLiveSources(details.sources);
           const next = phase === "searching" ? "Searching the web" : phase === "calculating" ? "Calculating" : phase === "writing" ? "Writing" : "Thinking";
           if (mountedRef.current) setActivity(next);
+          if (phase !== currentPhase) {
+            currentPhase = phase;
+            if (phase === "thinking") thinkingStartedAt = Date.now();
+          }
+          if (mountedRef.current) setLivePhase({ phase, attempt: details?.attempt, maxAttempts: details?.maxAttempts, startedAt: thinkingStartedAt });
           onBackgroundTask?.({ label: next === "Writing" ? "Writing your document" : next, detail: phase === "searching" ? "Checking web sources for up-to-date information." : phase === "calculating" ? "Running the calculation in an isolated sandbox." : phase === "writing" ? "Writing your document. Longer documents take up to a minute." : "Preparing a reply in the background." });
         },
         {
           signal: controller.signal,
+          // A first message's conversation exists before the reply does, so
+          // a failed reply's Retry (and the next message) continue it
+          // instead of starting another.
+          onConversation: (saved) => {
+            if (!saved?.conversationId || saved.conversationId === conversationId) return;
+            setConversationId(saved.conversationId);
+            onConversationSaved?.(saved.conversationId, !mountedRef.current);
+          },
           onDelta: (delta) => {
             if (!mountedRef.current) return;
+            if (typeof delta.reasoning === "string") {
+              reasoningSoFar += delta.reasoning;
+              setLiveReasoning(reasoningSoFar);
+              if (currentPhase !== "thinking") {
+                currentPhase = "thinking";
+                thinkingStartedAt = Date.now();
+                setLivePhase({ phase: currentPhase, startedAt: thinkingStartedAt });
+              }
+              return;
+            }
+            if (delta.reasoningReset) { reasoningSoFar = ""; setLiveReasoning(""); return; }
             if (delta.reset) { previousStream = visibleStream || previousStream; visibleStream = ""; setStreamText(""); return; }
             if (typeof delta.text !== "string") return;
+            if (!streamedAny && reasoningSoFar) setLiveThought(elapsedSeconds(thinkingStartedAt));
             streamedAny = true;
             visibleStream += delta.text;
             setStreamText((current) => current + delta.text);
@@ -2553,9 +2606,10 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       if (mountedRef.current) setMessages((current) => [
         ...current,
         // A reply already read as it streamed isn't typed out a second time.
-        { role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny },
+        { role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny,
+          reasoning: reasoningSoFar || undefined, thoughtSeconds: reply.thoughtSeconds ?? null },
       ]);
-      if (mountedRef.current) setStreamText("");
+      if (mountedRef.current) { setStreamText(""); setLiveReasoning(""); setLiveThought(null); }
       selectedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
       if (mountedRef.current) setFailed(null);
     } catch (err) {
@@ -2578,6 +2632,8 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         setBusy(false);
         setActivity("");
         setStreamText("");
+        setLiveReasoning("");
+        setLiveThought(null);
       }
       onBackgroundTask?.(null);
     }
@@ -2832,20 +2888,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
 
   return (
     <section className="chat" data-scrolled={scrolled}>
-      <header className="chat__header">
-        <div className="chat__header-title">
-          <strong>{conversationId ? conversationTitle || "Conversation" : studyMode ? "New study session" : "New chat"}{group && !conversationId ? ` in ${group.name}` : ""}</strong>
-          {!studyMode && <span>{modelInfo.full}</span>}
-        </div>
-        <div className="chat__header-actions">
-          {!empty && (
-            <IconButton label="Start a new chat" onClick={onNewChat}>
-              <Plus size={18} strokeWidth={1.9} />
-            </IconButton>
-          )}
-        </div>
-      </header>
-
       <div
         className="chat__scroll"
         data-empty={empty || undefined}
@@ -2888,13 +2930,14 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                     {studyMode ? "VibhavGPT" : message.model ?? modelInfo.full}
                   </div>
                   <div className="bubble bubble--assistant bubble--wide">
+                    <ReasoningTrace text={message.reasoning ?? ""} seconds={message.thoughtSeconds ?? null} />
                     <AssistantBody
                       text={message.content}
                       animate={Boolean(message.fresh) && index === messages.length - 1}
                       onTick={stickToBottom}
                     />
                     {message.incomplete && <p className="response-interrupted" role="status">Response interrupted. This partial answer is not saved; retry for a complete response.</p>}
-                    <ThinkingTool state="thought" content={message.activitySummary?.join("\n")} sources={message.sources ?? []} />
+                    <SourcesDisclosure sources={message.sources ?? []} steps={message.activitySummary ?? []} />
                     {message.attachment && (
                       <PrivateFileLink className="generated-attachment" href={message.attachment.downloadUrl} name={message.attachment.name}>
                         {message.attachment.kind === "generated-image" ? <PrivateImage src={message.attachment.previewUrl ?? message.attachment.downloadUrl} alt={message.attachment.name} /> : <FileText size={22} />}
@@ -2915,9 +2958,11 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                   {studyMode ? "VibhavGPT" : modelInfo.full}
                 </div>
                 <div className={`bubble bubble--assistant${streamText ? " bubble--wide" : ""}`}>
+                  {liveReasoning && streamText && <ReasoningTrace text={liveReasoning} seconds={liveThought} />}
                   {streamText
                     ? <AssistantBody text={streamText} animate={false} />
-                    : <ThinkingTool state="thinking" content={activity === "Searching the web" ? "Checking web sources for your answer." : activity === "Writing" ? "Writing your document. Longer documents take up to a minute." : activity === "Almost done" ? "Saving the result to your conversation." : "Working on your request."} sources={liveSources} />}
+                    : <ThinkingTool state="thinking" label={<LiveStatusLabel {...livePhase} />} sources={liveSources} />}
+                  {liveReasoning && !streamText && <ReasoningTrace text={liveReasoning} live />}
                 </div>
               </article>
             )}

@@ -1,4 +1,6 @@
 import { config } from "../config.js";
+import { redactSensitive } from "../../frontend/src/sentry-scrub.js";
+import { replyTokenEstimate, requestTokenEstimate } from "./context-window.js";
 
 // Each stage's endpoint is its configured base URL plus the standard
 // chat-completions path; an unconfigured stage is skipped like a missing key.
@@ -17,6 +19,87 @@ export class InferenceUnavailableError extends Error {
 
 function writeInferenceLog(level, event, fields) {
   console[level](JSON.stringify({ event, ...fields }));
+}
+
+// What a provider said when it failed, safe to log: its code and one short
+// line of its message, with emails and anything key- or token-like removed.
+export function providerErrorSummary(error) {
+  if (!error || typeof error !== "object") return null;
+  const code = typeof error.code === "string" || Number.isInteger(error.code) ? String(error.code).slice(0, 40) : null;
+  // The same redaction rules as error monitoring (frontend/src/sentry-scrub.js).
+  // A long quoted run is replaced too: a provider that rejects a request can
+  // quote part of it back, and that part may be the user's own words.
+  const message = typeof error.message === "string"
+    ? redactSensitive(error.message.replace(/[\u0000-\u001f\u007f]+/g, " "))
+      .replace(/(["'`])[^"'`]{24,}\1/g, "[quoted]")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160)
+    : "";
+  return { code, message: message || null };
+}
+
+// Why a provider refused a request (a 4xx), safe to log. Only the start of
+// the body is read, so a large or endless body cannot hold the request; a
+// body that cannot be read leaves the status alone to explain it.
+async function rejectionSummary(response) {
+  let text = "";
+  try {
+    const reader = response.body?.getReader();
+    if (reader) {
+      const decoder = new TextDecoder();
+      while (text.length < 2_048) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        text += decoder.decode(value, { stream: true });
+      }
+      void reader.cancel().catch(() => {});
+    }
+  } catch { /* The status is still logged. */ }
+  let error = { message: text };
+  try {
+    // OpenAI-style bodies are { error }; some providers send [{ error }].
+    const parsed = JSON.parse(text);
+    const detail = Array.isArray(parsed) ? parsed[0]?.error : parsed?.error;
+    if (typeof detail === "string") error = { message: detail };
+    else if (detail && typeof detail === "object") error = detail;
+  } catch { /* Not JSON: summarize the text itself. */ }
+  return providerErrorSummary(error);
+}
+
+// Models whose context window (input and output together) is smaller than a
+// reply's usual budget. A request to one gets an output ceiling that fits,
+// and one that cannot fit is not sent at all.
+const CONTEXT_WINDOW_TOKENS = { "allam-2-7b": 4_096 };
+const CONTEXT_MARGIN_TOKENS = 256;
+const MIN_OUTPUT_TOKENS = 256;
+
+export function outputTokenCeiling(model, messages, tools, maxTokens) {
+  const window = CONTEXT_WINDOW_TOKENS[model];
+  if (!window) return maxTokens;
+  const room = window - requestTokenEstimate(messages, tools) - CONTEXT_MARGIN_TOKENS;
+  if (room < MIN_OUTPUT_TOKENS) throw new ProviderStageError("context-too-large");
+  return Math.min(maxTokens, room);
+}
+
+// Token counts the provider actually reported. A failed try without them is
+// released, never settled: settling would refuse it as unconfirmed usage and
+// hide the real failure.
+function confirmedUsage(usage) {
+  return [usage?.prompt_tokens ?? usage?.input_tokens, usage?.completion_tokens ?? usage?.output_tokens]
+    .every((value) => Number.isSafeInteger(value) && value >= 0);
+}
+
+// The usage a successful reply is settled at. A reply that reached the user
+// never becomes an error because its provider left out the token counts: it
+// is settled at an estimate (the request and the reply, UTF-8 bytes / 3) and
+// the gap is logged.
+function successUsage(data, messages, tools, fields) {
+  if (confirmedUsage(data.usage)) return data.usage;
+  const estimate = { prompt_tokens: requestTokenEstimate(messages, tools), completion_tokens: replyTokenEstimate(data.choices?.[0]?.message) };
+  writeInferenceLog("warn", "usage_unreported_on_success", { ...fields, ...estimate });
+  data.usage = { ...data.usage, ...estimate, estimated: true };
+  return data.usage;
 }
 
 class ProviderStageError extends Error {
@@ -65,6 +148,11 @@ export const MODEL_CONFIGS = {
   }] },
 };
 
+// The byline over a generated image, in the same "VibhavGPT <name>" form as
+// the chat models above. It is a label only: not a model key, so nothing
+// routes on it and the model picker never offers it.
+export const IMAGE_DISPLAY_NAME = "VibhavGPT Image";
+
 export function getModelConfig(modelKey) {
   if (modelKey === "spark") modelKey = "lumen";
   return MODEL_CONFIGS[modelKey] ?? MODEL_CONFIGS.lumen;
@@ -91,10 +179,12 @@ function requestBody(entry, messages, tools, maxTokens, reasoning, extraBody = {
     body.reasoning_effort = "none";
     body.store = false;
   } else {
-    body.max_tokens = maxTokens;
+    body.max_tokens = outputTokenCeiling(entry.model, compatibleMessages, entry.supportsTools === false ? undefined : tools, maxTokens);
     if (entry.providerRouting) body.provider = entry.providerRouting;
     if (entry.provider === "paid" && (reasoning === false || (reasoning == null && entry.defaultReasoning === false))) body.reasoning = { enabled: false, exclude: true };
-    else if (entry.provider === "paid" && reasoning) body.reasoning = { effort: reasoning, exclude: true };
+    // A chosen thinking effort is billed whether or not its thinking is
+    // returned, so it is returned: it streams to the user as live thinking.
+    else if (entry.provider === "paid" && reasoning) body.reasoning = { effort: reasoning };
   }
   if (tools?.length && entry.supportsTools !== false) { body.tools = tools; body.tool_choice = "auto"; }
   return body;
@@ -172,12 +262,13 @@ async function callProvider(
       if (Number.isFinite(seconds) && seconds >= 0) retryDelayMs = Math.ceil(seconds * 1_000);
       else if (Number.isFinite(retryAt)) retryDelayMs = Math.max(0, retryAt - Date.now());
     }
-    void response.body?.cancel?.().catch(() => {});
+    const providerError = status >= 400 && status < 500 ? await rejectionSummary(response) : null;
+    if (!providerError) void response.body?.cancel?.().catch(() => {});
     throw Object.assign(new ProviderStageError("provider-http-error", {
       status,
       retryable: status === 408 || status === 425 || status === 429 || status >= 500,
       retryDelayMs,
-    }), { quotaExceeded: isProviderQuota(null, status) });
+    }), { quotaExceeded: isProviderQuota(null, status), providerError });
   }
 
   let data;
@@ -259,7 +350,7 @@ export async function callModelWithFallback(
           signal,
         });
       } catch (error) {
-        if ((error.usage && Object.keys(error.usage).length) || error.inferenceStarted) await usageTracker?.record(error.usage);
+        if (confirmedUsage(error.usage)) await usageTracker?.record(error.usage);
         await usageTracker?.release();
         attempts += 1;
         let stageError = error;
@@ -272,6 +363,9 @@ export async function callModelWithFallback(
           retryable: Boolean(stageError?.retryable),
           attempt: attempt + 1,
           elapsedMs: Date.now() - startedAt,
+          providerStatus: Number.isInteger(stageError?.status) ? stageError.status : null,
+          providerCode: stageError?.providerError?.code ?? null,
+          providerMessage: stageError?.providerError?.message ?? null,
         });
         if (stageError?.code === "client-aborted" || signal?.aborted) throw new InferenceUnavailableError();
 
@@ -288,7 +382,7 @@ export async function callModelWithFallback(
         }
         break;
       }
-      await usageTracker?.record(data.usage);
+      await usageTracker?.record(successUsage(data, messages, tools, { requestId, stage: entry.provider }));
       return { data, internalStage: entry.provider };
     }
   }
@@ -342,7 +436,7 @@ async function recoverStreamUsage(entry, generationId, usage, fetchImpl, { signa
 }
 
 async function streamOnce(entry, messages, tools, {
-  fetchImpl, maxTokens, reasoning, responseFormat, idleTimeoutMs, deadlineAt, imageInput, signal, onDelta,
+  fetchImpl, maxTokens, reasoning, responseFormat, idleTimeoutMs, firstOutputTimeoutMs = idleTimeoutMs, deadlineAt, imageInput, signal, onDelta, onReasoning,
 }) {
   const apiKey = config.providerKeys[entry.provider];
   const endpoint = chatCompletionsUrl(entry.provider);
@@ -357,10 +451,17 @@ async function streamOnce(entry, messages, tools, {
   const stop = (reason) => { stopReason ??= reason; controller.abort(); void reader?.cancel().catch(() => {}); };
   const overallTimer = setTimeout(() => stop("provider-timeout"), Math.max(1, deadlineAt - Date.now()));
   let idleTimer = setTimeout(() => stop("provider-stalled"), idleTimeoutMs);
+  // A shorter wait for the first text or tool call. Empty chunks do not count.
+  const firstOutputTimer = firstOutputTimeoutMs < idleTimeoutMs ? setTimeout(() => stop("provider-stalled"), firstOutputTimeoutMs) : null;
   const onClientAbort = () => stop("client-aborted");
   if (signal?.aborted) stop("client-aborted");
   signal?.addEventListener("abort", onClientAbort, { once: true });
-  const state = { content: "", firstTokenMs: null, delivered: 0 };
+  const state = { content: "", firstTokenMs: null, firstOutputMs: null, firstReasoningMs: null, delivered: 0 };
+  const outputArrived = () => {
+    if (state.firstOutputMs !== null) return;
+    state.firstOutputMs = Date.now() - startedAt;
+    clearTimeout(firstOutputTimer);
+  };
   let finishReason = null;
   let generationId = null;
   let usage = {};
@@ -376,15 +477,16 @@ async function streamOnce(entry, messages, tools, {
     });
     if (!response.ok) {
       inferenceStarted = false;
-      void response.body?.cancel?.().catch(() => {});
       const status = response.status;
-      throw Object.assign(new ProviderStageError("provider-http-error", { status, retryable: status === 408 || status === 429 || status >= 500 }), { quotaExceeded: isProviderQuota(null, status) });
+      const providerError = status >= 400 && status < 500 ? await rejectionSummary(response) : null;
+      if (!providerError) void response.body?.cancel?.().catch(() => {});
+      throw Object.assign(new ProviderStageError("provider-http-error", { status, retryable: status === 408 || status === 429 || status >= 500 }), { quotaExceeded: isProviderQuota(null, status), providerError });
     }
     if (response.headers.get("content-type")?.includes("application/json")) {
       const data = await response.json();
       const quotaExceeded = isProviderQuota(data?.error);
       if (quotaExceeded) inferenceStarted = false;
-      throw Object.assign(new ProviderStageError(quotaExceeded ? "provider-quota" : "provider-invalid-stream", { retryable: true }), { quotaExceeded });
+      throw Object.assign(new ProviderStageError(quotaExceeded ? "provider-quota" : "provider-invalid-stream", { retryable: true }), { quotaExceeded, providerError: providerErrorSummary(data?.error) });
     }
     reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -410,18 +512,32 @@ async function streamOnce(entry, messages, tools, {
           // A quota rejection before any output never began billable inference.
           // Do not turn it into an unknown-usage hold that stops the chain.
           if (quotaExceeded && !state.content && !toolCalls.length) inferenceStarted = false;
-          throw Object.assign(new ProviderStageError("provider-stream-error", { status, retryable: true }), { quotaExceeded });
+          throw Object.assign(new ProviderStageError("provider-stream-error", { status, retryable: true }), { quotaExceeded, providerError: providerErrorSummary(chunk.error) });
         }
         clearTimeout(idleTimer);
         idleTimer = setTimeout(() => stop("provider-stalled"), idleTimeoutMs);
         const choice = chunk.choices?.[0];
+        // Streamed thinking (delta.reasoning_details) shows the model is
+        // working: it ends the first-output wait, but it is never part of the
+        // reply or counted as output. Readable thinking (text and summary
+        // details) goes to onReasoning; encrypted details are never shown.
+        if (Array.isArray(choice?.delta?.reasoning_details) && choice.delta.reasoning_details.length) {
+          state.firstReasoningMs ??= Date.now() - startedAt;
+          clearTimeout(firstOutputTimer);
+          for (const detail of choice.delta.reasoning_details) {
+            const text = detail?.type === "reasoning.text" ? detail.text : detail?.type === "reasoning.summary" ? detail.summary : null;
+            if (typeof text === "string" && text) onReasoning?.(text);
+          }
+        }
         const delta = choice?.delta?.content;
         if (typeof delta === "string" && delta) {
+          outputArrived();
           state.firstTokenMs ??= Date.now() - startedAt;
           state.content += delta;
           if (onDelta) state.delivered += onDelta(delta, state.content) ? delta.length : 0;
         }
         for (const call of choice?.delta?.tool_calls ?? []) {
+          outputArrived();
           const index = Number.isInteger(call.index) ? call.index : toolCalls.length;
           toolCalls[index] ??= { id: call.id, type: "function", function: { name: "", arguments: "" } };
           if (call.id) toolCalls[index].id = call.id;
@@ -440,12 +556,17 @@ async function streamOnce(entry, messages, tools, {
     const stageError = error instanceof ProviderStageError ? error
       : new ProviderStageError(stopReason ?? "provider-network-error", { retryable: stopReason !== "client-aborted" });
     if (stopReason) stageError.code = stopReason;
-    usage = await recoverStreamUsage(entry, generationId, usage, fetchImpl, { signal, deadlineAt });
-    Object.assign(stageError, { usage, inferenceStarted, elapsedMs: Date.now() - startedAt, firstTokenMs: state.firstTokenMs, receivedChars: state.content.length, delivered: state.delivered > 0 });
+    // A stall before any output is released, not charged, so its usage
+    // lookup would only delay the retry.
+    const stalledBeforeOutput = stopReason === "provider-stalled" && !state.content && !toolCalls.length;
+    if (!stalledBeforeOutput) usage = await recoverStreamUsage(entry, generationId, usage, fetchImpl, { signal, deadlineAt });
+    Object.assign(stageError, { usage, inferenceStarted, elapsedMs: Date.now() - startedAt, firstTokenMs: state.firstTokenMs,
+      receivedChars: state.content.length, receivedToolCalls: toolCalls.length, delivered: state.delivered > 0 });
     throw stageError;
   } finally {
     clearTimeout(overallTimer);
     clearTimeout(idleTimer);
+    clearTimeout(firstOutputTimer);
     signal?.removeEventListener("abort", onClientAbort);
   }
   usage = await recoverStreamUsage(entry, generationId, usage, fetchImpl, { signal, deadlineAt });
@@ -454,32 +575,81 @@ async function streamOnce(entry, messages, tools, {
   if (calls.length) message.tool_calls = calls;
   const data = { choices: [{ message, finish_reason: finishReason }], usage };
   if (!hasUsableResponse(data)) throw Object.assign(new ProviderStageError("provider-empty-response", { retryable: true }), { delivered: state.delivered > 0, usage, inferenceStarted: true });
-  return { data, elapsedMs: Date.now() - startedAt, firstTokenMs: state.firstTokenMs };
+  return { data, elapsedMs: Date.now() - startedAt, firstTokenMs: state.firstTokenMs, firstOutputMs: state.firstOutputMs, firstReasoningMs: state.firstReasoningMs };
+}
+
+// A stall, a transient 5xx, or a provider error event in the stream, before
+// any text or tool call reached us, is safe to try again: the user has seen
+// nothing, and the try is not charged.
+const START_RETRY_DELAYS_MS = [500, 1_000];
+const SINGLE_ROUTE_START_RETRIES = 2;
+
+function failedBeforeOutput(error) {
+  if (error?.delivered || error?.receivedChars || error?.receivedToolCalls) return false;
+  if (error?.code === "provider-stalled") return true;
+  const transientStatus = error?.status >= 500 || error?.status === 408;
+  if (error?.code === "provider-stream-error") return !error.quotaExceeded && (error.status == null || transientStatus);
+  return error?.code === "provider-http-error" && transientStatus;
+}
+
+function pause(ms, signal) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); signal?.removeEventListener("abort", done); resolve(); };
+    const timer = setTimeout(done, ms);
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }
 
 // Walk explicitly configured routes; providers never choose an unlisted fallback.
 export async function callModelStreaming(modelKey, messages, tools, {
   fetchImpl = fetch, maxTokens = 2_048, reasoning = null, responseFormat,
-  idleTimeoutMs = 25_000, overallTimeoutMs = 120_000,
-  deadlineAt = Date.now() + overallTimeoutMs, maxRetries = 1,
-  imageInput = false, signal, onDelta, onReset, requestId = "unknown", usageTracker,
+  idleTimeoutMs = 25_000, firstOutputTimeoutMs = idleTimeoutMs, overallTimeoutMs = 120_000,
+  deadlineAt = Date.now() + overallTimeoutMs, maxRetries = 1, startRetryDelaysMs = START_RETRY_DELAYS_MS,
+  imageInput = false, signal, onDelta, onReset, onReasoning, onRetry, requestId = "unknown", usageTracker,
 } = {}) {
   const chain = getModelConfig(modelKey).chain;
+  const requestStartedAt = Date.now();
   let stageCode = "provider-error";
+  let attempts = 0;
   for (let index = 0; index < chain.length; index += 1) {
     const entry = chain[index];
-    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    const lastRoute = index + 1 === chain.length;
+    // A tier with one route gets two more tries when it fails before any
+    // output. A chain with fallback routes keeps walking its routes instead.
+    const startRetries = chain.length === 1 ? Math.max(maxRetries, SINGLE_ROUTE_START_RETRIES) : maxRetries;
+    for (let attempt = 0; attempt <= startRetries; attempt += 1) {
       if (signal?.aborted || deadlineAt <= Date.now()) throw new InferenceUnavailableError();
+      // Only the last possible try waits the full idle time for its first output.
+      const waitForFirstOutputMs = (lastRoute && attempt === startRetries) ? idleTimeoutMs : firstOutputTimeoutMs;
       await usageTracker?.beforeCall(messages, tools, maxTokens);
+      attempts += 1;
       let result;
       try {
-        result = await streamOnce(entry, messages, tools, { fetchImpl, maxTokens, reasoning, responseFormat, idleTimeoutMs, deadlineAt, imageInput, signal, onDelta });
+        result = await streamOnce(entry, messages, tools, { fetchImpl, maxTokens, reasoning, responseFormat, idleTimeoutMs,
+          firstOutputTimeoutMs: waitForFirstOutputMs, deadlineAt, imageInput, signal, onDelta, onReasoning });
       } catch (error) {
         const code = /^[a-z0-9_.-]{1,60}$/i.test(String(error?.code ?? "")) ? error.code : "provider-error";
         stageCode = code;
         writeInferenceLog("warn", "inference_stream_failed", { requestId, stage: entry.provider, code, status: error?.status ?? null, attempt: attempt + 1,
-          elapsedMs: error?.elapsedMs ?? null, receivedChars: error?.receivedChars ?? 0 });
-        if ((error.usage && Object.keys(error.usage).length) || error.inferenceStarted) await usageTracker?.record(error.usage);
+          elapsedMs: error?.elapsedMs ?? null, receivedChars: error?.receivedChars ?? 0, providerStatus: Number.isInteger(error?.status) ? error.status : null,
+          providerCode: error?.providerError?.code ?? null, providerMessage: error?.providerError?.message ?? null });
+        if (failedBeforeOutput(error)) {
+          await usageTracker?.release();
+          if (signal?.aborted || deadlineAt <= Date.now()) throw new InferenceUnavailableError();
+          const delayMs = startRetryDelaysMs[Math.min(attempt, startRetryDelaysMs.length - 1)] ?? 0;
+          const nextWaitMs = (lastRoute && attempt + 1 === startRetries) ? idleTimeoutMs : firstOutputTimeoutMs;
+          if (attempt < startRetries && deadlineAt - Date.now() > delayMs + nextWaitMs) {
+            writeInferenceLog("info", "inference_retry", { requestId, stage: entry.provider, attempt: attempts, reason: code,
+              status: error?.status ?? null, elapsedMs: error?.elapsedMs ?? null, delayMs });
+            onRetry?.({ attempt: attempt + 2, maxAttempts: startRetries + 1, reason: code });
+            await pause(delayMs, signal);
+            continue;
+          }
+          if (!lastRoute) break;
+          writeInferenceLog("error", "inference_exhausted", { requestId, attempts, reason: code, totalElapsedMs: Date.now() - requestStartedAt });
+          throw Object.assign(new InferenceUnavailableError(), { stageCode: code, exhausted: true });
+        }
+        if (confirmedUsage(error.usage)) await usageTracker?.record(error.usage);
         await usageTracker?.release();
         if (code === "client-aborted" || signal?.aborted || deadlineAt <= Date.now()) throw new InferenceUnavailableError();
         // A second model must replace a partial answer, never append to it.
@@ -495,10 +665,11 @@ export async function callModelStreaming(modelKey, messages, tools, {
         }
         break;
       }
-      // Accounting failures stop the request rather than silently trying another model.
-      await usageTracker?.record(result.data.usage);
-      writeInferenceLog("info", "inference_stream_completed", { requestId, stage: entry.provider, attempt: attempt + 1,
-        elapsedMs: result.elapsedMs, firstTokenMs: result.firstTokenMs,
+      // Accounting failures stop the request rather than silently trying
+      // another model. Missing token counts are not one: see successUsage.
+      await usageTracker?.record(successUsage(result.data, messages, tools, { requestId, stage: entry.provider }));
+      writeInferenceLog("info", "inference_stream_completed", { requestId, stage: entry.provider, attempt: attempt + 1, attempts,
+        elapsedMs: result.elapsedMs, firstTokenMs: result.firstTokenMs, firstOutputMs: result.firstOutputMs, firstReasoningMs: result.firstReasoningMs,
         completionTokens: result.data.usage?.completion_tokens ?? null, finishReason: result.data.choices[0].finish_reason });
       return { data: result.data, internalStage: entry.provider };
     }

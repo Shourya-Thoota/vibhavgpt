@@ -5,7 +5,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { usageEvents, subscriptions, creditLedger } from "../src/db/schema.js";
 process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:5432/test";
-const { LIMITS, GENERATION_LIMITS, VOICE_LIMITS, normalizedProviderUsage, actualApiCostUsd, creditsForImage, creditsForVoiceSeconds, checkUsageLimit, utcMonthWindow, rollingTokenWindow, monthlyEntitlementPeriodEnd, monthlyEntitlementPeriodStart, reserveUsage, finalizeUsage, cancelUsageReservation, getCurrentUsage, createUsageTracker } = await import("../src/usage/service.js");
+const { LIMITS, GENERATION_LIMITS, VOICE_LIMITS, normalizedProviderUsage, actualApiCostUsd, creditsForImage, creditsForVoiceSeconds, checkUsageLimit, utcMonthWindow, rollingTokenWindow, monthlyEntitlementPeriodEnd, monthlyEntitlementPeriodStart, reserveUsage, finalizeUsage, cancelUsageReservation, getCurrentUsage, createUsageTracker, inferenceTokenBudget } = await import("../src/usage/service.js");
+const { VISION_IMAGE_TOKEN_ESTIMATE } = await import("../src/chat/context-window.js");
 
 const blank = (tier = "free") => ({ tier, tokenBreakdown: {}, rollingTokenBreakdown: {}, reservedTokenBreakdown: {}, creditBalance: 99999, periodEndsAt: new Date("2026-11-01T00:00:00Z") });
 test("every plan has the exact monthly and 5-hour caps", () => {
@@ -129,6 +130,47 @@ test("Lumen usage counts lumen and spark rows, and the retired qwen key is treat
     }
     assert.equal((await f.db.select().from(usageEvents)).filter((row) => row.userId === "b").length, 0);
   } finally { await f.client.close(); }
+});
+test("the pre-request hold counts text at bytes / 3, plus the output budget and margin", () => {
+  const messages = [{ role: "user", content: "abc" }];
+  const json = '{"messages":[{"role":"user","content":"abc"}]}';
+  assert.equal(inferenceTokenBudget(messages, undefined, 100), Math.ceil(Buffer.byteLength(json) / 3) + 100 + 512);
+  // Tools are part of the request, so they are part of the hold.
+  const tools = [{ type: "function", function: { name: "web_search" } }];
+  const withTools = '{"messages":[{"role":"user","content":"abc"}],"tools":[{"type":"function","function":{"name":"web_search"}}]}';
+  assert.equal(inferenceTokenBudget(messages, tools, 100), Math.ceil(Buffer.byteLength(withTools) / 3) + 100 + 512);
+  // Multi-byte text is counted by UTF-8 bytes and rounds up.
+  const accented = [{ role: "user", content: "é" }];
+  assert.equal(inferenceTokenBudget(accented, undefined, 0), Math.ceil(Buffer.byteLength('{"messages":[{"role":"user","content":"é"}]}') / 3) + 512);
+});
+test("each image holds the context window's fixed estimate, whatever its encoded size", () => {
+  assert.equal(VISION_IMAGE_TOKEN_ESTIMATE, 4_096);
+  const prompt = (urls) => [{ role: "user", content: [{ type: "text", text: "What is this?" }, ...urls.map((url) => ({ type: "image_url", image_url: { url } }))] }];
+  const small = inferenceTokenBudget(prompt(["data:image/png;base64,AAAA"]), undefined, 2_048);
+  const large = inferenceTokenBudget(prompt([`data:image/png;base64,${"A".repeat(2_000_000)}`]), undefined, 2_048);
+  assert.equal(large, small, "base64 bytes never count as text");
+  const none = inferenceTokenBudget(prompt([]), undefined, 2_048);
+  const two = inferenceTokenBudget(prompt(["data:image/png;base64,AAAA", "data:image/png;base64,BBBB"]), undefined, 2_048);
+  // The image part's own JSON wrapper is a few bytes of text.
+  assert.ok(small - none >= 4_096 && small - none < 4_096 + 20, `one image adds ${small - none}`);
+  assert.ok(two - none >= 8_192 && two - none < 8_192 + 40, `two images add ${two - none}`);
+});
+test("a standard Vesper image request is held well below the Plus 5-hour cap", async () => {
+  const { buildIdentitySystemPrompt } = await import("../src/chat/prompts.js");
+  const { CHAT_TOOLS } = await import("../src/chat/tool-calls.js");
+  const messages = [
+    { role: "system", content: buildIdentitySystemPrompt("vesper") },
+    { role: "user", content: [{ type: "text", text: "What is in this picture?" }, { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } }] },
+  ];
+  // responseTokenBudget's output budgets for normal, high and max effort.
+  for (const [effort, maxTokens] of [["normal", 2_048], ["high", 4_096], ["max", 8_192]]) {
+    const hold = inferenceTokenBudget(messages, CHAT_TOOLS, maxTokens);
+    // A normal-effort image prompt fits twice in Plus's 5-hour window; every
+    // effort fits in the whole window and in 46% of Pro's.
+    if (effort === "normal") assert.ok(hold < LIMITS.plus.vesper.rolling / 2, `normal: ${hold} is under half of Plus's ${LIMITS.plus.vesper.rolling}`);
+    assert.ok(hold < LIMITS.plus.vesper.rolling, `${effort}: ${hold} is under Plus's ${LIMITS.plus.vesper.rolling}`);
+    assert.ok(hold < LIMITS.pro.vesper.rolling * 0.46, `${effort}: ${hold} fits in 46% of Pro's ${LIMITS.pro.vesper.rolling}`);
+  }
 });
 test("failed generations refund reserved credits exactly once", async () => {
   const f = await fixture();

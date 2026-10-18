@@ -133,6 +133,12 @@
 .mode-tabs__tab[aria-selected="true"] { color: var(--ink); }
 .mode-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .mode-tabs__tab:disabled { cursor: default; }
+/* An image job running (or finished) while another tab is open. */
+.mode-tabs__dot { position: absolute; top: 7px; right: 10px; width: 6px; height: 6px; border-radius: var(--radius-round); background: var(--accent); }
+.mode-tabs__dot[data-state="generating"] { animation: mode-tabs-dot 1.6s ease-in-out infinite; }
+.mode-tabs__dot[data-state="failed"] { background: var(--danger); }
+@keyframes mode-tabs-dot { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .mode-tabs__dot[data-state="generating"] { animation: none; } }
 .mode-tabs-bar { display: flex; justify-content: center; padding: 12px 16px 0; }
 .workspace[data-collapsed="true"] .sidebar__brand > span { display: none; }
 

@@ -1,0 +1,4 @@
+/* The thinking block: a hairline border and muted text. The "Thought for X s"
+   pill itself uses the orb pill from thinking-tool.css. */
+.reasoning-trace{display:flex;flex-direction:column;gap:6px;width:100%;margin:6px 0 10px;color:var(--muted)}
+.reasoning-trace__body{max-height:220px;overflow:auto;padding:8px 12px;border:1px solid var(--line);border-radius:var(--r-md);background:transparent;color:var(--muted);font-size:13px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
