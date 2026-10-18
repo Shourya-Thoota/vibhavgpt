@@ -57,6 +57,7 @@ import {
 import { checkDirectAndroidUpdate } from "./direct-distribution.js";
 import { NAMELESS_GREETING, workspaceNames } from "./display-names.js";
 import { COMPARISON_GROUPS, monthlyEquivalent, yearlySaving } from "./plan-comparison.js";
+import { SOURCE_REPO_URL } from "./source-repo.js";
 import Sentry from "./sentry.js";
 
 // Terms and Privacy load on demand, in their own chunk, so the app bundle
@@ -4180,6 +4181,7 @@ function SettingsFooter({ onLegal }) {
       <LegalLink page="terms" onOpen={onLegal}>Terms of Service</LegalLink>
       <LegalLink page="privacy" onOpen={onLegal}>Privacy Policy</LegalLink>
       <LegalLink page="guarantee" onOpen={onLegal}>The VibhavGPT Guarantee</LegalLink>
+      <a className="link" href={SOURCE_REPO_URL} target="_blank" rel="noopener noreferrer">Source code</a>
     </p>
     <p className="settings__attribution">Made by Vibhav Thoota</p>
   </footer>;
