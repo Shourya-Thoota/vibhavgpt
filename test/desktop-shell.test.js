@@ -233,3 +233,15 @@ test("the desktop build stays out of the API's install and packages the preload"
   assert.equal(desktop.build.appId, "com.pansophy.vibhavgpt.desktop", "same app id, so installs upgrade in place");
   assert.deepEqual(desktop.build.win.target, [{ target: "nsis", arch: ["x64"] }]);
 });
+
+test("the Windows download page describes the version the desktop package builds", () => {
+  const page = read("frontend/public/vibhavgpt-windows/index.html");
+  const { version } = JSON.parse(read("desktop/package.json"));
+  const hero = page.match(/<span class="download-meta">Version ([\d.]+), ([\d.]+ MB)<\/span>/);
+  assert.ok(hero, "the download button names the version and size");
+  assert.equal(hero[1], version);
+  assert.match(page, new RegExp(`<dt>Version</dt><dd>${version.replaceAll(".", "\.")}</dd>`));
+  assert.match(page, new RegExp(`<dt>Download size</dt><dd>${hero[2].replace(".", "\.")}</dd>`), "the facts agree with the button");
+  assert.match(page, /<span class="checksum" id="checksum">[0-9a-f]{64}<\/span>/);
+  assert.match(page, /href="https:\/\/github\.com\/Shourya-Thoota\/vibhavgpt-releases\/releases\/latest\/download\/VibhavGPT-Setup-x64\.exe"/);
+});
