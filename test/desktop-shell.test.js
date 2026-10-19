@@ -226,8 +226,13 @@ test("the preload exposes only isDesktop and platform, and makes the top strip t
 
 test("the web app leaves room for the title bar only in the desktop app, and starts a chat from the tray", () => {
   const css = read("frontend/src/desktop.css");
-  const rules = css.replace(/\/\*[\s\S]*?\*\//g, "").split("}").map((rule) => rule.trim()).filter(Boolean);
-  for (const rule of rules) for (const selector of rule.split("{")[0].split(",")) assert.match(selector.trim(), /^html\[data-desktop\]/, selector);
+  // Every style rule is scoped to the desktop app, by the preload's
+  // html[data-desktop] or the web app's body.is-desktop-app; keyframe steps
+  // and the @media wrapper are not style rules.
+  const body = css.replace(/\/\*[\s\S]*?\*\//g, "").replace(/@keyframes[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, "").replace(/@media[^{]*\{/g, "");
+  const selectors = [...body.matchAll(/([^{}]+)\{[^{}]*\}/g)].flatMap(([, list]) => list.split(",").map((selector) => selector.trim())).filter(Boolean);
+  assert.ok(selectors.length > 10);
+  for (const selector of selectors) assert.match(selector, /^(?:html\[data-desktop\]|\.is-desktop-app)(?:\s|$)/, selector);
   assert.match(css, /html\[data-desktop\] \.workspace__main \{ padding-top: var\(--desktop-title-bar-h\); \}/);
   assert.match(read("frontend/src/main.jsx"), /import "\.\/desktop\.css";/);
   assert.match(read("frontend/src/App.jsx"), /window\.addEventListener\("desktop:new-chat", onDesktopNewChat\)/);

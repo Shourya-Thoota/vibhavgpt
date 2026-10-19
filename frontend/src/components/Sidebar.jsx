@@ -8,6 +8,7 @@ import { SOURCE_REPO_URL } from "../source-repo.js";
 import { Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "./ui.jsx";
 import { AccountBillingMenu } from "./AccountBillingMenu.jsx";
 import ConversationLibrary from "./ConversationLibrary.jsx";
+import { visibleAppLinks, WINDOWS_DOWNLOAD_PATH } from "../desktop-app.js";
 
 function relativeConversationTime(value) {
   if (!value) return "";
@@ -126,9 +127,10 @@ const CHAT_LINKS = () => [
 
 // The native apps' public download pages: plain links, outside the app. The
 // public source code opens in a new tab.
+// Inside the Windows app, its own download link is left out (desktop-app.js).
 const APP_LINKS = [
   { href: "/android", label: "Android", icon: <Smartphone size={17} strokeWidth={1.9} /> },
-  { href: "/vibhavgpt-windows", label: "Windows", icon: <Monitor size={17} strokeWidth={1.9} /> },
+  { href: WINDOWS_DOWNLOAD_PATH, label: "Windows", icon: <Monitor size={17} strokeWidth={1.9} /> },
   { href: SOURCE_REPO_URL, label: "Source code", icon: <Code size={17} strokeWidth={1.9} />, external: true },
 ];
 
@@ -232,7 +234,7 @@ export default function Sidebar({
       {variant === "chat" && (
         <nav className="sidebar__nav sidebar__apps" aria-label="Apps">
           {!rail && <span className="sidebar__apps-label">Apps</span>}
-          {APP_LINKS.map((link) => (
+          {visibleAppLinks(APP_LINKS).map((link) => (
             <a key={link.href} href={link.href} className="sidebar__link" title={rail ? link.label : undefined}
               {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
               {link.icon}
