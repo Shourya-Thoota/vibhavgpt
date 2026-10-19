@@ -1,20 +1,21 @@
 {
   "name": "vibhavgpt-desktop",
   "productName": "VibhavGPT",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "description": "Windows desktop shell for VibhavGPT",
   "author": "VibhavGPT",
   "main": "main.js",
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "electron-window-state": "^5.0.3"
   },
   "scripts": {
     "dev": "electron .",
     "dev:local": "concurrently --kill-others --names web,desktop \"npm run dev --prefix ../frontend\" \"wait-on http://localhost:5173 && electron . --app-url=http://localhost:5173/app\"",
     "icon": "node scripts/make-icon.mjs",
-    "dist": "electron-builder --win nsis --x64"
+    "dist": "electron-builder --win nsis --x64 --publish never"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",
@@ -65,11 +66,19 @@
       "shortcutName": "VibhavGPT",
       "uninstallDisplayName": "VibhavGPT",
       "deleteAppDataOnUninstall": true,
-      "artifactName": "VibhavGPT-Setup-${version}-x64.${ext}",
+      "artifactName": "VibhavGPT-Setup-x64.${ext}",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "installerHeaderIcon": "build/icon.ico"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Shourya-Thoota",
+        "repo": "vibhavgpt-releases",
+        "releaseType": "release"
+      }
+    ]
   },
   "allowScripts": {
     "electron@38.8.6": true
