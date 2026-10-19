@@ -2230,6 +2230,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   // reply does not return its title, so it keeps the generic label.
   const [loadingConversation, setLoadingConversation] = useState(Boolean(initialConversationId));
   const [draft, setDraft] = useState("");
+  // Counts sends; the composer's data-send-pulse flips with it so its pop
+  // (desktop.css, Windows app only) restarts on every send.
+  const [sendPulse, setSendPulse] = useState(0);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const activeRequestRef = useRef(null);
@@ -2682,6 +2685,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     }
     const selectedAttachments = attachments;
     if (dictation.listening) dictation.stop();
+    setSendPulse((count) => count + 1);
     setDraft("");
     setAttachments([]);
     // A reply is still coming in: queue this one instead. The stream is left
@@ -3033,7 +3037,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
 
         {narrow ? (
           <>
-            <form className="composer" data-layout="pill" onSubmit={send}>
+            <form className="composer" data-layout="pill" data-send-pulse={sendPulse ? (sendPulse % 2 ? "odd" : "even") : undefined} onSubmit={send}>
               {attachmentTray}
               <div className="composer__row">
                 {addSheetButton}
@@ -3045,7 +3049,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             </form>
           </>
         ) : (
-          <form className="composer" onSubmit={send}>
+          <form className="composer" data-send-pulse={sendPulse ? (sendPulse % 2 ? "odd" : "even") : undefined} onSubmit={send}>
             {composerInput}
             {attachmentTray}
             <div className="composer__bar">

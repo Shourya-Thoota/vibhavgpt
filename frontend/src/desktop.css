@@ -16,3 +16,62 @@ html[data-desktop] .legal { padding-top: var(--desktop-title-bar-h); }
 /* The landing page is a framed document the strip cannot reach into, so it
    starts below the strip rather than under it. */
 html[data-desktop] .home-frame { margin-top: var(--desktop-title-bar-h); height: calc(100dvh - var(--desktop-title-bar-h)); }
+
+/* --- Playful touches, the Windows app only --------------------------------
+
+   <body class="is-desktop-app"> (desktop-app.js) turns these on; a browser
+   never gets them. Everything moves with transform or opacity: the
+   individual `scale`, `rotate` and `translate` properties add to the
+   existing float, spin and hover transforms instead of replacing them. With
+   reduced motion asked for, none of it runs. */
+.is-desktop-app { --desktop-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* The welcome planet leans toward the pointer and its glow swells (its
+     opacity belongs to the existing glow-pulse, so the swell is a scale). */
+  .is-desktop-app .opening { perspective: 900px; }
+  .is-desktop-app .opening__planet { transition: scale 520ms var(--desktop-spring), rotate 620ms var(--desktop-spring); }
+  .is-desktop-app .opening__planet::before { transition: scale 620ms var(--desktop-spring); }
+  .is-desktop-app .opening__planet:hover { scale: 1.06; rotate: -1 1 0 12deg; }
+  .is-desktop-app .opening__planet:hover::before { scale: 1.22; }
+
+  /* The sidebar answers with a spring: its existing hover moves overshoot
+     and settle, buttons press in, and their icons give a small wiggle. */
+  .is-desktop-app .sidebar__link,
+  .is-desktop-app .sidebar__new,
+  .is-desktop-app .sidebar .ui-icon-button { transition: transform 380ms var(--desktop-spring), scale 380ms var(--desktop-spring), background-color 160ms ease, color 160ms ease; }
+  .is-desktop-app .sidebar__new:hover:not(:disabled) { scale: 1.02; }
+  .is-desktop-app .sidebar .ui-icon-button:hover:not(:disabled) { scale: 1.1; }
+  .is-desktop-app .sidebar__link:active,
+  .is-desktop-app .sidebar__new:active:not(:disabled),
+  .is-desktop-app .sidebar .ui-icon-button:active:not(:disabled) { scale: 0.94; transition-duration: 90ms; }
+  .is-desktop-app .sidebar__link:hover > svg,
+  .is-desktop-app .sidebar__new:hover:not(:disabled) > svg,
+  .is-desktop-app .sidebar .ui-icon-button:hover:not(:disabled) > svg { animation: desktop-wiggle 520ms var(--desktop-spring); }
+
+  /* The VibhavGPT mark tips its hat, and a soft shine passes over it. */
+  .is-desktop-app .sidebar__brand { position: relative; overflow: hidden; }
+  .is-desktop-app .sidebar__brand img { transition: rotate 460ms var(--desktop-spring), scale 460ms var(--desktop-spring); }
+  .is-desktop-app .sidebar__brand:hover img { rotate: -10deg; scale: 1.08; }
+  .is-desktop-app .sidebar__brand::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0;
+    background: linear-gradient(105deg, transparent 35%, color-mix(in srgb, var(--color-sky-blue, #8fd3ff) 35%, transparent) 50%, transparent 65%);
+    translate: -100% 0;
+  }
+  .is-desktop-app .sidebar__brand:hover::after { animation: desktop-shine 900ms ease-out; }
+
+  /* Sending pops the send button and nudges the prompt pill. The attribute
+     flips on every send (App.jsx), so the pop restarts each time. */
+  .is-desktop-app .composer__send:active:not(:disabled) { scale: 0.9; transition: scale 90ms ease; }
+  .is-desktop-app .composer[data-send-pulse="odd"] { animation: desktop-pill-odd 420ms var(--desktop-spring); }
+  .is-desktop-app .composer[data-send-pulse="even"] { animation: desktop-pill-even 420ms var(--desktop-spring); }
+  .is-desktop-app .composer[data-send-pulse="odd"] .composer__send { animation: desktop-send-odd 460ms var(--desktop-spring); }
+  .is-desktop-app .composer[data-send-pulse="even"] .composer__send { animation: desktop-send-even 460ms var(--desktop-spring); }
+}
+
+@keyframes desktop-wiggle { 0%, 100% { rotate: 0deg; } 25% { rotate: -12deg; } 55% { rotate: 9deg; } 80% { rotate: -4deg; } }
+@keyframes desktop-shine { 0% { translate: -100% 0; opacity: 0; } 20% { opacity: 1; } 100% { translate: 100% 0; opacity: 0; } }
+@keyframes desktop-pill-odd { 0%, 100% { scale: 1; } 35% { scale: 1.012; } }
+@keyframes desktop-pill-even { 0%, 100% { scale: 1; } 35% { scale: 1.012; } }
+@keyframes desktop-send-odd { 0%, 100% { scale: 1; } 30% { scale: 0.86; } 60% { scale: 1.14; } }
+@keyframes desktop-send-even { 0%, 100% { scale: 1; } 30% { scale: 0.86; } 60% { scale: 1.14; } }
