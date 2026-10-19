@@ -22,8 +22,9 @@ current site.
   title bar, and Windows draws its caption buttons (with Snap Layouts on
   maximize) over the right end. `preload.js` adds a draggable
   `#desktop-title-bar` strip, keeps links, buttons and fields clickable
-  inside it, and sends the page's background colour so the caption buttons
-  match the light and dark themes. The web app starts each screen below the
+  inside it. The caption buttons have a transparent background, so the
+  page's header shows through behind them, and their symbols switch between
+  dark and light with the theme. The web app starts each screen below the
   strip when `html[data-desktop]` is set (`frontend/src/desktop.css`).
 - `preload.js` exposes only `window.desktop = { isDesktop: true, platform }`
   to the page, and relays the tray's New Chat as a `desktop:new-chat` event.
@@ -69,6 +70,17 @@ and SHA-256 in the release notes. The download page links to
 Every release carries BOTH files, the Windows installer and the Android APK,
 because the download links always point at the latest release. When only one
 app changes, re-attach the unchanged file from the previous release.
+
+## Installer
+
+A one-click installer (NSIS `oneClick`): opening it shows a single progress
+window with the app icon, installs for the current user only (no admin
+prompt) in `%LOCALAPPDATA%\Programs\VibhavGPT`, adds Start menu and desktop
+shortcuts, and opens VibhavGPT when it finishes. There are no wizard pages and
+no folder choice. A newer installer replaces the installed version in place,
+since the app id is unchanged. Uninstalling (Settings, Apps) removes the app,
+its shortcuts and its local data (the window's saved sign-in, cache and window
+size); the VibhavGPT account itself is untouched. Updates keep that data.
 
 The installer is unsigned, so Windows SmartScreen warns on first run until a
 code-signing certificate is added.

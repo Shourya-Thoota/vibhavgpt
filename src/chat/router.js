@@ -17,6 +17,7 @@ import { providerNameTerms } from "../security/provider-names.js";
 import { reportChatReplyFailure } from "../sentry.js";
 import { createThinkingRelay } from "./reasoning-stream.js";
 import { createThoughtFilter, stripThoughts } from "./thought-filter.js";
+import { imageHandoffContext } from "../generation/image-handoff.js";
 import { composeImagePrompt, createStoredAttachment, documentLabel, generateDocument, generateImage } from "../generation/service.js";
 import { cancelUsageReservation, createUsageTracker, reserveUsage } from "../usage/service.js";
 import { searchWeb } from "../search/service.js";
@@ -350,8 +351,11 @@ chatRouter.delete("/conversations/:id", requireSession, async (req, res, next) =
   }
 });
 
-async function generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt, mode, attachmentIds = [], userMessageId = null }) {
-  const generated = await generateImage({ userId, prompt: composeImagePrompt(prompt) });
+// `history` lets a request that points back at the conversation ("an image
+// of that analogy") carry what it points at (see generation/image-handoff.js).
+async function generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt, mode, attachmentIds = [], userMessageId = null, history = [] }) {
+  const context = imageHandoffContext(prompt, history);
+  const generated = await generateImage({ userId, prompt: composeImagePrompt(prompt, "", { context }) });
   const activitySummary = buildActivitySummary({ query: prompt, actions: { imageGenerated: true } });
   const saved = await saveExchange({
     userId,
@@ -501,7 +505,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
     }
     if (!studyAction && isImageGenerationRequest(content)) {
       onStatus("thinking");
-      return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: content, mode: conversationMode, attachmentIds });
+      return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: content, mode: conversationMode, attachmentIds, history });
     }
     if (!studyAction && isDocumentGenerationRequest(content)) {
       onStatus("writing");
@@ -732,7 +736,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
         if (!toolCall) break;
         if (!studyAction && toolCall.name === "generate_image") {
           await cancelUsageReservation(usageEvent.id, usageEvent.creditReservationId);
-          return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: toolCall.arguments.prompt || content, mode: conversationMode, attachmentIds, userMessageId });
+          return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: toolCall.arguments.prompt || content, mode: conversationMode, attachmentIds, userMessageId, history });
         }
         if (!studyAction && toolCall.name === "generate_document") {
           await cancelUsageReservation(usageEvent.id, usageEvent.creditReservationId);

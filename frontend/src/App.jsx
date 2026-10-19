@@ -9,7 +9,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import {
   ArrowUp, BarChart3, Brain, Check, ChevronRight, Copy, CreditCard, Eye, EyeOff, FileText, Fingerprint,
-  Globe, Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
+  Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
   Moon, Paperclip, Plus, RotateCw, Settings as SettingsIcon,
   Download, Lock, MessageSquareText, Palette, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
 } from "lucide-react";
@@ -2235,7 +2235,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const [attachments, setAttachments] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [uploadLimits, setUploadLimits] = useState(null);
-  const [webSearch, setWebSearch] = useState(false);
   const [activity, setActivity] = useState("");
   // The reply as it streams in, shown until the saved reply replaces it.
   const [streamText, setStreamText] = useState("");
@@ -2542,7 +2541,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         const result = await api("/api/uploads", { method: "POST", body: formData, signal: controller.signal });
         uploaded = result.attachments;
       }
-      setActivity(webSearch ? "Searching the web" : "Thinking");
+      // The server searches the web on its own when a question needs it and
+      // reports "searching" as it does (see the status handler below).
+      setActivity("Thinking");
       setStreamText("");
       currentPhase = "thinking";
       thinkingStartedAt = Date.now();
@@ -2557,7 +2558,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           ...(group && !conversationId ? { groupId: group.id } : {}),
           ...(recapRef.current ? { memoryRecap: recapRef.current } : {}),
           attachmentIds: uploaded.map((file) => file.id),
-          webSearch,
           // Send the currently selected mode with this turn as well as saving
           // it in Settings. This avoids a PATCH/send race when someone changes
           // the mode and immediately sends their next message.
@@ -2858,20 +2858,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     />
   );
   const fileInputs = <>{imageInput}{fileInput}</>;
-  const webToggle = (
-    <button
-      type="button"
-      className="pill-toggle"
-      aria-pressed={webSearch}
-      aria-label="Web search"
-      disabled={busy}
-      onClick={() => setWebSearch((enabled) => !enabled)}
-      title={webSearch ? "Web search on" : "Search the web"}
-    >
-      <Globe size={16} strokeWidth={1.9} />
-      <span>Web</span>
-    </button>
-  );
   const micButton = dictation.supported && (
     <button
       type="button"
@@ -3046,15 +3032,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         {narrow ? (
           <>
             <form className="composer" data-layout="pill" onSubmit={send}>
-              {webSearch && (
-                <div className="composer__tools">
-                  <button type="button" className="composer__tool" onClick={() => setWebSearch(false)} disabled={busy} aria-label="Turn off web search">
-                    <Globe size={14} strokeWidth={2} />
-                    <span>Web search</span>
-                    <X size={13} strokeWidth={2.4} />
-                  </button>
-                </div>
-              )}
               {attachmentTray}
               <div className="composer__row">
                 {addSheetButton}
@@ -3075,7 +3052,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                 {imageInput}
               </div>
               {fileInput}
-              {webToggle}
               <div className="composer__right">
                 {effortApplies && (
                   <Select
@@ -3124,11 +3100,6 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             </button>
           </div>
           {mode !== "study" && <><div className="add-sheet__list">
-            <button type="button" role="switch" aria-checked={webSearch} className="add-sheet__row" disabled={busy} onClick={() => setWebSearch((enabled) => !enabled)}>
-              <Globe size={19} strokeWidth={1.9} />
-              <span className="add-sheet__copy">Web search<small>Look up current information</small></span>
-              <span className="add-sheet__switch" aria-hidden="true" />
-            </button>
             <button type="button" className="add-sheet__row" disabled={busy} onClick={() => setSheet("model")}>
               <Sparkles size={19} strokeWidth={1.9} />
               <span className="add-sheet__copy">Model<small>{modelInfo.label}</small></span>

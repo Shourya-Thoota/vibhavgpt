@@ -1,7 +1,7 @@
 // Runs in every page the window loads, isolated from the page's own scripts.
 // It tells the page it is in the desktop app, makes the top 38px of every
-// page the window's title bar, and keeps the caption buttons in the page's
-// colours. Nothing else from Electron or Node is exposed.
+// page the window's title bar, and keeps the caption button symbols
+// readable on the page's theme. Nothing else from Electron or Node is exposed.
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktop", Object.freeze({ isDesktop: true, platform: process.platform }));
@@ -30,21 +30,24 @@ function toHex(value) {
   return `#${rgb.slice(1, 4).map((part) => Number(part).toString(16).padStart(2, "0")).join("")}`;
 }
 
-// The page's paper colour (the theme token, else the body's background).
+// The caption buttons have a transparent background (main.js), so only
+// their symbols need to read against the page: dark on a light theme,
+// light on a dark one. The theme is judged by the page's paper colour (the
+// theme token, else the body's background).
 function pageColors() {
   const root = getComputedStyle(document.documentElement);
-  const color = toHex(root.getPropertyValue("--color-paper")) ?? toHex(document.body && getComputedStyle(document.body).backgroundColor);
-  if (!color) return null;
-  const [r, g, b] = [1, 3, 5].map((start) => parseInt(color.slice(start, start + 2), 16) / 255);
+  const paper = toHex(root.getPropertyValue("--color-paper")) ?? toHex(document.body && getComputedStyle(document.body).backgroundColor);
+  if (!paper) return null;
+  const [r, g, b] = [1, 3, 5].map((start) => parseInt(paper.slice(start, start + 2), 16) / 255);
   const light = 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.5;
-  return { color, symbolColor: light ? "#334155" : "#94a3b8" };
+  return { symbolColor: light ? "#1e293b" : "#94a3b8" };
 }
 
 let sent = "";
 function syncTitleBarColors() {
   const colors = pageColors();
-  if (!colors || `${colors.color}${colors.symbolColor}` === sent) return;
-  sent = `${colors.color}${colors.symbolColor}`;
+  if (!colors || colors.symbolColor === sent) return;
+  sent = colors.symbolColor;
   ipcRenderer.send("desktop:title-bar-colors", colors);
 }
 

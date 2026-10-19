@@ -182,29 +182,6 @@
 .add-sheet__copy { display: grid; flex: 1; gap: 2px; min-width: 0; font-size: 0.95rem; font-weight: 550; }
 .add-sheet__copy small { color: var(--muted); font-size: 0.8rem; font-weight: 450; }
 .add-sheet__label { margin: 10px 10px 2px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
-.add-sheet__switch {
-  position: relative;
-  flex: 0 0 auto;
-  width: 42px;
-  height: 26px;
-  border-radius: var(--r-pill);
-  background: var(--line-strong);
-  transition: background-color var(--t-fast) var(--ease);
-}
-.add-sheet__switch::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  border-radius: var(--radius-round);
-  background: #f4f8fc; /* the knob reads light on both skies, like a physical switch */
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--t-base) var(--spring);
-}
-.add-sheet__row[aria-checked="true"] .add-sheet__switch { background: var(--accent); }
-.add-sheet__row[aria-checked="true"] .add-sheet__switch::after { transform: translateX(16px); }
 
 @media (max-width: 760px) {
   .workspace {
@@ -251,9 +228,13 @@
     /* Opaque over the page; the desktop column's slight translucency reads
        as the conversation bleeding through once the drawer overlaps it. */
     background: var(--paper-deep);
+    /* No will-change: transform. Like a transform, it makes the drawer the
+       containing block for its position: fixed dialogs (New project,
+       folders), which then opened squeezed inside the drawer. */
     transition: transform 320ms var(--ease), box-shadow 320ms var(--ease);
-    will-change: transform;
   }
+  /* Opaque, so the desktop column's frosted layer would blur nothing. */
+  .sidebar::before { display: none; }
   /* The drawer closes by swipe, by tapping the dimmed page, or by Back, so
      the X in its head is redundant on phones. */
   .sidebar__close { display: none; }
@@ -346,30 +327,9 @@
     line-height: 1.4;
   }
   .composer[data-layout="pill"] .tray { padding: 10px 12px 2px; }
-  /* Active tools show inside the composer, not as pills above it. */
-  .composer__tools { display: flex; gap: 6px; padding: 8px 10px 0; }
-  .composer__tool {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding: 0 10px;
-    border-radius: var(--r-pill);
-    background: var(--accent-soft);
-    color: var(--accent);
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
   .composer__row .composer__add-trigger,
   .composer__row .composer__mic,
   .composer__row .composer__send { flex: 0 0 auto; width: 40px; height: 40px; }
-  .composer__row .pill-toggle {
-    flex: 0 0 auto;
-    justify-content: center;
-    min-width: 40px;
-    height: 40px;
-    padding: 0 10px;
-  }
   .settings__info-link { margin-top: 10px; font-size: 0.82rem; }
   .settings__info-link a { color: var(--accent); text-underline-offset: 3px; }
   .card--danger .card__body { margin-top: 14px; }

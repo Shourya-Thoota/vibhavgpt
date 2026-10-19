@@ -395,7 +395,7 @@ export default function ConversationLibrary({
           : dialog?.parentId ? `Inside ${groups.find((group) => group.id === dialog.parentId)?.name ?? "this project"}.` : "A place to keep related chats together."}
         onSubmit={submitDialog}
       >
-        <Field label="Name">
+        <Field label={dialog?.kind === "project" ? "Project name" : "Folder name"}>
           <input className="input" autoFocus maxLength={80} value={draft.name} placeholder={dialog?.kind === "project" ? "Thesis research" : "Drafts"} onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))} />
         </Field>
         {dialog?.kind === "project" && (

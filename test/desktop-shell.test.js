@@ -84,7 +84,7 @@ test("the window is frameless with Windows caption buttons over a 38px title bar
   const shell = loadMain();
   const [win] = shell.windows;
   assert.equal(win.options.titleBarStyle, "hidden");
-  assert.deepEqual({ ...win.options.titleBarOverlay }, { color: "#071227", symbolColor: "#94a3b8", height: 38 });
+  assert.deepEqual({ ...win.options.titleBarOverlay }, { color: "#00000000", symbolColor: "#94a3b8", height: 38 }, "no background box behind the buttons");
   assert.equal(win.options.minWidth, 800);
   assert.equal(win.options.minHeight, 600);
   assert.deepEqual([win.options.x, win.options.y, win.options.width, win.options.height], [10, 20, 1400, 900], "saved bounds restored");
@@ -96,13 +96,16 @@ test("the window is frameless with Windows caption buttons over a 38px title bar
   assert.deepEqual(win.loaded, ["https://vibhavgpt.com/app"]);
 });
 
-test("the caption buttons follow the page's colours, and only colours are accepted", () => {
+test("the caption button symbols follow the theme while their background stays transparent", () => {
   const shell = loadMain();
   const [win] = shell.windows;
-  shell.ipc.emit("desktop:title-bar-colors", { sender: win.webContents }, { color: "#eef2f9", symbolColor: "#334155" });
-  assert.deepEqual({ ...win.overlay }, { color: "#eef2f9", symbolColor: "#334155", height: 38 });
-  shell.ipc.emit("desktop:title-bar-colors", { sender: win.webContents }, { color: "red; height: 900", symbolColor: "#334155" });
-  assert.equal(win.overlay.color, "#eef2f9");
+  shell.ipc.emit("desktop:title-bar-colors", { sender: win.webContents }, { symbolColor: "#1e293b" });
+  assert.deepEqual({ ...win.overlay }, { color: "#00000000", symbolColor: "#1e293b", height: 38 });
+  // A page cannot paint a background back in, and only a #rrggbb symbol colour is taken.
+  shell.ipc.emit("desktop:title-bar-colors", { sender: win.webContents }, { color: "#ffffff", symbolColor: "#94a3b8" });
+  assert.deepEqual({ ...win.overlay }, { color: "#00000000", symbolColor: "#94a3b8", height: 38 });
+  shell.ipc.emit("desktop:title-bar-colors", { sender: win.webContents }, { symbolColor: "red; height: 900" });
+  assert.equal(win.overlay.symbolColor, "#94a3b8");
 });
 
 test("closing hides to the tray; the tray opens, starts a new chat and quits", () => {
@@ -200,12 +203,12 @@ test("the preload exposes only isDesktop and platform, and makes the top strip t
   const css = page.document.head.children[0].textContent;
   assert.match(css, /#desktop-title-bar \{[^}]*height: 38px;[^}]*width: env\(titlebar-area-width, calc\(100% - 138px\)\);[^}]*pointer-events: none; -webkit-app-region: drag; app-region: drag;/);
   assert.match(css, /html\[data-desktop\] :is\(a, button, input, select, textarea[^)]*\) \{\s*-webkit-app-region: no-drag; app-region: no-drag;/);
-  assert.deepEqual(plain(page.sent), [["desktop:title-bar-colors", { color: "#071227", symbolColor: "#94a3b8" }]]);
-  // Switching to the light sky updates the caption buttons once.
+  assert.deepEqual(plain(page.sent), [["desktop:title-bar-colors", { symbolColor: "#94a3b8" }]], "light symbols on the dark theme");
+  // Switching to the light sky updates the symbols once.
   page.setPaper("#eef2f9");
   page.observed();
   page.observed();
-  assert.deepEqual(plain(page.sent.slice(1)), [["desktop:title-bar-colors", { color: "#eef2f9", symbolColor: "#334155" }]]);
+  assert.deepEqual(plain(page.sent.slice(1)), [["desktop:title-bar-colors", { symbolColor: "#1e293b" }]], "dark symbols on the light theme");
   page.ipcHandlers["desktop:new-chat"]();
   assert.deepEqual(plain(page.sent.at(-1)), ["dom", "desktop:new-chat"]);
 });
@@ -232,6 +235,22 @@ test("the desktop build stays out of the API's install and packages the preload"
   assert.equal(desktop.build.directories.output, "dist-desktop");
   assert.equal(desktop.build.appId, "com.pansophy.vibhavgpt.desktop", "same app id, so installs upgrade in place");
   assert.deepEqual(desktop.build.win.target, [{ target: "nsis", arch: ["x64"] }]);
+});
+
+test("the installer is a one-click, per-user install with shortcuts and a clean uninstall", () => {
+  const { nsis } = JSON.parse(read("desktop/package.json")).build;
+  assert.equal(nsis.oneClick, true, "no wizard pages");
+  assert.equal(nsis.perMachine, false, "no admin prompt");
+  assert.equal(nsis.allowToChangeInstallationDirectory, undefined, "no folder page");
+  assert.equal(nsis.runAfterFinish, true);
+  assert.deepEqual([nsis.createDesktopShortcut, nsis.createStartMenuShortcut, nsis.shortcutName], [true, true, "VibhavGPT"]);
+  assert.equal(nsis.uninstallDisplayName, "VibhavGPT");
+  assert.equal(nsis.deleteAppDataOnUninstall, true, "no local data left behind");
+  for (const key of ["installerIcon", "uninstallerIcon", "installerHeaderIcon"]) assert.equal(nsis[key], "build/icon.ico", key);
+  // The icon carries every size Windows asks for, up to 256 px.
+  const ico = readFileSync(new URL("../desktop/build/icon.ico", import.meta.url));
+  const sizes = Array.from({ length: ico.readUInt16LE(4) }, (_, index) => ico[6 + index * 16] || 256).sort((a, b) => a - b);
+  assert.deepEqual(sizes, [16, 32, 48, 256]);
 });
 
 test("the Windows download page describes the version the desktop package builds", () => {
