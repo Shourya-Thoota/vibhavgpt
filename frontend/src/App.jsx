@@ -44,6 +44,7 @@ import { DELETION_PLAN_NOTICE } from "./public-pages.js";
 import { PublicFaq } from "./components/PublicPageDetails.jsx";
 import { resetPageScroll } from "./page-scroll.js";
 import { SETTINGS_SECTIONS, settingsPath, settingsRoute } from "./settings-routes.js";
+import { updateStatusLabel, updateStore } from "./desktop-updates.js";
 import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
 import { usagePercentage, combinedTokenUsage } from "./usage-percentage.js";
 import { interruptedStreamMessage } from "./stream-recovery.js";
@@ -2071,6 +2072,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
             <button className="btn btn--quiet" type="button" aria-label="Dismiss update notice" onClick={() => setDirectUpdate(null)}>Dismiss</button>
           </div>
         )}
+        <DesktopUpdateBanner />
         {backgroundTask && page !== "chat" && (
           <div className="background-task" role="status">
             <strong>{backgroundTask.label}</strong>
@@ -3819,6 +3821,7 @@ function Settings({
                     </a>
                   </SettingsRow>
                 </SettingsGroup>
+                <DesktopUpdateSettings />
               </div>
             )}
 
@@ -4152,6 +4155,45 @@ function SettingsRow({ label, description, htmlFor, stacked = false, children })
         </div>
       )}
       <div className="settings-row__control">{children}</div>
+    </div>
+  );
+}
+
+function useDesktopUpdates() {
+  const store = updateStore();
+  const state = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
+  return { store, state };
+}
+
+// The Windows desktop app's version and updates (desktop-updates.js). Not
+// shown on the web, where window.desktopAPI does not exist.
+function DesktopUpdateSettings() {
+  const { store, state } = useDesktopUpdates();
+  if (!store.available) return null;
+  const busy = state.status === "checking" || state.status === "available" || state.status === "downloading";
+  const label = updateStatusLabel(state);
+  return (
+    <SettingsGroup title="Desktop app">
+      <SettingsRow label={state.appVersion ? `Version ${state.appVersion}` : "Version"} description="Updates download in the background and install the next time VibhavGPT restarts.">
+        {state.status === "downloaded"
+          ? <button type="button" className="btn btn--primary" onClick={store.install}>Install & Restart</button>
+          : <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => void store.check()}><RotateCw size={16} /> Check for updates</button>}
+      </SettingsRow>
+      {label && <p className="settings-update-status" role="status" aria-live="polite" data-status={state.status}>{label}</p>}
+    </SettingsGroup>
+  );
+}
+
+// Shown over the workspace once an update has downloaded, until dismissed.
+function DesktopUpdateBanner() {
+  const { store, state } = useDesktopUpdates();
+  const [dismissed, setDismissed] = useState(null);
+  if (!store.available || state.status !== "downloaded" || dismissed === (state.version ?? "")) return null;
+  return (
+    <div className="banner direct-update" role="status">
+      <span><strong>{state.version ? `VibhavGPT ${state.version} is ready.` : "An update is ready."}</strong> Restart to install it, or it installs the next time you quit.</span>
+      <button className="btn btn--secondary" type="button" onClick={store.install}>Install & Restart</button>
+      <button className="btn btn--quiet" type="button" aria-label="Dismiss update notice" onClick={() => setDismissed(state.version ?? "")}>Later</button>
     </div>
   );
 }

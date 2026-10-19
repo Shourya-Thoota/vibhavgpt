@@ -24,8 +24,10 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
   const shortcuts = {};
   let trayMenu = null;
   let quit = 0;
-  const ipc = new Emitter();
+  const ipc = Object.assign(new Emitter(), { handlers: {}, handle(channel, handler) { this.handlers[channel] = handler; } });
   const appEvents = new Emitter();
+  const updater = Object.assign(new Emitter(), { checks: 0, installs: 0, checkForUpdates() { this.checks += 1; return Promise.resolve(null); }, quitAndInstall() { this.installs += 1; } });
+  const timers = [];
   class BrowserWindow extends Emitter {
     constructor(options) {
       super();
@@ -34,12 +36,13 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
       this.overlay = options.titleBarOverlay;
       this.loaded = [];
       this.sent = [];
+      this.messages = [];
       const win = this;
       this.webContents = Object.assign(new Emitter(), {
         url: "https://vibhavgpt.com/app/chat",
         getURL() { return this.url; },
         isLoading: () => false,
-        send: (channel) => win.sent.push(channel),
+        send: (channel, payload) => { win.sent.push(channel); win.messages.push([channel, payload]); },
         setWindowOpenHandler(handler) { this.openHandler = handler; },
         executeJavaScript: async () => ({ ok: false }),
       });
@@ -57,6 +60,7 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
   const electron = {
     app: Object.assign(appEvents, {
       isPackaged: packaged,
+      getVersion: () => "1.2.0",
       requestSingleInstanceLock: () => true,
       setAsDefaultProtocolClient() {},
       whenReady: () => ({ then: (run) => run() }),
@@ -70,13 +74,14 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
     Tray: class extends Emitter { setToolTip() {} setContextMenu(menu) { trayMenu = menu.template; } },
   };
   const windowState = { x: 10, y: 20, width: 1400, height: 900, managed: null, manage(win) { this.managed = win; } };
-  const modules = { electron, "electron-window-state": (defaults) => Object.assign(windowState, { defaults }) };
+  const modules = { electron, "electron-updater": { autoUpdater: updater }, "electron-window-state": (defaults) => Object.assign(windowState, { defaults }) };
   const sandbox = {
     require: (name) => modules[name] ?? require(name),
-    __dirname: "C:/app", process: { ...process, argv, platform: "win32" }, URL, URLSearchParams, console,
+    __dirname: "C:/app", process: { ...process, argv, platform: "win32" }, URL, URLSearchParams, console, Promise, String, Number, Math, Boolean,
+    setTimeout: (run, ms) => { timers.push({ run, ms }); return timers.length; },
   };
   vm.runInNewContext(read("desktop/main.js"), sandbox, { filename: "desktop/main.js" });
-  return { windows, opened, shortcuts, ipc, appEvents, trayMenu: () => trayMenu, quits: () => quit, windowState };
+  return { windows, opened, shortcuts, ipc, appEvents, updater, timers, trayMenu: () => trayMenu, quits: () => quit, windowState };
 }
 const require = (await import("node:module")).createRequire(import.meta.url);
 
@@ -169,6 +174,7 @@ function runPreload({ paper = "#071227" } = {}) {
   const exposed = {};
   const sent = [];
   const ipcHandlers = {};
+  const invoked = [];
   const listeners = {};
   const element = (tag) => ({ tag, attrs: {}, setAttribute(name, value) { this.attrs[name] = value; } });
   const head = { children: [], append(child) { this.children.push(child); } };
@@ -179,7 +185,12 @@ function runPreload({ paper = "#071227" } = {}) {
   const sandbox = {
     require: () => ({
       contextBridge: { exposeInMainWorld: (name, value) => { exposed[name] = value; } },
-      ipcRenderer: { on: (channel, handler) => { ipcHandlers[channel] = handler; }, send: (channel, value) => sent.push([channel, value]) },
+      ipcRenderer: {
+        on: (channel, handler) => { ipcHandlers[channel] = handler; },
+        removeListener: (channel, handler) => { if (ipcHandlers[channel] === handler) delete ipcHandlers[channel]; },
+        send: (channel, value) => sent.push([channel, value]),
+        invoke: (channel, ...args) => { invoked.push([channel, ...args]); return Promise.resolve(channel === "app:get-version" ? "1.2.0" : undefined); },
+      },
     }),
     process: { platform: "win32" },
     document,
@@ -190,7 +201,7 @@ function runPreload({ paper = "#071227" } = {}) {
   };
   vm.runInNewContext(read("desktop/preload.js"), sandbox, { filename: "desktop/preload.js" });
   listeners.DOMContentLoaded();
-  return { exposed, sent, ipcHandlers, document, observed, setPaper: (value) => { paper = value; } };
+  return { exposed, sent, invoked, ipcHandlers, document, observed, setPaper: (value) => { paper = value; } };
 }
 
 test("the preload exposes only isDesktop and platform, and makes the top strip the title bar", () => {
@@ -263,4 +274,100 @@ test("the Windows download page describes the version the desktop package builds
   assert.match(page, new RegExp(`<dt>Download size</dt><dd>${hero[2].replace(".", "\.")}</dd>`), "the facts agree with the button");
   assert.match(page, /<span class="checksum" id="checksum">[0-9a-f]{64}<\/span>/);
   assert.match(page, /href="https:\/\/github\.com\/Shourya-Thoota\/vibhavgpt-releases\/releases\/latest\/download\/VibhavGPT-Setup-x64\.exe"/);
+});
+
+test("the updater downloads in the background, installs on quit, and checks 10 s after an installed app starts", async () => {
+  const shell = loadMain({ packaged: true });
+  assert.equal(shell.updater.autoDownload, true);
+  assert.equal(shell.updater.autoInstallOnAppQuit, true);
+  const startup = shell.timers.find((timer) => timer.ms === 10_000);
+  assert.ok(startup, "a delayed check is scheduled");
+  assert.equal(shell.updater.checks, 0, "not straight away");
+  startup.run();
+  assert.equal(shell.updater.checks, 1);
+  assert.equal(loadMain({ packaged: false }).timers.some((timer) => timer.ms === 10_000), false, "no automatic check in development");
+});
+
+test("each updater event reaches the page as updater:status, and the latest one can be asked for", async () => {
+  const shell = loadMain({ packaged: true });
+  const [win] = shell.windows;
+  const statuses = () => plain(win.messages.filter(([channel]) => channel === "updater:status").map(([, payload]) => payload));
+  shell.updater.emit("checking-for-update");
+  shell.updater.emit("update-available", { version: "1.2.0" });
+  shell.updater.emit("download-progress", { percent: 12.4 });
+  shell.updater.emit("download-progress", { percent: 12.9 });
+  shell.updater.emit("download-progress", { percent: 57.2 });
+  shell.updater.emit("update-downloaded", { version: "1.2.0" });
+  assert.deepEqual(statuses(), [
+    { status: "checking" },
+    { status: "available", version: "1.2.0" },
+    { status: "downloading", percent: 12 },
+    { status: "downloading", percent: 57 },
+    { status: "downloaded", version: "1.2.0" },
+  ], "progress is sent once per whole percent");
+  shell.updater.emit("update-not-available");
+  shell.updater.emit("error", new Error("net::ERR_INTERNET_DISCONNECTED"));
+  assert.deepEqual(statuses().slice(-2), [{ status: "not-available" }, { status: "error", message: "net::ERR_INTERNET_DISCONNECTED" }]);
+  const page = { sender: win.webContents, senderFrame: { url: "https://vibhavgpt.com/app/settings/account" } };
+  assert.deepEqual(plain(await shell.ipc.handlers["app:get-update-status"](page)), { status: "error", message: "net::ERR_INTERNET_DISCONNECTED" });
+  assert.equal(await shell.ipc.handlers["app:get-version"](page), "1.2.0");
+});
+
+test("only the app's own page can check or install, and Install & Restart works only once an update has downloaded", async () => {
+  const shell = loadMain({ packaged: true });
+  const [win] = shell.windows;
+  const page = { sender: win.webContents, senderFrame: { url: "https://vibhavgpt.com/app" } };
+  const stranger = { sender: win.webContents, senderFrame: { url: "https://evil.example/" } };
+  await shell.ipc.handlers["app:check-for-updates"](stranger);
+  assert.equal(shell.updater.checks, 0);
+  await shell.ipc.handlers["app:check-for-updates"](page);
+  assert.equal(shell.updater.checks, 1);
+  shell.ipc.emit("app:restart-and-install", page);
+  assert.equal(shell.updater.installs, 0, "nothing downloaded yet");
+  shell.updater.emit("update-downloaded", { version: "1.2.0" });
+  shell.ipc.emit("app:restart-and-install", stranger);
+  assert.equal(shell.updater.installs, 0);
+  shell.ipc.emit("app:restart-and-install", page);
+  assert.equal(shell.updater.installs, 1);
+  // The hide-to-tray close handler steps aside so the installer can replace the app.
+  let prevented = false;
+  win.emit("close", { preventDefault: () => { prevented = true; } });
+  assert.equal(prevented, false);
+});
+
+test("a development run reports that updates need the installed app instead of checking", async () => {
+  const shell = loadMain({ packaged: false });
+  const [win] = shell.windows;
+  await shell.ipc.handlers["app:check-for-updates"]({ sender: win.webContents, senderFrame: { url: "https://vibhavgpt.com/app" } });
+  assert.equal(shell.updater.checks, 0);
+  assert.deepEqual(plain(win.messages.at(-1)), ["updater:status", { status: "error", message: "Updates are checked in the installed app only." }]);
+});
+
+test("the preload's desktopAPI wires each method to its fixed message, and a status listener cleans up", async () => {
+  const page = runPreload();
+  const api = page.exposed.desktopAPI;
+  assert.ok(Object.isFrozen(api));
+  assert.deepEqual(plain(Object.keys(api).sort()), ["checkForUpdates", "getAppVersion", "getUpdaterStatus", "onUpdaterStatus", "restartAndInstall"]);
+  assert.equal(await api.checkForUpdates(), undefined);
+  assert.equal(await api.getAppVersion(), "1.2.0");
+  api.restartAndInstall();
+  assert.deepEqual(plain(page.invoked.map(([channel]) => channel)), ["app:check-for-updates", "app:get-version"]);
+  assert.deepEqual(plain(page.sent.at(-1)), ["app:restart-and-install", null]);
+  const seen = [];
+  const stop = api.onUpdaterStatus((status) => seen.push(status));
+  page.ipcHandlers["updater:status"]({}, { status: "downloading", percent: 40 });
+  stop();
+  assert.equal(page.ipcHandlers["updater:status"], undefined, "the listener is removed");
+  assert.deepEqual(plain(seen), [{ status: "downloading", percent: 40 }]);
+  assert.equal(typeof api.onUpdaterStatus("not a function"), "function");
+});
+
+test("releases publish to vibhavgpt-releases under one stable name, and local builds never publish", () => {
+  const desktop = JSON.parse(read("desktop/package.json"));
+  assert.ok(desktop.dependencies["electron-updater"], "packaged with the app");
+  assert.deepEqual(desktop.build.publish, [{ provider: "github", owner: "Shourya-Thoota", repo: "vibhavgpt-releases", releaseType: "release" }]);
+  // latest.yml names this file; the download page links to the same name.
+  assert.equal(desktop.build.nsis.artifactName, "VibhavGPT-Setup-x64.${ext}");
+  assert.match(desktop.scripts.dist, /--publish never$/);
+  assert.match(read("frontend/public/vibhavgpt-windows/index.html"), /releases\/latest\/download\/VibhavGPT-Setup-x64\.exe/);
 });

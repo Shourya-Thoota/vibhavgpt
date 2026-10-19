@@ -47,7 +47,7 @@ cd desktop
 npm install
 npm run dev        # run against the live site
 npm run dev:local  # run against the local Vite server (starts it too)
-npm run dist       # NSIS installer in dist-desktop/VibhavGPT-Setup-<version>-x64.exe
+npm run dist       # NSIS installer, latest.yml and blockmap in dist-desktop/
 ```
 
 From the repository root, `npm run desktop:dev` and `npm run desktop:build`
@@ -62,14 +62,30 @@ editor-hosted terminals do). Clear it first: `Remove-Item Env:ELECTRON_RUN_AS_NO
 ## Publish a release
 
 Release files are published in the separate `vibhavgpt-releases` repository,
-not in this one. Upload `dist-desktop/VibhavGPT-Setup-<version>-x64.exe` renamed to
-`VibhavGPT-Setup-x64.exe` to a new release there, and list each file's version
-and SHA-256 in the release notes. The download page links to
-`releases/latest/download/VibhavGPT-Setup-x64.exe`, so the name must stay the same.
+not in this one. Bump `version` in `package.json`, run `npm run dist`, and
+upload these from `dist-desktop/` to a new release there (tag `v<version>`),
+unrenamed, then list each file's version and SHA-256 in the release notes:
 
-Every release carries BOTH files, the Windows installer and the Android APK,
-because the download links always point at the latest release. When only one
-app changes, re-attach the unchanged file from the previous release.
+- `VibhavGPT-Setup-x64.exe`: the installer. The download page links to
+  `releases/latest/download/VibhavGPT-Setup-x64.exe`, so the name never changes.
+- `latest.yml` and `VibhavGPT-Setup-x64.exe.blockmap`: what installed apps read
+  to find, check and download the update. Without `latest.yml` in the latest
+  release, no installed app updates.
+
+Every release carries the Android APK too, because the download links always
+point at the latest release. When only one app changes, re-attach the
+unchanged file from the previous release.
+
+`npm run dist` never publishes by itself (`--publish never`); the `publish`
+block in `package.json` only tells the built app where to look for updates.
+
+## Updates
+
+The installed app checks for updates 10 seconds after it starts, and from
+Settings, Account, Desktop app, "Check for updates". A newer release downloads
+in the background, then a banner offers "Install & Restart"; otherwise it
+installs the next time VibhavGPT quits. Versions up to 1.1.1 have no updater,
+so their users install the first release that has one by hand, once.
 
 ## Installer
 

@@ -2,6 +2,7 @@
 // approach as the Android Capacitor build. No bundled web code, so the app
 // is always the current production site.
 const { app, BrowserWindow, globalShortcut, ipcMain, Menu, shell, Tray } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const windowStateKeeper = require("electron-window-state");
 const { createHash, randomBytes } = require("node:crypto");
 const path = require("node:path");
@@ -223,6 +224,60 @@ function createWindow() {
   win.loadURL(APP_URL);
 }
 
+// Updates come from the latest release in Shourya-Thoota/vibhavgpt-releases
+// (the "publish" block in package.json): electron-updater reads its
+// latest.yml, downloads the new installer in the background and installs it
+// when the app quits, or straight away from "Install & Restart". The page
+// sees each step as an `updater:status` message, and asks for the latest
+// one when it opens, so Settings knows an update is waiting.
+const UPDATE_CHECK_DELAY_MS = 10_000;
+let updateStatus = { status: "idle" };
+
+function sendUpdateStatus(next) {
+  updateStatus = next;
+  if (mainWindow && !mainWindow.isDestroyed?.()) mainWindow.webContents.send("updater:status", next);
+}
+
+// Only the app's own page in the main window may drive the updater.
+function fromAppPage(event) {
+  return Boolean(mainWindow) && event.sender === mainWindow.webContents && isAppUrl(event.senderFrame?.url ?? event.sender.getURL());
+}
+
+function checkForUpdates() {
+  if (!app.isPackaged) {
+    sendUpdateStatus({ status: "error", message: "Updates are checked in the installed app only." });
+    return Promise.resolve();
+  }
+  return autoUpdater.checkForUpdates().then(() => undefined, (error) => {
+    sendUpdateStatus({ status: "error", message: String(error?.message ?? error).slice(0, 300) });
+  });
+}
+
+function setupUpdates() {
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on("checking-for-update", () => sendUpdateStatus({ status: "checking" }));
+  autoUpdater.on("update-available", (info) => sendUpdateStatus({ status: "available", version: info?.version }));
+  autoUpdater.on("update-not-available", () => sendUpdateStatus({ status: "not-available" }));
+  // Progress arrives many times a second; the page hears each whole percent.
+  autoUpdater.on("download-progress", (progress) => {
+    const percent = Math.floor(Number(progress?.percent) || 0);
+    if (updateStatus.status !== "downloading" || updateStatus.percent !== percent) sendUpdateStatus({ status: "downloading", percent });
+  });
+  autoUpdater.on("update-downloaded", (info) => sendUpdateStatus({ status: "downloaded", version: info?.version }));
+  autoUpdater.on("error", (error) => sendUpdateStatus({ status: "error", message: String(error?.message ?? error).slice(0, 300) }));
+
+  ipcMain.handle("app:check-for-updates", (event) => (fromAppPage(event) ? checkForUpdates() : undefined));
+  ipcMain.handle("app:get-version", () => app.getVersion());
+  ipcMain.handle("app:get-update-status", (event) => (fromAppPage(event) ? updateStatus : { status: "idle" }));
+  ipcMain.on("app:restart-and-install", (event) => {
+    if (!fromAppPage(event) || updateStatus.status !== "downloaded") return;
+    // Past the hide-to-tray close handler, so the installer can replace the app.
+    quitting = true;
+    autoUpdater.quitAndInstall();
+  });
+}
+
 // One instance: a second launch, including the one Windows starts for a
 // vibhavgpt:// link, hands its arguments to the running window.
 if (!app.requestSingleInstanceLock()) {
@@ -246,6 +301,8 @@ if (!app.requestSingleInstanceLock()) {
     win.setTitleBarOverlay({ color: TRANSPARENT, symbolColor, height: TITLE_BAR_HEIGHT });
   });
 
+  setupUpdates();
+
   app.on("before-quit", () => { quitting = true; });
   app.on("will-quit", () => globalShortcut.unregisterAll());
 
@@ -257,6 +314,8 @@ if (!app.requestSingleInstanceLock()) {
     // Summons the window from anywhere in Windows. Another app may own the
     // shortcut already; the app works the same without it.
     globalShortcut.register(SUMMON_SHORTCUT, focusWindow);
+    // A quiet check once the app has settled; installed builds only.
+    if (app.isPackaged) setTimeout(() => void checkForUpdates(), UPDATE_CHECK_DELAY_MS);
     // Launched by a return link while closed: the sign-in it belongs to was
     // lost with the old process, so this shows the expired message.
     mainWindow.webContents.once("did-finish-load", () => handleProtocolArgs(process.argv));

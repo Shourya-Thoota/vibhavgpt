@@ -1,10 +1,27 @@
 // Runs in every page the window loads, isolated from the page's own scripts.
 // It tells the page it is in the desktop app, makes the top 38px of every
 // page the window's title bar, and keeps the caption button symbols
-// readable on the page's theme. Nothing else from Electron or Node is exposed.
+// readable on the page's theme, and offers the in-app updater
+// (window.desktopAPI). Nothing else from Electron or Node is exposed.
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktop", Object.freeze({ isDesktop: true, platform: process.platform }));
+
+// In-app updates (main.js). Each call is a fixed message; the page passes no
+// arguments to the main process, and a status listener gets plain data and
+// returns its own cleanup.
+contextBridge.exposeInMainWorld("desktopAPI", Object.freeze({
+  checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates").then(() => undefined),
+  restartAndInstall: () => { ipcRenderer.send("app:restart-and-install"); },
+  getAppVersion: () => ipcRenderer.invoke("app:get-version"),
+  getUpdaterStatus: () => ipcRenderer.invoke("app:get-update-status"),
+  onUpdaterStatus: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const listener = (_event, status) => callback(status);
+    ipcRenderer.on("updater:status", listener);
+    return () => ipcRenderer.removeListener("updater:status", listener);
+  },
+}));
 
 // Tray "New Chat": the app starts one on this event (see frontend App.jsx).
 ipcRenderer.on("desktop:new-chat", () => window.dispatchEvent(new Event("desktop:new-chat")));
