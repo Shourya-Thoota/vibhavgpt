@@ -1807,6 +1807,14 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     newChat();
     setPendingGroup(group);
   };
+  // "New Chat" in the Windows desktop app's tray menu (desktop/preload.js).
+  const newChatRef = useRef(newChat);
+  newChatRef.current = newChat;
+  useEffect(() => {
+    const onDesktopNewChat = () => newChatRef.current();
+    window.addEventListener("desktop:new-chat", onDesktopNewChat);
+    return () => window.removeEventListener("desktop:new-chat", onDesktopNewChat);
+  }, []);
   const openConversation = (conversationId, mode = productMode) => {
     setPendingGroup(null);
     setActiveConversationId(conversationId);

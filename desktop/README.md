@@ -18,17 +18,41 @@ current site.
   hands the link to the running window). It then redeems the code with
   `/api/native-auth/exchange` from the page, so the session cookies land in
   the window. Email sign-in is untouched.
-- `build/icon.ico`: app, installer and window icon, generated from
+- Title bar: the window has no frame. The top 38px of every page is the
+  title bar, and Windows draws its caption buttons (with Snap Layouts on
+  maximize) over the right end. `preload.js` adds a draggable
+  `#desktop-title-bar` strip, keeps links, buttons and fields clickable
+  inside it, and sends the page's background colour so the caption buttons
+  match the light and dark themes. The web app starts each screen below the
+  strip when `html[data-desktop]` is set (`frontend/src/desktop.css`).
+- `preload.js` exposes only `window.desktop = { isDesktop: true, platform }`
+  to the page, and relays the tray's New Chat as a `desktop:new-chat` event.
+- Window size, position and maximized state are kept between launches
+  (`electron-window-state`).
+- Closing the window hides it to the tray. The tray menu has Open VibhavGPT,
+  New Chat and Quit; Ctrl+Shift+Space brings the window back from anywhere.
+- No right-click menu in packaged builds; development runs offer Inspect
+  Element.
+- `build/icon.ico`: app, installer, tray and window icon, generated from
   `frontend/public/brand/vibhavgpt-icon-512.png` with `npm run icon`.
+
+The shell has its own `package.json`, so Electron is never installed with
+the API (the Railway build installs only the root package).
 
 ## Build
 
 ```powershell
 cd desktop
 npm install
-npm run dev     # run against the live site
-npm run dist    # NSIS installer in release/VibhavGPT-Setup-<version>-x64.exe
+npm run dev        # run against the live site
+npm run dev:local  # run against the local Vite server (starts it too)
+npm run dist       # NSIS installer in dist-desktop/VibhavGPT-Setup-<version>-x64.exe
 ```
+
+From the repository root, `npm run desktop:dev` and `npm run desktop:build`
+do the same as `dev:local` and `dist` (run `npm install --prefix desktop`
+once first). `dev:local` needs the API on port 3001 for signing in, as for
+`npm run dev --prefix frontend`.
 
 If `npm run dev` fails with `Cannot read properties of undefined (reading
 'requestSingleInstanceLock')`, the shell has `ELECTRON_RUN_AS_NODE` set (some
@@ -37,7 +61,7 @@ editor-hosted terminals do). Clear it first: `Remove-Item Env:ELECTRON_RUN_AS_NO
 ## Publish a release
 
 Release files are published in the separate `vibhavgpt-releases` repository,
-not in this one. Upload `release/VibhavGPT-Setup-<version>-x64.exe` renamed to
+not in this one. Upload `dist-desktop/VibhavGPT-Setup-<version>-x64.exe` renamed to
 `VibhavGPT-Setup-x64.exe` to a new release there, and list each file's version
 and SHA-256 in the release notes. The download page links to
 `releases/latest/download/VibhavGPT-Setup-x64.exe`, so the name must stay the same.
