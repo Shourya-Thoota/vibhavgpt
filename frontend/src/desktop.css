@@ -1,0 +1,18 @@
+/* The Windows desktop app (desktop/). Its window has no frame: the top 38px
+   of the page is the title bar, which the app's preload makes draggable
+   (#desktop-title-bar) and Windows overlays with its caption buttons on the
+   right. Each screen starts below that strip, so nothing sits under the
+   caption buttons and the strip's empty space drags the window. Links,
+   buttons and fields stay clickable anywhere (preload.js). Only applies
+   when html[data-desktop] is set, which only the desktop app does. */
+html[data-desktop] { --desktop-title-bar-h: env(titlebar-area-height, 38px); }
+
+html[data-desktop] .sidebar { padding-top: calc(var(--desktop-title-bar-h) + 8px); }
+html[data-desktop] .workspace__main { padding-top: var(--desktop-title-bar-h); }
+html[data-desktop] .auth,
+html[data-desktop] .survey,
+html[data-desktop] .legal { padding-top: var(--desktop-title-bar-h); }
+
+/* The landing page is a framed document the strip cannot reach into, so it
+   starts below the strip rather than under it. */
+html[data-desktop] .home-frame { margin-top: var(--desktop-title-bar-h); height: calc(100dvh - var(--desktop-title-bar-h)); }

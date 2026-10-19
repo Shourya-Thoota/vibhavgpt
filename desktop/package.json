@@ -1,32 +1,39 @@
 {
   "name": "vibhavgpt-desktop",
   "productName": "VibhavGPT",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "AGPL-3.0-only",
   "private": true,
   "description": "Windows desktop shell for VibhavGPT",
   "author": "VibhavGPT",
   "main": "main.js",
+  "dependencies": {
+    "electron-window-state": "^5.0.3"
+  },
   "scripts": {
     "dev": "electron .",
+    "dev:local": "concurrently --kill-others --names web,desktop \"npm run dev --prefix ../frontend\" \"wait-on http://localhost:5173 && electron . --app-url=http://localhost:5173/app\"",
     "icon": "node scripts/make-icon.mjs",
     "dist": "electron-builder --win nsis --x64"
   },
   "devDependencies": {
+    "concurrently": "^10.0.6",
     "electron": "^38.2.0",
     "electron-builder": "^26.0.12",
-    "png-to-ico": "^2.1.8"
+    "png-to-ico": "^2.1.8",
+    "wait-on": "^9.5.1"
   },
   "build": {
     "appId": "com.pansophy.vibhavgpt.desktop",
     "productName": "VibhavGPT",
     "copyright": "VibhavGPT",
     "directories": {
-      "output": "release",
+      "output": "dist-desktop",
       "buildResources": "build"
     },
     "files": [
       "main.js",
+      "preload.js",
       "build/icon.ico",
       "package.json"
     ],

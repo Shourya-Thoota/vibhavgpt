@@ -11,6 +11,8 @@ import "./mobile.css";
 // Public legal pages must also be styled before their lazy JS chunk loads,
 // including the prerendered version viewed without JavaScript.
 import "./legal.css";
+// The Windows desktop app's title bar strip; inert in a browser.
+import "./desktop.css";
 import Sentry from "./sentry.js";
 import ErrorFallback from "./components/ErrorFallback.jsx";
 import { PUBLIC_PAGES, publicPagePath } from "./public-pages.js";

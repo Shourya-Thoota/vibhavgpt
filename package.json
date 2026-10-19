@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/server.js",
+    "desktop:dev": "npm run dev:local --prefix desktop",
+    "desktop:build": "npm run dist --prefix desktop",
     "start": "node scripts/migrate-database.js && node --import ./src/instrument.js src/server.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
