@@ -84,12 +84,9 @@ body { background: var(--paper); }
   .composer__bar { flex-wrap: wrap; gap: 3px; }
   .composer__left, .composer__right { flex-shrink: 0; }
   .composer__right { gap: 2px; }
-  .composer__bar > .pill-toggle { width: 30px; padding: 0; justify-content: center; flex-shrink: 0; }
-  .composer__bar > .pill-toggle span { display: none; }
   .composer__effort, .composer__model { width: 78px; flex: 0 0 78px; }
   .composer__effort .ui-select__trigger, .composer__model .ui-select__trigger { width: 100%; min-width: 0; padding-inline: 7px; gap: 3px; }
   .composer__model .ui-select__value > svg { display: none; }
-  .composer__right > .pill-toggle { padding-inline: 7px; max-width: 100px; }
   .composer__send { flex-shrink: 0; }
   .page { padding-top: 24px; }
   .page__header { padding: 24px 26px; min-height: auto; }

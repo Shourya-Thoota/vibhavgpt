@@ -20,10 +20,13 @@ const SUMMON_SHORTCUT = "CommandOrControl+Shift+Space";
 
 // The page runs edge to edge: the title bar is a 38px strip of the page
 // itself (see preload.js), and Windows draws only the caption buttons, with
-// Snap Layouts on maximize, over its right end. Deep Space until the page
-// reports its own colours.
+// Snap Layouts on maximize, over its right end. The buttons have no
+// background of their own (fully transparent), so the page's own header,
+// gradients included, shows through behind them; only the symbols follow
+// the theme, dark until the page reports a light one.
 const TITLE_BAR_HEIGHT = 38;
-const TITLE_BAR_OVERLAY = { color: "#071227", symbolColor: "#94a3b8", height: TITLE_BAR_HEIGHT };
+const TRANSPARENT = "#00000000";
+const TITLE_BAR_OVERLAY = { color: TRANSPARENT, symbolColor: "#94a3b8", height: TITLE_BAR_HEIGHT };
 
 let mainWindow = null;
 let tray = null;
@@ -234,13 +237,13 @@ if (!app.requestSingleInstanceLock()) {
     handleProtocolArgs(argv);
   });
 
-  // The page's title bar strip reports its background, so the caption
-  // buttons match the light and dark themes. Only colours are accepted.
+  // The page reports which symbol colour reads on its theme; the buttons'
+  // background stays transparent. Only a #rrggbb colour is accepted.
   const COLOUR = /^#[0-9a-f]{6}$/i;
-  ipcMain.on("desktop:title-bar-colors", (event, { color, symbolColor } = {}) => {
+  ipcMain.on("desktop:title-bar-colors", (event, { symbolColor } = {}) => {
     const win = BrowserWindow.fromWebContents(event.sender);
-    if (!win || !COLOUR.test(color ?? "") || !COLOUR.test(symbolColor ?? "")) return;
-    win.setTitleBarOverlay({ color, symbolColor, height: TITLE_BAR_HEIGHT });
+    if (!win || !COLOUR.test(symbolColor ?? "")) return;
+    win.setTitleBarOverlay({ color: TRANSPARENT, symbolColor, height: TITLE_BAR_HEIGHT });
   });
 
   app.on("before-quit", () => { quitting = true; });

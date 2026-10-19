@@ -46,7 +46,20 @@
 .sidebar {
   border-right: var(--rule-fine) solid var(--color-rule);
   background: color-mix(in srgb, var(--color-paper-deep) 88%, transparent);
+  isolation: isolate;
+}
+/* The blur sits on a layer behind the sidebar's content, not on the sidebar
+   itself: a backdrop-filter makes its element the containing block for every
+   position: fixed descendant, which confined the dialogs opened from the
+   sidebar (New project, folders, Move chat) to the sidebar instead of the
+   whole window. */
+.sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
   backdrop-filter: blur(6px);
+  pointer-events: none;
 }
 
 /* --- Labels --------------------------------------------------------------- */

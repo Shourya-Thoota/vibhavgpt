@@ -67,12 +67,17 @@ export const IMAGE_STYLES = {
 const IMAGE_CRAFT_BRIEF = "Render it with fine detail, one clear focal point, a balanced composition, and coherent anatomy, hands and perspective. No watermark, signature, frame or border.";
 const ASKS_FOR_TEXT = /\b(text|words?|titled?|caption|lettering|typography|typographic|logo|wordmark|poster|label|sign(?:age)?|quote|headline|banner|says|reads|written)\b/i;
 
-export function composeImagePrompt(prompt, style = "") {
+// `context` is what an image request points back at in its conversation
+// (see image-handoff.js); only the request itself decides whether the image
+// may carry text.
+export function composeImagePrompt(prompt, style = "", { context = "" } = {}) {
   const subject = String(prompt ?? "").trim().replace(/[\s.]+$/, "");
   const key = String(style ?? "").trim().toLowerCase();
   const direction = IMAGE_STYLES[key] ?? (key ? `${String(style).trim()} style` : "");
+  const reference = String(context ?? "").trim().replace(/[\s.]+$/, "");
   return [
     `${subject}.`,
+    reference ? `The request refers to this, from the conversation just before it: ${reference}.` : "",
     direction ? `Style: ${direction}.` : "",
     IMAGE_CRAFT_BRIEF,
     ASKS_FOR_TEXT.test(subject) ? "" : "Do not add any text, letters or numbers to the image.",
