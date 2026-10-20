@@ -1,4 +1,4 @@
-import { Children, isValidElement, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Children, createContext, isValidElement, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
@@ -45,6 +45,9 @@ import { PublicFaq } from "./components/PublicPageDetails.jsx";
 import { resetPageScroll } from "./page-scroll.js";
 import { SETTINGS_SECTIONS, settingsPath, settingsRoute } from "./settings-routes.js";
 import { updateStatusLabel, updateStore } from "./desktop-updates.js";
+import { parseStudyBlock, STUDY_BLOCK_LANGUAGES } from "./study-widgets.js";
+import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
+import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
 import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
 import { usagePercentage, combinedTokenUsage } from "./usage-percentage.js";
 import { interruptedStreamMessage } from "./stream-recovery.js";
@@ -2130,6 +2133,21 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   );
 }
 
+// Whether the reply around a block has finished arriving (AssistantBody).
+const ReplySettledContext = createContext(true);
+
+// A ```flashcards or ```quiz block (study-widgets.js) becomes its widget.
+// Until it parses, a reply still arriving shows a placeholder; a finished
+// reply whose block never parsed shows it as ordinary code.
+function StudyBlock({ language, text, fallback }) {
+  const settled = useContext(ReplySettledContext);
+  const parsed = useMemo(() => parseStudyBlock(language, text), [language, text]);
+  if (parsed?.kind === "flashcards") return <InteractiveFlashcards deck={parsed} />;
+  if (parsed?.kind === "quiz") return <InteractiveQuiz quiz={parsed} />;
+  if (!settled) return <div className="study-widget study-widget--pending" role="status">{language === "quiz" ? "Preparing your quiz..." : "Preparing your flashcards..."}</div>;
+  return fallback;
+}
+
 function CodeBlock({ inline, className, children, ...props }) {
   const [copied, setCopied] = useState(false);
 
@@ -2145,7 +2163,7 @@ function CodeBlock({ inline, className, children, ...props }) {
   const language = code.props.className?.match(/language-([\w-]+)/)?.[1] ?? "text";
   const text = String(code.props.children ?? "").replace(/\n$/, "");
 
-  return (
+  const block = (
     <div className="code-block">
       <div className="code-block__header">
         <span className="code-block__language">{language}</span>
@@ -2166,15 +2184,19 @@ function CodeBlock({ inline, className, children, ...props }) {
       <pre><code className={code.props.className}>{code.props.children}</code></pre>
     </div>
   );
+  return STUDY_BLOCK_LANGUAGES.has(language.toLowerCase()) ? <StudyBlock language={language.toLowerCase()} text={text} fallback={block} /> : block;
 }
 
-function AssistantBody({ text, animate, onTick }) {
+// `streaming`: the reply is still arriving from the server.
+function AssistantBody({ text, animate, onTick, streaming = false }) {
   const { shown, done } = useTypewriter(text, { enabled: animate, onTick });
+  const settled = !streaming && (!animate || done);
   // Models sometimes use HTML line-break tags. Convert only that harmless
   // formatting shorthand to Markdown before rendering; do not enable raw HTML
   // from model output in the DOM.
   const rendered = protectPlainDollarSigns(normalizeTexDelimiters(shown).replace(/<br\s*\/?\s*>/gi, "  \n"));
   return (
+    <ReplySettledContext.Provider value={settled}>
     <div className="prose" data-typing={animate && !done ? "true" : undefined}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }] ]}
@@ -2191,6 +2213,7 @@ function AssistantBody({ text, animate, onTick }) {
         {rendered}
       </ReactMarkdown>
     </div>
+    </ReplySettledContext.Provider>
   );
 }
 
@@ -2965,7 +2988,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                 <div className={`bubble bubble--assistant${streamText ? " bubble--wide" : ""}`}>
                   {liveReasoning && streamText && <ReasoningTrace text={liveReasoning} seconds={liveThought} />}
                   {streamText
-                    ? <AssistantBody text={streamText} animate={false} />
+                    ? <AssistantBody text={streamText} animate={false} streaming />
                     : <ThinkingTool state="thinking" label={<LiveStatusLabel {...livePhase} />} sources={liveSources} />}
                   {liveReasoning && !streamText && <ReasoningTrace text={liveReasoning} live />}
                 </div>

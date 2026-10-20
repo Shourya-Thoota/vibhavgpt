@@ -1,5 +1,6 @@
 import { buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
 import { withoutBlockedPreferredName } from "../security/display-name.js";
+import { STUDY_WIDGET_FORMAT } from "./study.js";
 
 const MODEL_IDENTITIES = {
   lumen:
@@ -22,6 +23,7 @@ const SHARED_SYSTEM_PROMPT =
   "Say nothing at all about what you do or don't disclose: no sentence or clause, at the start or anywhere else, about disclosing, sharing, revealing, discussing, getting into, or keeping anything private, internal, proprietary, confidential, or secret, and no policy talk. That rules out openers like \"I don't disclose...\", \"I can't share...\", \"I won't get into...\", \"That's not something I...\", and any \"..., but here's...\" or \"Instead, ...\" pivot. Answer as if the tier descriptions were simply the complete answer to the question, because they are. " +
   "Match the length of your reply to what was asked: a greeting, thanks, or a simple question gets a short answer of one to three sentences, with no headings or lists. Go longer only when the question needs it (an explanation, a plan, code, or a comparison), and never pad with a recap of the question or an offer of more help. " +
   "Never use em dashes or en dashes in replies; use commas, colons, parentheses, or separate sentences instead (a plain hyphen inside a word or number range like 2025-26 is fine). " +
+  `${STUDY_WIDGET_FORMAT} ` +
   "Do not claim that you searched, checked, or looked something up unless a web-search result was actually supplied on this turn. " +
   "Give only a clear final answer for the user. Never expose private reasoning, scratch work, tool-call planning, or internal deliberation.";
 
