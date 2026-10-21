@@ -11,29 +11,23 @@ import vm from "node:vm";
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const home = read("frontend/public/home/index.html");
 const slides = JSON.parse(home.match(/<script type="application\/json" id="carousel-slides">([\s\S]*?)<\/script>/)[1]);
-const NBSP = " ";
 
 test("the four slides, in order, with their badges, titles and copy", () => {
   assert.deepEqual(slides.order, ["earth", "guarantee", "venus", "mars"]);
-  assert.deepEqual(slides.slides.earth, {
-    label: "WHAT IT IS", badge: "ALL-IN-ONE AI WORKSPACE", title: "AI CHAT, IMAGE CREATION & STUDY",
-    lede: "Chat with intelligent models, generate custom images, and master any subject with interactive flashcards and quizzes, built private, fast, and ad-free.",
-  });
-  assert.deepEqual(slides.slides.guarantee, {
-    label: "GUARANTEE", badge: "OUR PROMISE", title: "VIBHAVGPT GUARANTEE",
-    lede: `We don't train AI models on your chats, we don't sell your data, and we don't${NBSP}run${NBSP}ads. Export your data or delete your account from Settings at any${NBSP}time.`,
-  });
-  assert.deepEqual(slides.slides.venus, { label: "IMAGE", badge: "FEATURE", title: "CREATIVE IMAGE GENERATION", lede: "Turn ideas, descriptions, and study notes into vivid illustrations with dedicated image models." });
-  assert.deepEqual(slides.slides.mars, { label: "STUDY", badge: "FEATURE", title: "INTERACTIVE STUDY TOOLS", lede: "Master any topic with 3D flippable flashcards and instant-feedback quizzes with score tracking and explanations." });
+  assert.deepEqual(slides.slides.earth, { label: "WHAT IT IS", badge: "WORKSPACE", title: "ALL-IN-ONE AI", lede: "Private AI chat, image creation, and interactive study tools." });
+  assert.deepEqual(slides.slides.guarantee, { label: "GUARANTEE", badge: "PRIVACY", title: "OUR GUARANTEE", lede: "No training on your chats, no data selling, and no ads. Complete privacy by design." });
+  assert.deepEqual(slides.slides.venus, { label: "IMAGE", badge: "VISUALS", title: "IMAGE CREATION", lede: "Turn descriptions, ideas, and study notes into visual art." });
+  assert.deepEqual(slides.slides.mars, { label: "STUDY", badge: "LEARNING", title: "STUDY TOOLS", lede: "3D flippable flashcards and instant-feedback quizzes with score tracking." });
+  for (const slide of Object.values(slides.slides)) assert.ok(slide.title.split(/\s+/).length <= 2, `short, punchy title: ${slide.title}`);
   for (const slide of Object.values(slides.slides)) for (const text of Object.values(slide)) assert.doesNotMatch(text, /—|–/, "no em or en dashes in page copy");
   assert.doesNotMatch(home, /PRIVATE AI</, "the old slide is gone");
 });
 
 test("the page opens on What It Is over Earth, before any script runs", () => {
   assert.match(home, /<div class="atmosphere is-active" data-planet="earth">/);
-  assert.match(home, /<div class="col eyebrow"><span class="ent-mask"><span class="ent-line">ALL-IN-ONE AI WORKSPACE<\/span><\/span><\/div>/);
-  assert.match(home, /<h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">AI CHAT, IMAGE CREATION &amp; STUDY<\/span><\/span><\/h1>/);
-  assert.match(home, /<p class="col lede">Chat with intelligent models, generate custom images, and master any subject/);
+  assert.match(home, /<div class="col eyebrow"><span class="ent-mask"><span class="ent-line">WORKSPACE<\/span><\/span><\/div>/);
+  assert.match(home, /<h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">ALL-IN-ONE AI<\/span><\/span><\/h1>/);
+  assert.match(home, /<p class="col lede">Private AI chat, image creation, and interactive study tools\.<\/p>/);
   assert.match(home, /<button class="planet planet-l" type="button" data-slot="l" aria-label="Show STUDY">.*?<img data-planet="mars" class="is-shown"/, "Study waits on the left");
   assert.match(home, /<button class="planet planet-r" type="button" data-slot="r" aria-label="Show GUARANTEE">.*?<img data-planet="guarantee" class="is-shown" src="\/planets\/guarantee\.svg"/, "the Guarantee waits on the right");
   assert.match(home, /<a href="\/signup">GET STARTED<\/a><span class="label label-l">STUDY<\/span><span class="label label-r">GUARANTEE<\/span>/);
@@ -114,16 +108,16 @@ function runCarousel() {
 
 test("the carousel opens on Earth and cycles 1, 2, 3, 4 and back to 1 either way", () => {
   const { state, slots, nodes, key, lede } = runCarousel();
-  assert.deepEqual(state(), { active: "earth", badge: "ALL-IN-ONE AI WORKSPACE", title: "AI CHAT, IMAGE CREATION & STUDY", left: "STUDY", right: "GUARANTEE", leftPlanet: "mars", rightPlanet: "guarantee" });
+  assert.deepEqual(state(), { active: "earth", badge: "WORKSPACE", title: "ALL-IN-ONE AI", left: "STUDY", right: "GUARANTEE", leftPlanet: "mars", rightPlanet: "guarantee" });
   const right = slots.find((slot) => slot.dataset.slot === "r");
   const left = slots.find((slot) => slot.dataset.slot === "l");
   right.emit("click");
-  assert.deepEqual(state(), { active: "guarantee", badge: "OUR PROMISE", title: "VIBHAVGPT GUARANTEE", left: "WHAT IT IS", right: "IMAGE", leftPlanet: "earth", rightPlanet: "venus" }, "slide 2 is the VibhavGPT Guarantee");
-  assert.match(lede.textContent, /^We don't train AI models on your chats/);
+  assert.deepEqual(state(), { active: "guarantee", badge: "PRIVACY", title: "OUR GUARANTEE", left: "WHAT IT IS", right: "IMAGE", leftPlanet: "earth", rightPlanet: "venus" }, "slide 2 is the VibhavGPT Guarantee");
+  assert.match(lede.textContent, /^No training on your chats/);
   right.emit("click");
-  assert.equal(state().title, "CREATIVE IMAGE GENERATION");
+  assert.equal(state().title, "IMAGE CREATION");
   nodes[".label-r"].emit("click");
-  assert.equal(state().title, "INTERACTIVE STUDY TOOLS", "the labels move it too");
+  assert.equal(state().title, "STUDY TOOLS", "the labels move it too");
   key("ArrowRight");
   assert.equal(state().active, "earth", "and it wraps from Study back to What It Is");
   left.emit("click");
@@ -139,6 +133,15 @@ test("long titles fit on one line on wide screens and wrap on phones", () => {
   assert.match(home, /@media\(max-width:579px\),\(max-height:620px\)\{h1\.title\{font-size:calc\(46 \* var\(--u\)\);line-height:1\.08\}h1\.title \.ent-line\{white-space:normal;text-wrap:balance\}\}/);
   assert.match(home, /function fitTitle\(\)\{titleLine\.style\.fontSize='';if\(narrow\.matches\)return;/);
   assert.match(home, /addEventListener\('resize',fitTitle\);document\.fonts\?\.ready\.then\(fitTitle\);/);
+});
+
+test("titles and ledes sit in a narrow centred column instead of stretching across the screen", () => {
+  assert.match(home, /h1\.title\{max-width:680px;margin:0 auto;text-wrap:balance;text-align:center;text-indent:0;font-size:clamp\(2\.2rem,5vw,3\.4rem\);letter-spacing:-0\.02em;line-height:1\.15\}/);
+  assert.match(home, /p\.lede\{max-width:540px;margin:14px auto 0;font-size:clamp\(0\.95rem,1\.4vw,1\.05rem\);line-height:1\.5;opacity:0\.85;--settle:0\.85\}/);
+  assert.match(home, /@keyframes ent-rise\{[^}]*\}to\{opacity:var\(--settle,1\);/, "the lede's entrance settles at its softer opacity");
+  assert.match(home, /@media\(max-width:579px\),\(max-height:620px\)\{h1\.title\{margin-top:calc\(15 \* var\(--u\)\)\}\}/, "phones keep the gap under the badge");
+  const css = home.slice(0, home.indexOf("</style>"));
+  assert.ok(css.lastIndexOf("h1.title{max-width:680px") > css.lastIndexOf("{h1.title{font-size:calc(46 * var(--u))"), "the constraints win over the older sizes");
 });
 
 test("the navbar shows the official mark beside a sans wordmark", () => {
