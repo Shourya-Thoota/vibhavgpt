@@ -29,6 +29,18 @@ test("the Windows link shows on the web and is hidden in the desktop app", () =>
   assert.equal(WINDOWS_DOWNLOAD_PATH, "/vibhavgpt-windows");
 });
 
+test("the YouTube channel sits last in the Apps links and opens safely in a new tab", () => {
+  const sidebar = read("frontend/src/components/Sidebar.jsx");
+  assert.match(sidebar, /const YOUTUBE_CHANNEL_URL = "https:\/\/www\.youtube\.com\/@vibhavthoota";/);
+  const links = sidebar.slice(sidebar.indexOf("const APP_LINKS = ["), sidebar.indexOf("];", sidebar.indexOf("const APP_LINKS = [")));
+  assert.deepEqual([...links.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), ["Android", "Windows", "Source code", "YouTube"]);
+  assert.match(links, /\{ href: YOUTUBE_CHANNEL_URL, label: "YouTube", icon: <YoutubeIcon size=\{17\} strokeWidth=\{1\.9\} \/>, external: true \}/, "the same size and stroke as its neighbours");
+  assert.match(sidebar, /\{\.\.\.\(link\.external \? \{ target: "_blank", rel: "noopener noreferrer" \} : \{\}\)\}/, "external links open in a new tab without an opener");
+  assert.match(sidebar, /function YoutubeIcon\(\{ size = 24, strokeWidth = 2 \}\)[\s\S]*?stroke="currentColor"[\s\S]*?aria-hidden="true"/, "inherits the link colour and stays out of the accessible name");
+  const youtube = { href: "https://www.youtube.com/@vibhavthoota", label: "YouTube" };
+  assert.deepEqual(visibleAppLinks([...LINKS, youtube], isDesktopApp({ desktopAPI: {} })).map((link) => link.label), ["Android", "Source code", "YouTube"], "kept in the desktop app");
+});
+
 test("only the desktop app's <body> is marked, before the app renders", () => {
   const classes = new Set();
   const page = (extra) => ({ ...extra, document: { body: { classList: { add: (name) => classes.add(name) } } } });

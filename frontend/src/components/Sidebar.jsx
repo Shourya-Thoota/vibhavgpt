@@ -10,6 +10,8 @@ import { AccountBillingMenu } from "./AccountBillingMenu.jsx";
 import ConversationLibrary from "./ConversationLibrary.jsx";
 import { visibleAppLinks, WINDOWS_DOWNLOAD_PATH } from "../desktop-app.js";
 
+const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vibhavthoota";
+
 function relativeConversationTime(value) {
   if (!value) return "";
   const diffMs = Date.now() - new Date(value).getTime();
@@ -119,6 +121,18 @@ function ConversationHistory({ api, activeId, revision, onOpen, onNew, productMo
   );
 }
 
+// lucide-react 1.x dropped brand icons, so YouTube is drawn here in the same
+// 24px, round-stroked style as the lucide icons beside it.
+function YoutubeIcon({ size = 24, strokeWidth = 2 }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
+      <path d="m10 15 5-3-5-3z" />
+    </svg>
+  );
+}
+
 const CHAT_LINKS = () => [
   { id: "chat", label: "Chat", icon: <MessageSquare size={17} strokeWidth={1.9} /> },
   { id: "memory", label: "Memory", icon: <Brain size={17} strokeWidth={1.9} /> },
@@ -126,12 +140,13 @@ const CHAT_LINKS = () => [
 ];
 
 // The native apps' public download pages: plain links, outside the app. The
-// public source code opens in a new tab.
+// public source code and the YouTube channel open in a new tab.
 // Inside the Windows app, its own download link is left out (desktop-app.js).
 const APP_LINKS = [
   { href: "/android", label: "Android", icon: <Smartphone size={17} strokeWidth={1.9} /> },
   { href: WINDOWS_DOWNLOAD_PATH, label: "Windows", icon: <Monitor size={17} strokeWidth={1.9} /> },
   { href: SOURCE_REPO_URL, label: "Source code", icon: <Code size={17} strokeWidth={1.9} />, external: true },
+  { href: YOUTUBE_CHANNEL_URL, label: "YouTube", icon: <YoutubeIcon size={17} strokeWidth={1.9} />, external: true },
 ];
 
 /**
