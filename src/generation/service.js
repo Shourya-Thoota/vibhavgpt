@@ -65,12 +65,14 @@ export const IMAGE_STYLES = {
 // and perspective, stray lettering) instead of stacking vague praise words.
 // It is prompt text only: the image endpoint takes no extra parameters.
 const IMAGE_CRAFT_BRIEF = "Render it with fine detail, one clear focal point, a balanced composition, and coherent anatomy, hands and perspective. No watermark, signature, frame or border.";
-const ASKS_FOR_TEXT = /\b(text|words?|titled?|caption|lettering|typography|typographic|logo|wordmark|poster|label|sign(?:age)?|quote|headline|banner|says|reads|written)\b/i;
+const ASKS_FOR_TEXT = /\b(text|words?|titled?|caption|lettering|typography|typographic|logo|wordmark|poster|labels?|labell?ed|vocab|vocabulary|sign(?:age)?|quote|headline|banner|says|reads|written)\b/i;
 
 // `context` is what an image request points back at in its conversation
 // (see image-handoff.js); only the request itself decides whether the image
 // may carry text.
-export function composeImagePrompt(prompt, style = "", { context = "" } = {}) {
+// `textRequest` is what the user asked for when `prompt` is a rewrite of it;
+// either one asking for words lets the image carry them.
+export function composeImagePrompt(prompt, style = "", { context = "", textRequest = "" } = {}) {
   const subject = String(prompt ?? "").trim().replace(/[\s.]+$/, "");
   const key = String(style ?? "").trim().toLowerCase();
   const direction = IMAGE_STYLES[key] ?? (key ? `${String(style).trim()} style` : "");
@@ -80,7 +82,7 @@ export function composeImagePrompt(prompt, style = "", { context = "" } = {}) {
     reference ? `The request refers to this, from the conversation just before it: ${reference}.` : "",
     direction ? `Style: ${direction}.` : "",
     IMAGE_CRAFT_BRIEF,
-    ASKS_FOR_TEXT.test(subject) ? "" : "Do not add any text, letters or numbers to the image.",
+    ASKS_FOR_TEXT.test(subject) || ASKS_FOR_TEXT.test(String(textRequest ?? "")) ? "" : "Do not add any text, letters or numbers to the image.",
   ].filter(Boolean).join(" ");
 }
 

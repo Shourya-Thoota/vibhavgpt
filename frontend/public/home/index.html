@@ -72,6 +72,14 @@ html,body{height:100%}body{background:#04101f;color:var(--ink);font-family:var(-
 @keyframes planet-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes planet-idle{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(calc(-3 * var(--u))) scale(1.012)}}
 @media(prefers-reduced-motion:reduce){.orb,.orb img,.planet img.is-shown,.atmosphere::before{animation:none!important}.planet,.links,.burger span,.atmosphere{transition:none}.planet:hover,.planet:active{transform:none}}
+/* The Guarantee's gold world; its shield stays upright, so it doesn't spin. */
+.atmosphere[data-planet=guarantee]{--glow:#9a6d1f66}.atmosphere[data-planet=guarantee] .orb img{animation:none}
+/* The official mark beside a sans wordmark (the app's Hanken Grotesk). */
+.logo{display:inline-flex;align-items:center;gap:calc(10 * var(--u));font-family:var(--font-body);font-weight:650;font-size:calc(21 * var(--u));letter-spacing:calc(-.45 * var(--u));top:0}.logo img{display:block;flex:0 0 auto;width:calc(30 * var(--u));height:calc(30 * var(--u))}.logo i{font-weight:700}
+/* Titles stay on one line on wide screens (the script fits their size) and wrap, balanced, on phones. */
+h1.title .ent-line{white-space:nowrap}
+.label{pointer-events:auto;cursor:pointer}
+@media(max-width:579px),(max-height:620px){h1.title{font-size:calc(46 * var(--u));line-height:1.08}h1.title .ent-line{white-space:normal;text-wrap:balance}}
 </style>
   <script src="/theme/page-scroll-boot.js"></script>
 
@@ -96,24 +104,25 @@ html,body{height:100%}body{background:#04101f;color:var(--ink);font-family:var(-
  <div class="sky" aria-hidden="true">
   <div class="stars"></div>
   <div class="atmosphere is-active" data-planet="earth"><div class="orb"><img src="/planets/earth.webp" alt=""></div></div>
+  <div class="atmosphere" data-planet="guarantee"><div class="orb"><img src="/planets/guarantee.svg" alt=""></div></div>
   <div class="atmosphere" data-planet="venus"><div class="orb"><img src="/planets/venus.webp" alt=""></div></div>
   <div class="atmosphere" data-planet="mars"><div class="orb"><img src="/planets/mars.webp" alt=""></div></div>
  </div>
  <div class="ui">
   <header class="navbar"><div class="navrow">
-   <a class="logo" href="/home">Vibhav<i>GPT</i></a>
+   <a class="logo" href="/home"><img src="/brand/vibhavgpt-icon-64.png" srcset="/brand/vibhavgpt-icon-64.png 1x, /brand/vibhavgpt-icon-192.png 3x" width="30" height="30" alt=""><span>Vibhav<i>GPT</i></span></a>
    <nav class="links" id="site-nav" aria-label="Main navigation"><a href="#features" aria-current="page">Features</a><a href="/pricing">Pricing</a><a href="/app" id="nav-signin">Sign in</a><a class="avatar-chip" href="/app" id="nav-avatar" aria-label="Open your workspace" hidden></a><a class="enroll" href="/signup" id="nav-enroll">Get Started</a></nav>
    <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span></button>
   </div></header>
   <div class="copy">
-   <div class="col eyebrow"><span class="ent-mask"><span class="ent-line">FEATURE</span></span></div>
-   <h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">PRIVATE AI</span></span></h1>
+   <div class="col eyebrow"><span class="ent-mask"><span class="ent-line">ALL-IN-ONE AI WORKSPACE</span></span></div>
+   <h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">AI CHAT, IMAGE CREATION &amp; STUDY</span></span></h1>
    <div class="col rule"><span></span></div>
-   <p class="col lede">The VibhavGPT Guarantee: we don't train AI models on your chats, we don't sell your data, and we don't run ads. Export your data or delete your account from Settings at any time.</p>
+   <p class="col lede">Chat with intelligent models, generate custom images, and master any subject with interactive flashcards and quizzes, built private, fast, and ad-free.</p>
    <div class="col cta">
-    <button class="planet planet-l" type="button" data-slot="l" aria-label="Show CHAT"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="venus" class="is-shown" src="/planets/venus.webp" alt=""><img data-planet="mars" src="/planets/mars.webp" alt=""></button>
-    <button class="planet planet-r" type="button" data-slot="r" aria-label="Show STUDY"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" class="is-shown" src="/planets/mars.webp" alt=""></button>
-    <a href="/signup">GET STARTED</a><span class="label label-l">CHAT</span><span class="label label-r">STUDY</span>
+    <button class="planet planet-l" type="button" data-slot="l" aria-label="Show STUDY"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="guarantee" src="/planets/guarantee.svg" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" class="is-shown" src="/planets/mars.webp" alt=""></button>
+    <button class="planet planet-r" type="button" data-slot="r" aria-label="Show GUARANTEE"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="guarantee" class="is-shown" src="/planets/guarantee.svg" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" src="/planets/mars.webp" alt=""></button>
+    <a href="/signup">GET STARTED</a><span class="label label-l">STUDY</span><span class="label label-r">GUARANTEE</span>
    </div>
   </div>
  </div>
@@ -158,16 +167,22 @@ html,body{height:100%}body{background:#04101f;color:var(--ink);font-family:var(-
   .catch(() => {}); // Network hiccup: leave the safe signed-out default in place.
 })();
 </script>
+<script type="application/json" id="carousel-slides">{"order":["earth","guarantee","venus","mars"],"slides":{"earth":{"label":"WHAT IT IS","badge":"ALL-IN-ONE AI WORKSPACE","title":"AI CHAT, IMAGE CREATION & STUDY","lede":"Chat with intelligent models, generate custom images, and master any subject with interactive flashcards and quizzes, built private, fast, and ad-free."},"guarantee":{"label":"GUARANTEE","badge":"OUR PROMISE","title":"VIBHAVGPT GUARANTEE","lede":"We don't train AI models on your chats, we don't sell your data, and we don't run ads. Export your data or delete your account from Settings at any time."},"venus":{"label":"IMAGE","badge":"FEATURE","title":"CREATIVE IMAGE GENERATION","lede":"Turn ideas, descriptions, and study notes into vivid illustrations with dedicated image models."},"mars":{"label":"STUDY","badge":"FEATURE","title":"INTERACTIVE STUDY TOOLS","lede":"Master any topic with 3D flippable flashcards and instant-feedback quizzes with score tracking and explanations."}}}</script>
 <script>
 (() => {
- const ORDER=['venus','earth','mars'];
- const data={venus:{name:'CHAT',lede:'Ask a question. Explore an idea. Search the web when you need something current. VibhavGPT keeps your conversation and saved context close, so you can pick up where you left off.'},earth:{name:'PRIVATE AI',lede:"The VibhavGPT Guarantee: we don't train AI models on your chats, we don't sell your data, and we don't run ads. Export your data or delete your account from Settings at any time."},mars:{name:'STUDY',lede:'Upload your notes for worked examples, flashcards, and quizzes. On Plus and Pro, you can also create graphics with image generation.'}};
+ // The four slides, in order (the #carousel-slides block above): What It Is
+ // over Earth, the VibhavGPT Guarantee, Image and Study. The planets beside
+ // the button, their labels and the arrow keys move one step either way,
+ // wrapping round.
+ const SLIDES=JSON.parse(document.getElementById('carousel-slides').textContent);const ORDER=SLIDES.order;const data=SLIDES.slides;
  const slots=[...document.querySelectorAll('.planet')];let featured=null;
+ const titleBox=document.querySelector('h1.title'),titleLine=titleBox.querySelector('.ent-line'),narrow=matchMedia('(max-width:579px),(max-height:620px)');
+ function fitTitle(){titleLine.style.fontSize='';if(narrow.matches)return;const range=document.createRange();range.selectNodeContents(titleLine);const need=range.getBoundingClientRect().width,room=titleBox.clientWidth*0.94;if(need>room&&need>0)titleLine.style.fontSize=(parseFloat(getComputedStyle(titleBox).fontSize)*room/need)+'px';}
  function adjacent(direction){return ORDER[(ORDER.indexOf(featured)+direction+ORDER.length)%ORDER.length];}
- function show(next){if(!data[next]||featured===next)return;featured=next;document.querySelectorAll('.atmosphere').forEach(el=>el.classList.toggle('is-active',el.dataset.planet===next));document.querySelector('h1 .ent-line').textContent=data[next].name;document.querySelector('.lede').textContent=data[next].lede;slots.forEach(slot=>{const preview=adjacent(slot.dataset.slot==='l'?-1:1);slot.querySelectorAll('img').forEach(img=>img.classList.toggle('is-shown',img.dataset.planet===preview));slot.dataset.planet=preview;slot.setAttribute('aria-label','Show '+data[preview].name);document.querySelector('.label-'+slot.dataset.slot).textContent=data[preview].name;});}
+ function show(next){if(!data[next]||featured===next)return;featured=next;document.querySelectorAll('.atmosphere').forEach(el=>el.classList.toggle('is-active',el.dataset.planet===next));document.querySelector('.eyebrow .ent-line').textContent=data[next].badge;document.querySelector('h1 .ent-line').textContent=data[next].title;document.querySelector('.lede').textContent=data[next].lede;fitTitle();slots.forEach(slot=>{const preview=adjacent(slot.dataset.slot==='l'?-1:1);slot.querySelectorAll('img').forEach(img=>img.classList.toggle('is-shown',img.dataset.planet===preview));slot.dataset.planet=preview;slot.setAttribute('aria-label','Show '+data[preview].label);document.querySelector('.label-'+slot.dataset.slot).textContent=data[preview].label;});}
  // All nine image nodes retain their original src; decode up front for same-frame swaps.
  const images=[...document.images];const decoded=Promise.all(images.map(img=>img.decode().catch(()=>{})));
- slots.forEach(slot=>slot.addEventListener('click',()=>show(adjacent(slot.dataset.slot==='l'?-1:1))));document.querySelector('.scroll').addEventListener('click',()=>show(adjacent(1)));show('earth');
+ slots.forEach(slot=>slot.addEventListener('click',()=>show(adjacent(slot.dataset.slot==='l'?-1:1))));document.querySelector('.scroll').addEventListener('click',()=>show(adjacent(1)));document.querySelectorAll('.label').forEach(label=>label.addEventListener('click',()=>show(adjacent(label.classList.contains('label-l')?-1:1))));document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName??''))return;if(e.key==='ArrowRight'){e.preventDefault();show(adjacent(1));}if(e.key==='ArrowLeft'){e.preventDefault();show(adjacent(-1));}});addEventListener('resize',fitTitle);document.fonts?.ready.then(fitTitle);show('earth');
  const nav=document.querySelector('.navrow'),menu=document.querySelector('.links'),burger=document.querySelector('.burger');function setMenu(open){nav.dataset.open=String(open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Close navigation':'Open navigation');}setMenu(false);burger.addEventListener('click',e=>{e.stopPropagation();setMenu(nav.dataset.open!=='true');});document.addEventListener('click',e=>{if(!menu.contains(e.target)&&!burger.contains(e.target))setMenu(false);});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&nav.dataset.open==='true'){setMenu(false);burger.focus();}});menu.addEventListener('click',e=>{if(e.target.closest('a'))setMenu(false);});
  let seed=218;const stars=document.querySelector('.stars');for(let i=0;i<85;i++){seed=(seed*16807)%2147483647;const x=seed%10000/100;seed=(seed*16807)%2147483647;const y=seed%10000/100;const star=document.createElement('i');star.className='star';star.style.cssText=`left:${x}%;top:${y}%;--s:${i%9===0?2:1};--a:${.12+(i%5)*.08}`;stars.append(star);}
  if(!matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.classList.add('anim');let started=false;const start=()=>{if(started)return;started=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{document.documentElement.classList.add('play');setTimeout(()=>document.documentElement.classList.remove('anim','play'),2150);}));};Promise.race([Promise.all([document.fonts.ready,decoded]),new Promise(resolve=>setTimeout(resolve,500))]).then(start);}

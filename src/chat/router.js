@@ -11,14 +11,14 @@ import { callModelStreaming, callModelWithFallback, getModelConfig, IMAGE_DISPLA
 import { buildIdentitySystemPrompt, buildPreferenceSystemPrompt } from "./prompts.js";
 import { buildProductKnowledgeAddendum, buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
 import { deleteConversation, listConversations, loadConversation, markReplyMissing, recordStudyResult, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
-import { studyResultNote, withStudyResults } from "./study-results.js";
+import { studyResultNote, withImagePrompts, withStudyResults } from "./study-results.js";
 import { buildMemorySystemPrompt, buildRelevantMemoryContext, extractAndSaveFacts, getFacts, saveMemoryFromChat, vendorNamePattern } from "../memory/service.js";
 import { config } from "../config.js";
 import { providerNameTerms } from "../security/provider-names.js";
 import { reportChatReplyFailure } from "../sentry.js";
 import { createThinkingRelay } from "./reasoning-stream.js";
 import { createThoughtFilter, stripThoughts } from "./thought-filter.js";
-import { imageHandoffContext } from "../generation/image-handoff.js";
+import { expandImagePrompt } from "../generation/image-handoff.js";
 import { composeImagePrompt, createStoredAttachment, documentLabel, generateDocument, generateImage } from "../generation/service.js";
 import { cancelUsageReservation, createUsageTracker, reserveUsage } from "../usage/service.js";
 import { searchWeb } from "../search/service.js";
@@ -366,11 +366,16 @@ chatRouter.delete("/conversations/:id", requireSession, async (req, res, next) =
   }
 });
 
-// `history` lets a request that points back at the conversation ("an image
-// of that analogy") carry what it points at (see generation/image-handoff.js).
-async function generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt, mode, attachmentIds = [], userMessageId = null, history = [] }) {
-  const context = imageHandoffContext(prompt, history);
-  const generated = await generateImage({ userId, prompt: composeImagePrompt(prompt, "", { context }) });
+// `history` lets a request that draws on the conversation ("an image with
+// all the vocab Study listed") carry what it draws on: a lightweight model
+// rewrites it into one standalone prompt, or, when that model is not
+// available, the latest reply goes with it (generation/image-handoff.js).
+// The prompt actually used is kept with the image reply, so later turns know
+// what the picture shows.
+async function generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt, mode, attachmentIds = [], userMessageId = null, history = [], requestId, signal }) {
+  const expansion = await expandImagePrompt(prompt, history, { requestId, signal });
+  const imagePrompt = composeImagePrompt(expansion.prompt, "", { context: expansion.context, textRequest: prompt });
+  const generated = await generateImage({ userId, prompt: imagePrompt });
   const activitySummary = buildActivitySummary({ query: prompt, actions: { imageGenerated: true } });
   const saved = await saveExchange({
     userId,
@@ -382,6 +387,7 @@ async function generateNaturalLanguageImage({ userId, conversationId, modelKey, 
     reply: "I created this image for you.",
     activitySummary,
     userMessageId,
+    imagePrompt: expansion.expanded ? expansion.prompt : "",
   });
   const attachment = await createStoredAttachment({
     userId,
@@ -520,7 +526,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
     }
     if (!studyAction && isImageGenerationRequest(content)) {
       onStatus("thinking");
-      return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: content, mode: conversationMode, attachmentIds, history });
+      return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: content, mode: conversationMode, attachmentIds, history, requestId: req.chatRequestId, signal: req.chatAbortSignal });
     }
     if (!studyAction && isDocumentGenerationRequest(content)) {
       onStatus("writing");
@@ -614,7 +620,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
     };
     // The whole saved conversation goes to whichever model answers, with what
     // the learner did with each reply's flashcards or quiz.
-    const contextOptions = { systemMessages, history: withStudyResults(history), referenceMessages, currentMessage };
+    const contextOptions = { systemMessages, history: withImagePrompts(withStudyResults(history)), referenceMessages, currentMessage };
     const fittedContext = fitConversationContext(contextOptions);
     if (!fittedContext.ok) {
       console.warn(JSON.stringify({ event: "chat_context_exceeds_budget", requestId: req.chatRequestId ?? null, estimatedTokens: fittedContext.estimatedTokens, maxInputTokens: fittedContext.maxInputTokens, historyMessages: fittedContext.historyMessages ?? history.length }));
@@ -753,7 +759,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
         if (!toolCall) break;
         if (!studyAction && toolCall.name === "generate_image") {
           await cancelUsageReservation(usageEvent.id, usageEvent.creditReservationId);
-          return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: toolCall.arguments.prompt || content, mode: conversationMode, attachmentIds, userMessageId, history });
+          return generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt: toolCall.arguments.prompt || content, mode: conversationMode, attachmentIds, userMessageId, history, requestId: req.chatRequestId, signal: req.chatAbortSignal });
         }
         if (!studyAction && toolCall.name === "generate_document") {
           await cancelUsageReservation(usageEvent.id, usageEvent.creditReservationId);

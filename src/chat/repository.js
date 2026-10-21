@@ -17,8 +17,10 @@ export function messageActivityMetadata(metadata) {
 
 // Only these fields are stored with a reply. The model's thinking text is
 // shown live and never saved; how long it thought is the one thing kept.
-export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null } = {}) {
+export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null, imagePrompt = "" } = {}) {
+  const prompt = String(imagePrompt ?? "").trim().slice(0, 1500);
   return {
+    ...(prompt ? { imagePrompt: prompt } : {}),
     ...(sources.length ? { sources } : {}),
     ...(activitySummary.length ? { activitySummary } : {}),
     ...(wholeSeconds(thoughtSeconds) !== null ? { thoughtSeconds } : {}),
@@ -73,6 +75,8 @@ export async function loadConversation(userId, conversationId) {
     // What the learner did with this reply's flashcards or quiz
     // (study-results.js), for the model's context.
     message.studyResults = Array.isArray(message.metadata?.studyResults) ? message.metadata.studyResults.filter((note) => typeof note === "string") : [];
+    // The prompt a generated image was made from, for the model's context.
+    message.imagePrompt = typeof message.metadata?.imagePrompt === "string" ? message.metadata.imagePrompt : "";
     delete message.metadata;
   }
 
@@ -223,7 +227,7 @@ export async function markReplyMissing(messageId, replyStatus, requestId) {
 // Saves a finished exchange. With userMessageId, the user's message was
 // already saved by saveUserMessage: only the reply is added (and the
 // message's missing-reply mark cleared). Without it, both are saved together.
-export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null }) {
+export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "" }) {
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
@@ -253,7 +257,7 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
     // history, rather than relying on arbitrary order for equal timestamps.
     const userCreatedAt = new Date();
     const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
-    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds });
+    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds, imagePrompt });
     // Sources ride along in the assistant row's metadata so a reloaded
     // conversation can still show what an answer was grounded in. They
     // were previously returned on the live response only, which meant

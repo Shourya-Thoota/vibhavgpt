@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- The VibhavGPT Guarantee planet: a golden world with a faint shield on
+       its face, drawn to sit beside the Earth, Venus and Mars renders. -->
+  <defs>
+    <radialGradient id="body" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#fff3c4"/>
+      <stop offset="0.28" stop-color="#f6cf6b"/>
+      <stop offset="0.62" stop-color="#c98a2b"/>
+      <stop offset="0.9" stop-color="#6e4313"/>
+      <stop offset="1" stop-color="#3a2208"/>
+    </radialGradient>
+    <linearGradient id="bands" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.3" stop-color="#fff6d8" stop-opacity="0.16"/>
+      <stop offset="0.36" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.52" stop-color="#7a4b12" stop-opacity="0.18"/>
+      <stop offset="0.58" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.72" stop-color="#fff1c2" stop-opacity="0.12"/>
+      <stop offset="0.8" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="night" cx="78%" cy="80%" r="70%">
+      <stop offset="0.35" stop-color="#140b02" stop-opacity="0"/>
+      <stop offset="1" stop-color="#140b02" stop-opacity="0.78"/>
+    </radialGradient>
+    <radialGradient id="rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0.9" stop-color="#ffe7a3" stop-opacity="0"/>
+      <stop offset="0.985" stop-color="#ffe7a3" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffe7a3" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fffaf0" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#fffaf0" stop-opacity="0.08"/>
+    </linearGradient>
+    <clipPath id="sphere"><circle cx="400" cy="400" r="380"/></clipPath>
+  </defs>
+  <g clip-path="url(#sphere)">
+    <circle cx="400" cy="400" r="380" fill="url(#body)"/>
+    <rect x="0" y="0" width="800" height="800" fill="url(#bands)" transform="rotate(-14 400 400)"/>
+    <ellipse cx="300" cy="250" rx="170" ry="90" fill="#fff8de" opacity="0.12"/>
+    <path d="M400 232 L520 278 C520 392 476 474 400 528 C324 474 280 392 280 278 Z" fill="url(#shield)" stroke="#fffaf0" stroke-opacity="0.38" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M352 388 L388 424 L452 352" fill="none" stroke="#fffaf0" stroke-opacity="0.5" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="400" cy="400" r="380" fill="url(#night)"/>
+  </g>
+  <circle cx="400" cy="400" r="380" fill="url(#rim)"/>
+</svg>

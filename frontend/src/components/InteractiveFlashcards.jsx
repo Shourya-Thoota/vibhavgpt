@@ -5,6 +5,8 @@ import "../study-widgets.css";
 
 // A deck from a ```flashcards block (study-widgets.js). The card is a button:
 // a click, Space or Enter flips it; the arrow keys move through the deck.
+// The layout never moves: a counter line, one 320px slot (the card, or the
+// "Deck complete" summary) and one fixed-height controls area.
 // When a run through the deck finishes, `onResult` hears how it went, once.
 export default function InteractiveFlashcards({ deck, onResult = null }) {
   const { cards, title } = deck;
@@ -37,21 +39,16 @@ export default function InteractiveFlashcards({ deck, onResult = null }) {
       </header>
 
       <div className="study-widget__body">
-      {state.finished ? (
-        <div className="study-widget__summary" role="status">
-          <p className="study-widget__summary-title">Deck complete</p>
-          <p className="study-widget__summary-counts">
-            <span data-tone="positive"><Check size={15} strokeWidth={2.4} aria-hidden="true" /> Know it: {known}</span>
-            <span data-tone="learning">Still learning: {learning}</span>
-          </p>
-          <div className="study-widget__actions">
-            {learning > 0 && <button type="button" className="btn btn--primary" onClick={() => dispatch({ type: "review" })}>Review {learning} still learning</button>}
-            <button type="button" className="btn btn--secondary" onClick={() => dispatch({ type: "restart", count: cards.length })}><RotateCcw size={15} /> Start over</button>
+        <p className="study-widget__counter" aria-live="polite">{state.finished ? "Deck complete" : `Card ${state.position + 1} of ${total}`}</p>
+        {state.finished ? (
+          <div className="study-widget__summary deck-complete flashcards-complete" role="status">
+            <p className="study-widget__summary-title">Deck complete</p>
+            <p className="study-widget__summary-counts">
+              <span data-tone="positive"><Check size={15} strokeWidth={2.4} aria-hidden="true" /> Know it: {known}</span>
+              <span data-tone="learning">Still learning: {learning}</span>
+            </p>
           </div>
-        </div>
-      ) : (
-        <>
-          <p className="study-widget__counter" aria-live="polite">Card {state.position + 1} of {total}</p>
+        ) : (
           <button
             type="button"
             className="flashcards__card"
@@ -71,19 +68,30 @@ export default function InteractiveFlashcards({ deck, onResult = null }) {
               </span>
             </span>
           </button>
-          <div className="flashcards__marks">
-            <button type="button" className="flashcards__mark" data-tone="learning" onClick={() => dispatch({ type: "mark", value: "learning" })}>Still learning</button>
-            <button type="button" className="flashcards__mark" data-tone="positive" onClick={() => dispatch({ type: "mark", value: "know" })}><Check size={15} strokeWidth={2.4} aria-hidden="true" /> Know it</button>
-          </div>
-          <div className="study-widget__nav">
-            <button type="button" className="study-widget__icon" aria-label="Previous card" disabled={state.position === 0} onClick={() => dispatch({ type: "prev" })}><ChevronLeft size={18} /></button>
-            <button type="button" className="btn btn--quiet" onClick={() => dispatch({ type: "flip" })}>Flip</button>
-            <button type="button" className="btn btn--quiet" onClick={() => dispatch({ type: "shuffle" })}><Shuffle size={15} /> Shuffle</button>
-            <button type="button" className="study-widget__icon" aria-label="Next card" onClick={() => dispatch({ type: "next" })}><ChevronRight size={18} /></button>
-          </div>
-          {(known > 0 || learning > 0) && <p className="study-widget__tally">Know it: {known} · Still learning: {learning}</p>}
-        </>
-      )}
+        )}
+        <div className="flashcards__controls">
+          {state.finished ? (
+            <div className="study-widget__actions">
+              {learning > 0 && <button type="button" className="btn btn--primary" onClick={() => dispatch({ type: "review" })}>Review {learning} still learning</button>}
+              <button type="button" className="btn btn--secondary" onClick={() => dispatch({ type: "restart", count: cards.length })}><RotateCcw size={15} /> Start over</button>
+            </div>
+          ) : (
+            <>
+              <div className="flashcards__marks">
+                <button type="button" className="flashcards__mark" data-tone="learning" onClick={() => dispatch({ type: "mark", value: "learning" })}>Still learning</button>
+                <button type="button" className="flashcards__mark" data-tone="positive" onClick={() => dispatch({ type: "mark", value: "know" })}><Check size={15} strokeWidth={2.4} aria-hidden="true" /> Know it</button>
+              </div>
+              <div className="study-widget__nav">
+                <button type="button" className="study-widget__icon" aria-label="Previous card" disabled={state.position === 0} onClick={() => dispatch({ type: "prev" })}><ChevronLeft size={18} /></button>
+                <button type="button" className="btn btn--quiet" onClick={() => dispatch({ type: "flip" })}>Flip</button>
+                <button type="button" className="btn btn--quiet" onClick={() => dispatch({ type: "shuffle" })}><Shuffle size={15} /> Shuffle</button>
+                <button type="button" className="study-widget__icon" aria-label="Next card" onClick={() => dispatch({ type: "next" })}><ChevronRight size={18} /></button>
+              </div>
+            </>
+          )}
+          {/* Always present, so the running count appearing moves nothing. */}
+          <p className="study-widget__tally" aria-live="polite">{!state.finished && (known > 0 || learning > 0) ? `Know it: ${known} · Still learning: ${learning}` : " "}</p>
+        </div>
       </div>
     </section>
   );
