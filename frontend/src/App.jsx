@@ -4581,8 +4581,24 @@ function AccessNotice({ access, onAction, onDismiss }) {
   </div>;
 }
 
+// The public /pricing page sits in the landing page's night sky: stars,
+// orbit rings and faint planets behind the plans (pricing.css). The sky is
+// decoration only; the plans keep their own solid, readable surfaces.
 export function PublicPricing({ signedIn = false }) {
-  return <><nav className="public-nav"><Brand /><a className="btn btn--primary" href={signedIn ? "/app" : "/signup"}>{signedIn ? "Open workspace" : "Get started"}</a></nav><Billing tier="visitor" publicPreview /></>;
+  return (
+    <div className="pricing-cosmos">
+      <div className="pricing-cosmos__sky" aria-hidden="true">
+        <span className="pricing-cosmos__stars" />
+        <span className="pricing-cosmos__orbit pricing-cosmos__orbit--one" />
+        <span className="pricing-cosmos__orbit pricing-cosmos__orbit--two" />
+        <img className="pricing-cosmos__planet pricing-cosmos__planet--earth" src="/planets/earth.webp" alt="" />
+        <img className="pricing-cosmos__planet pricing-cosmos__planet--venus" src="/planets/venus.webp" alt="" />
+        <img className="pricing-cosmos__planet pricing-cosmos__planet--mars" src="/planets/mars.webp" alt="" />
+      </div>
+      <nav className="public-nav"><Brand /><a className="btn btn--primary" href={signedIn ? "/app" : "/signup"}>{signedIn ? "Open workspace" : "Get started"}</a></nav>
+      <Billing tier="visitor" publicPreview />
+    </div>
+  );
 }
 
 function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) {

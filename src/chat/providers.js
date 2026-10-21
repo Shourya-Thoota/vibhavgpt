@@ -365,6 +365,26 @@ export async function callSearchIntentModel(
   return { data, internalStage: "primaryFree" };
 }
 
+// The image prompt rewriter (generation/image-handoff.js): the same
+// lightweight model and gate as the search-intent step, plain text out.
+export async function callImagePromptModel(
+  messages,
+  { fetchImpl = fetch, maxTokens = 420, timeoutMs = 8_000, signal, requestId = "unknown" } = {},
+) {
+  if (!primaryProviderApproved()) throw new ProviderStageError("route-not-configured");
+  const data = await callProvider(
+    { provider: "primaryFree", model: config.searchIntentModel },
+    messages,
+    undefined,
+    fetchImpl,
+    maxTokens,
+    null,
+    { reasoning_effort: "low", include_reasoning: false },
+    { timeoutMs, maxRetries: 0, signal, requestId },
+  );
+  return { data, internalStage: "primaryFree" };
+}
+
 export async function callModelWithFallback(
   modelKey,
   messages,

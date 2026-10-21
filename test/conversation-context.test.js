@@ -157,7 +157,7 @@ test("study results become short, bounded notes, and only well-formed ones are k
 test("history does not depend on which model answers", () => {
   const router = read("src/chat/router.js");
   assert.match(router, /const existing = await loadConversation\(userId, conversationId\);[\s\S]*?history = existing\.history;/, "loaded by conversation, not by model");
-  assert.match(router, /const contextOptions = \{ systemMessages, history: withStudyResults\(history\), referenceMessages, currentMessage \};\n\s*const fittedContext = fitConversationContext\(contextOptions\);/, "one shared budget for every model");
+  assert.match(router, /const contextOptions = \{ systemMessages, history: withImagePrompts\(withStudyResults\(history\)\), referenceMessages, currentMessage \};\n\s*const fittedContext = fitConversationContext\(contextOptions\);/, "one shared budget for every model");
   const app = read("frontend/src/App.jsx");
   assert.match(app, /if \(conversationId\) \{\s*await api\(`\/api\/chat\/conversations\/\$\{conversationId\}`, \{\s*method: "PATCH",\s*body: JSON\.stringify\(\{ model: nextModel \}\),/, "a model switch keeps the conversation");
 });

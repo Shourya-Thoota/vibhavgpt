@@ -2,14 +2,55 @@
    Theme tokens only, so both skies style them; motion is transform and
    opacity, and stops under reduced motion.
 
-   Sizing is fixed rather than fitted to the text: every widget spans the
-   reply (up to 680px), its body keeps one minimum height, and a flashcard
-   keeps one height whatever is written on it, so flipping, moving between
-   cards or questions, and reaching the summary never make the reply jump. */
+   Sizing is locked, never fitted to the text. Every widget spans the reply
+   (up to 680px) and the reply bubble spans the column around it, instead of
+   shrinking to its text. The flashcard, the quiz card and both end screens
+   ("Deck complete", the score card) are one 320px box, scrolling inside
+   when their text is long, and the flashcard controls keep one height, so
+   flipping, moving between cards or questions, and finishing never move
+   anything. */
 
 .study-widget-container,
 .interactive-flashcards,
-.interactive-quiz { width: 100%; max-width: 680px; box-sizing: border-box; }
+.interactive-quiz,
+.deck-complete,
+.flashcards-complete,
+.quiz-summary {
+  width: 100% !important;
+  max-width: 680px !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+  align-self: stretch !important;
+}
+/* The reply around a widget or a diagram spans the column. Without this the
+   assistant bubble (margin-right: auto in a grid row) shrinks to its text,
+   and the widget with it. */
+.bubble:has(.study-widget-container, .diagram-viewer),
+.prose:has(.study-widget-container, .diagram-viewer) { width: 100% !important; max-width: 100% !important; }
+
+/* The one box every card, question and end screen fills. */
+.flashcards__card,
+.quiz__card,
+.deck-complete,
+.flashcards-complete,
+.quiz-summary {
+  height: 320px !important;
+  min-height: 320px !important;
+  max-height: 320px !important;
+}
+.deck-complete,
+.flashcards-complete,
+.quiz-summary,
+.quiz__card {
+  display: flex; flex-direction: column; justify-content: safe center; align-items: stretch;
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.deck-complete,
+.flashcards-complete,
+.quiz-summary {
+  align-items: center; text-align: center;
+  border: 1px solid var(--color-accent-line); border-radius: var(--radius-card); background: var(--color-paper);
+}
 .study-widget-container *,
 .study-widget-container *::before,
 .study-widget-container *::after { box-sizing: border-box; }
@@ -23,10 +64,15 @@
   color: var(--color-ink);
 }
 .study-widget__head { display: grid; gap: 6px; margin-bottom: var(--space-md); }
-/* One footprint for every card, question and summary in a widget. */
-.study-widget__body { display: flex; flex-direction: column; min-height: 440px; }
-.interactive-quiz .study-widget__body { min-height: 420px; }
-.study-widget__body > .study-widget__summary { flex: 1; align-content: center; }
+.study-widget__body { display: flex; flex-direction: column; }
+/* The flashcard controls (marks, navigation and the running count, or the
+   end screen's actions) keep one height too. */
+.flashcards__controls { display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; height: 140px; margin-top: var(--space-md); }
+.flashcards__controls .flashcards__marks,
+.flashcards__controls .study-widget__nav,
+.flashcards__controls .study-widget__actions { margin-top: 0; }
+.flashcards__controls .study-widget__actions { flex: 1; align-content: center; }
+.study-widget__tally { min-height: 1.2em; }
 .study-widget__eyebrow { color: var(--color-accent); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
 .study-widget__title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: 400; }
 .study-widget__progress { height: 4px; overflow: hidden; border-radius: 999px; background: var(--color-rule); }
@@ -42,7 +88,7 @@
 .study-widget__icon:hover:not(:disabled) { background: var(--color-accent-soft); }
 .study-widget__icon:disabled { opacity: 0.4; }
 .study-widget__tally { margin: var(--space-sm) 0 0; color: var(--color-muted); font-size: 0.8rem; text-align: center; }
-.study-widget__summary { display: grid; justify-items: center; gap: var(--space-sm); padding: var(--space-md) 0; text-align: center; }
+.study-widget__summary { gap: var(--space-sm); padding: var(--space-md); }
 .study-widget__summary-title { margin: 0; font-family: var(--font-display); font-size: 1.35rem; }
 .study-widget__summary-counts { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-md); margin: 0; font-weight: 550; }
 .study-widget__summary-counts [data-tone="positive"] { display: inline-flex; align-items: center; gap: 4px; color: var(--color-positive); }
@@ -50,7 +96,7 @@
 
 /* --- Flashcards: a card that turns over in 3D ---------------------------- */
 .flashcards__card {
-  display: block; width: 100%; height: 300px; padding: 0;
+  display: block; width: 100%; padding: 0;
   border: 0; background: none; color: inherit; text-align: center;
   perspective: 1100px; cursor: pointer;
 }
@@ -61,7 +107,7 @@
 }
 .flashcards__card[data-flipped] .flashcards__inner { transform: rotateY(180deg); }
 .flashcards__face {
-  grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 10px;
   min-height: 0; padding: var(--space-lg); overflow-y: auto; overscroll-behavior: contain;
   border: 1px solid var(--color-accent-line); border-radius: var(--radius-card);
   background: var(--color-paper); backface-visibility: hidden;
@@ -127,9 +173,7 @@
 @media (max-width: 640px) {
   .study-widget { padding: var(--space-sm) var(--space-md) var(--space-md); border-radius: 18px; }
   .study-widget__title { font-size: 1.1rem; }
-  .study-widget__body { min-height: 400px; }
-  .interactive-quiz .study-widget__body { min-height: 380px; }
-  .flashcards__card { height: 240px; }
+  .flashcards__controls { height: 156px; }
   .flashcards__face { padding: var(--space-md); }
   .flashcards__mark, .quiz__option { min-height: 48px; }
   .study-widget__icon { width: 44px; height: 44px; }

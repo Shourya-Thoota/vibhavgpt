@@ -4,6 +4,8 @@ import { explainMessage, initialQuiz, quizReducer, quizResult, quizScore, scoreM
 import "../study-widgets.css";
 
 // A quiz from a ```quiz block (study-widgets.js), one question at a time.
+// The layout never moves: a counter line, then one 320px card (the question,
+// its options and feedback, scrolling inside) or the score card in its place.
 // The first choice is final: the right answer turns green with a check, a
 // wrong choice turns red with a cross, and the explanation appears. After a
 // wrong answer, "Ask VibhavGPT to explain" sends a follow-up into the chat
@@ -39,8 +41,9 @@ export default function InteractiveQuiz({ quiz, onAsk = null, onResult = null })
       </header>
 
       <div className="study-widget__body">
+        <p className="study-widget__counter" aria-live="polite">{state.finished ? "Quiz complete" : `Question ${state.position + 1} of ${total}`}</p>
         {state.finished ? (
-          <div className="study-widget__summary" role="status">
+          <div className="study-widget__summary quiz-summary" role="status">
             <p className="study-widget__summary-title">{scoreMessage(score, total)}</p>
             <ol className="quiz__review">
               {questions.map((question, index) => (
@@ -55,8 +58,7 @@ export default function InteractiveQuiz({ quiz, onAsk = null, onResult = null })
             </div>
           </div>
         ) : (
-          <>
-            <p className="study-widget__counter" aria-live="polite">Question {state.position + 1} of {total}</p>
+          <div className="quiz__card">
             <p className="quiz__question">{item.question}</p>
             <div className="quiz__options" role="group" aria-label="Answers">
               {item.options.map((option, index) => {
@@ -90,7 +92,7 @@ export default function InteractiveQuiz({ quiz, onAsk = null, onResult = null })
                 onNext={() => dispatch({ type: "next", count: total })}
               />
             )}
-          </>
+          </div>
         )}
       </div>
     </section>

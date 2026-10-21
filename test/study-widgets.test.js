@@ -175,21 +175,6 @@ test("Study and Chat tell the model to write study aids as these blocks", async 
   assert.ok(parseStudyBlock("quiz", '{"title": "short topic", "questions": [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0, "explanation": "why the answer is right"}]}'));
 });
 
-test("both widgets span the reply in one stable frame, whatever their text", async () => {
-  const render = await renderWidgets();
-  const cards = render.flashcards(parseStudyBlock("flashcards", DECK));
-  const quiz = render.quiz(parseStudyBlock("quiz", QUIZ));
-  assert.match(cards, /<section class="study-widget-container study-widget interactive-flashcards flashcards"/);
-  assert.match(quiz, /<section class="study-widget-container study-widget interactive-quiz quiz"/);
-  for (const html of [cards, quiz]) assert.match(html, /<\/header><div class="study-widget__body">/, "the body under the header holds the footprint");
-  const css = read("frontend/src/study-widgets.css");
-  assert.match(css, /\.study-widget-container,\n\.interactive-flashcards,\n\.interactive-quiz \{ width: 100%; max-width: 680px; box-sizing: border-box; \}/);
-  assert.match(css, /\.study-widget__body \{ display: flex; flex-direction: column; min-height: 440px; \}/);
-  assert.match(css, /\.flashcards__card \{\n  display: block; width: 100%; height: 300px;/, "one card height for every card, front and back");
-  assert.match(css, /\.flashcards__face \{[^}]*overflow-y: auto;/, "long text scrolls inside the card instead of growing it");
-  assert.doesNotMatch(css, /\.flashcards__card \{[^}]*min-height/, "not a minimum that text could stretch");
-  assert.match(css, /\.study-widget--pending \{[^}]*width: 100%; max-width: 680px; min-height: 120px;/, "the placeholder is as wide as its widget");
-});
 
 test("a wrong answer offers Ask VibhavGPT to explain, which sends the explanation request once", async () => {
   const render = await renderWidgets();
@@ -226,11 +211,40 @@ test("a wrong answer offers Ask VibhavGPT to explain, which sends the explanatio
   assert.match(app, /const askFromWidget = \(content\) => \{[\s\S]*?if \(busyRef\.current \|\| busy\) \{[\s\S]*?setQueue\([\s\S]*?void startTurn\(content, \[\]\);/);
 });
 
-test("on phones the widgets tighten, shorten the card, stack their actions and keep 44px touch targets", () => {
+test("both widgets, their cards and their end screens are locked to one size, whatever their text", async () => {
+  const render = await renderWidgets();
+  const cards = render.flashcards(parseStudyBlock("flashcards", DECK));
+  const quiz = render.quiz(parseStudyBlock("quiz", QUIZ));
+  assert.match(cards, /<section class="study-widget-container study-widget interactive-flashcards flashcards"/);
+  assert.match(quiz, /<section class="study-widget-container study-widget interactive-quiz quiz"/);
+  assert.match(cards, /<div class="study-widget__body"><p class="study-widget__counter" aria-live="polite">Card 1 of 3<\/p><button type="button" class="flashcards__card"/, "counter, then the card slot");
+  assert.match(cards, /<div class="flashcards__controls">.*<p class="study-widget__tally" aria-live="polite"> <\/p><\/div>/, "the controls area keeps a line for the running count");
+  assert.match(quiz, /<div class="study-widget__body"><p class="study-widget__counter" aria-live="polite">Question 1 of 2<\/p><div class="quiz__card"><p class="quiz__question">/, "the question, its options and feedback share one card");
+  // The end screens take the same slot as the card they replace.
+  const flashcardsSource = read("frontend/src/components/InteractiveFlashcards.jsx");
+  assert.match(flashcardsSource, /className="study-widget__summary deck-complete flashcards-complete" role="status"/);
+  assert.match(flashcardsSource, /\{state\.finished \? "Deck complete" : `Card \$\{state\.position \+ 1\} of \$\{total\}`\}/);
+  assert.match(read("frontend/src/components/InteractiveQuiz.jsx"), /className="study-widget__summary quiz-summary" role="status"/);
+
+  const css = read("frontend/src/study-widgets.css");
+  const rule = (selectorList) => css.match(new RegExp(`${selectorList.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`))?.[1] ?? "";
+  const width = rule(".study-widget-container,\n.interactive-flashcards,\n.interactive-quiz,\n.deck-complete,\n.flashcards-complete,\n.quiz-summary");
+  for (const declaration of ["width: 100% !important;", "max-width: 680px !important;", "min-width: 100% !important;", "box-sizing: border-box !important;", "align-self: stretch !important;"]) assert.ok(width.includes(declaration), declaration);
+  const height = rule(".flashcards__card,\n.quiz__card,\n.deck-complete,\n.flashcards-complete,\n.quiz-summary");
+  for (const declaration of ["height: 320px !important;", "min-height: 320px !important;", "max-height: 320px !important;"]) assert.ok(height.includes(declaration), declaration);
+  assert.match(css, /\.bubble:has\(\.study-widget-container, \.diagram-viewer\),\n\.prose:has\(\.study-widget-container, \.diagram-viewer\) \{ width: 100% !important; max-width: 100% !important; \}/, "the reply no longer shrinks to its text");
+  assert.match(rule(".deck-complete,\n.flashcards-complete,\n.quiz-summary,\n.quiz__card"), /display: flex; flex-direction: column; justify-content: safe center;[^]*overflow-y: auto;/, "centred, and long text scrolls inside instead of growing the box");
+  assert.match(css, /\.flashcards__controls \{[^}]*height: 140px;/, "the controls keep one height");
+  assert.match(css, /\.flashcards__face \{[^}]*justify-content: safe center;[^}]*overflow-y: auto;/);
+  assert.match(css, /\.study-widget--pending \{[^}]*width: 100%; max-width: 680px; min-height: 120px;/, "the placeholder is as wide as its widget");
+});
+
+test("on phones the widgets tighten and stack their actions, keep 44px touch targets, and keep the same 320px card", () => {
   const css = read("frontend/src/study-widgets.css");
   const phone = css.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/)?.[1];
   assert.ok(phone, "a phone layout");
-  assert.match(phone, /\.flashcards__card \{ height: 240px; \}/);
+  assert.doesNotMatch(phone, /\.flashcards__card \{ height:/, "the card keeps its locked 320px on phones too");
+  assert.match(phone, /\.flashcards__controls \{ height: 156px; \}/, "room for the taller touch targets, still fixed");
   assert.match(phone, /\.flashcards__mark, \.quiz__option \{ min-height: 48px; \}/);
   assert.match(phone, /\.study-widget__icon \{ width: 44px; height: 44px; \}/);
   assert.match(phone, /\.study-widget__nav \.btn, \.study-widget__actions \.btn, \.quiz__feedback-actions \.btn \{ min-height: 44px;/);

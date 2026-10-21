@@ -181,3 +181,66 @@
 
 .compare__table { table-layout: fixed; }
 .compare__table thead td { width: 34%; border-bottom: 0; }
+
+/* --- The public /pricing page's sky (PublicPricing) -------------------------
+
+   The landing page's night carried over: a starfield, two orbit rings and
+   the planets as faint silhouettes in the corners. All of it sits in one
+   fixed, decorative layer behind the page, so it never moves under the
+   plans or takes a click; the rate card and the comparison table keep near
+   solid surfaces, so prices and text stay crisp in both skies. */
+.pricing-cosmos { position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; }
+.pricing-cosmos__sky { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.pricing-cosmos__stars {
+  position: absolute; inset: 0; opacity: 0.55;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1px 1px at 28% 72%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 44% 34%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1px 1px at 61% 86%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1px 1px at 73% 22%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1.5px 1.5px at 86% 58%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1px 1px at 93% 12%, var(--color-ink) 50%, transparent 51%),
+    radial-gradient(1px 1px at 6% 52%, var(--color-ink) 50%, transparent 51%);
+  background-size: 640px 640px;
+}
+.pricing-cosmos__orbit {
+  position: absolute; border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+.pricing-cosmos__orbit--one { width: 760px; height: 760px; top: -380px; right: -300px; }
+.pricing-cosmos__orbit--two { width: 1080px; height: 1080px; top: -540px; right: -460px; border-color: color-mix(in srgb, var(--color-accent) 9%, transparent); }
+.pricing-cosmos__planet { position: absolute; display: block; height: auto; user-select: none; }
+.pricing-cosmos__planet--earth { width: 360px; top: -120px; right: -110px; opacity: 0.32; }
+.pricing-cosmos__planet--venus { width: 300px; bottom: -110px; left: -120px; opacity: 0.22; }
+.pricing-cosmos__planet--mars { width: 120px; top: 46%; left: 3%; opacity: 0.2; }
+:root[data-theme="light"] .pricing-cosmos__stars { opacity: 0.22; }
+:root[data-theme="light"] .pricing-cosmos__planet { opacity: 0.16; }
+
+/* Readable surfaces over the sky. */
+.pricing-cosmos .plans.rate-card {
+  background: color-mix(in srgb, var(--color-paper-2) 95%, transparent);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--color-paper) 55%, transparent);
+}
+.pricing-cosmos .compare__scroll {
+  padding: var(--space-sm) var(--space-md);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-paper-2) 94%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pricing-cosmos__planet--earth { animation: pricing-drift 26s ease-in-out infinite; }
+  .pricing-cosmos__planet--venus { animation: pricing-drift 32s ease-in-out -9s infinite; }
+}
+@keyframes pricing-drift { 50% { translate: 0 -10px; } }
+
+@media (max-width: 760px) {
+  .pricing-cosmos__planet--earth { width: 200px; top: -70px; right: -80px; opacity: 0.24; }
+  .pricing-cosmos__planet--venus { width: 170px; bottom: -70px; left: -80px; opacity: 0.16; }
+  .pricing-cosmos__planet--mars, .pricing-cosmos__orbit--two { display: none; }
+  .pricing-cosmos__orbit--one { width: 440px; height: 440px; top: -220px; right: -200px; }
+  .pricing-cosmos .compare__scroll { padding: var(--space-xs) var(--space-sm); }
+}

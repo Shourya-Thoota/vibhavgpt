@@ -42,6 +42,14 @@ export function appendStudyNote(metadata, note) {
   return { ...(metadata ?? {}), studyResults: [...previous, note].slice(-MAX_NOTES_PER_REPLY) };
 }
 
+// An image reply carries the prompt the image was made from, so a later turn
+// on any model knows what the picture shows.
+export function withImagePrompts(history = []) {
+  return history.map((message) => (message?.role === "assistant" && typeof message.imagePrompt === "string" && message.imagePrompt
+    ? { ...message, content: `${message.content}\n\n[Image prompt: ${message.imagePrompt}]` }
+    : message));
+}
+
 // The history each model sees: a reply carries what the learner did with it.
 export function withStudyResults(history = []) {
   return history.map((message) => (message?.role === "assistant" && Array.isArray(message.studyResults) && message.studyResults.length
