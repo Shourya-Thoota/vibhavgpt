@@ -19,7 +19,7 @@ export default function InteractiveFlashcards({ deck }) {
   };
 
   return (
-    <section className="study-widget flashcards" aria-label={title || "Flashcards"} onKeyDown={onKeyDown}>
+    <section className="study-widget-container study-widget interactive-flashcards flashcards" aria-label={title || "Flashcards"} onKeyDown={onKeyDown}>
       <header className="study-widget__head">
         <span className="study-widget__eyebrow">Flashcards</span>
         {title && <h3 className="study-widget__title">{title}</h3>}
@@ -28,6 +28,7 @@ export default function InteractiveFlashcards({ deck }) {
         </div>
       </header>
 
+      <div className="study-widget__body">
       {state.finished ? (
         <div className="study-widget__summary" role="status">
           <p className="study-widget__summary-title">Deck complete</p>
@@ -75,6 +76,7 @@ export default function InteractiveFlashcards({ deck }) {
           {(known > 0 || learning > 0) && <p className="study-widget__tally">Know it: {known} · Still learning: {learning}</p>}
         </>
       )}
+      </div>
     </section>
   );
 }

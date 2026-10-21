@@ -121,6 +121,11 @@ export function quizScore(questions, answers) {
   return questions.reduce((score, item, index) => score + (answers[index] === item.answer ? 1 : 0), 0);
 }
 
+// What "Ask VibhavGPT to explain" sends after a wrong answer.
+export function explainMessage(item, chosen) {
+  return `Can you explain why the correct answer to "${item.question}" is "${item.options[item.answer]}", and why "${item.options[chosen]}" is incorrect?`;
+}
+
 export function scoreMessage(score, total) {
   if (total && score === total) return `You got ${score}/${total} correct! 🎉`;
   if (total && score / total >= 0.6) return `You got ${score}/${total} correct. Nice work!`;

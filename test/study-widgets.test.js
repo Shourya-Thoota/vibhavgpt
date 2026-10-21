@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createRequire } from "node:module";
 import {
-  deckReducer, deckSummary, initialDeck, initialQuiz, parseStudyBlock, quizReducer, quizScore, scoreMessage, STUDY_BLOCK_LANGUAGES,
+  deckReducer, deckSummary, explainMessage, initialDeck, initialQuiz, parseStudyBlock, quizReducer, quizScore, scoreMessage, STUDY_BLOCK_LANGUAGES,
 } from "../frontend/src/study-widgets.js";
 
 // Flashcards and quizzes in a reply arrive as ```flashcards and ```quiz JSON
@@ -105,7 +105,9 @@ async function renderWidgets() {
     stdin: {
       contents: `import { renderToStaticMarkup } from "react-dom/server";
         import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
-        import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
+        import InteractiveQuiz, { QuizFeedback } from "./components/InteractiveQuiz.jsx";
+        export { QuizFeedback };
+        export const feedback = (props) => renderToStaticMarkup(<QuizFeedback {...props} />);
         export const flashcards = (deck) => renderToStaticMarkup(<InteractiveFlashcards deck={deck} />);
         export const quiz = (quiz) => renderToStaticMarkup(<InteractiveQuiz quiz={quiz} />);`,
       resolveDir: new URL("../frontend/src/", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
@@ -128,7 +130,7 @@ async function renderWidgets() {
 test("the flashcards and quiz components render their first card and question", async () => {
   const render = await renderWidgets();
   const cards = render.flashcards(parseStudyBlock("flashcards", DECK));
-  assert.match(cards, /<section class="study-widget flashcards" aria-label="Cell biology"/);
+  assert.match(cards, /<section class="study-widget-container study-widget interactive-flashcards flashcards" aria-label="Cell biology"/);
   assert.match(cards, /Card 1 of 3/);
   assert.match(cards, /role="progressbar"[^>]*aria-valuemax="3"[^>]*aria-valuenow="0"/);
   assert.match(cards, /<button type="button" class="flashcards__card" aria-pressed="false" aria-label="Question: Mitosis\. Press to see the answer\.">/, "the card is a button, so Space and Enter flip it");
@@ -171,4 +173,67 @@ test("Study and Chat tell the model to write study aids as these blocks", async 
   // The block's sample shapes are valid input for the parser.
   assert.ok(parseStudyBlock("flashcards", '{"title": "short topic", "cards": [{"front": "term or question", "back": "answer or definition"}]}'));
   assert.ok(parseStudyBlock("quiz", '{"title": "short topic", "questions": [{"question": "...", "options": ["...", "...", "...", "..."], "answer": 0, "explanation": "why the answer is right"}]}'));
+});
+
+test("both widgets span the reply in one stable frame, whatever their text", async () => {
+  const render = await renderWidgets();
+  const cards = render.flashcards(parseStudyBlock("flashcards", DECK));
+  const quiz = render.quiz(parseStudyBlock("quiz", QUIZ));
+  assert.match(cards, /<section class="study-widget-container study-widget interactive-flashcards flashcards"/);
+  assert.match(quiz, /<section class="study-widget-container study-widget interactive-quiz quiz"/);
+  for (const html of [cards, quiz]) assert.match(html, /<\/header><div class="study-widget__body">/, "the body under the header holds the footprint");
+  const css = read("frontend/src/study-widgets.css");
+  assert.match(css, /\.study-widget-container,\n\.interactive-flashcards,\n\.interactive-quiz \{ width: 100%; max-width: 680px; box-sizing: border-box; \}/);
+  assert.match(css, /\.study-widget__body \{ display: flex; flex-direction: column; min-height: 440px; \}/);
+  assert.match(css, /\.flashcards__card \{\n  display: block; width: 100%; height: 300px;/, "one card height for every card, front and back");
+  assert.match(css, /\.flashcards__face \{[^}]*overflow-y: auto;/, "long text scrolls inside the card instead of growing it");
+  assert.doesNotMatch(css, /\.flashcards__card \{[^}]*min-height/, "not a minimum that text could stretch");
+  assert.match(css, /\.study-widget--pending \{[^}]*width: 100%; max-width: 680px; min-height: 120px;/, "the placeholder is as wide as its widget");
+});
+
+test("a wrong answer offers Ask VibhavGPT to explain, which sends the explanation request once", async () => {
+  const render = await renderWidgets();
+  const item = parseStudyBlock("quiz", QUIZ).questions[0];
+  assert.equal(explainMessage(item, 2), 'Can you explain why the correct answer to "What does mitosis produce?" is "Two identical cells", and why "One cell" is incorrect?');
+  const wrong = render.feedback({ item, chosen: 2, last: false, onAsk: () => {}, onNext: () => {} });
+  assert.match(wrong, /class="btn btn--secondary quiz__ask"[^>]*>.*Ask VibhavGPT to explain<\/button><button type="button" class="btn btn--primary">Next question<\/button>/, "next to Next question");
+  assert.doesNotMatch(render.feedback({ item, chosen: 0, last: false, onAsk: () => {}, onNext: () => {} }), /quiz__ask/, "not after a right answer");
+  assert.doesNotMatch(render.feedback({ item, chosen: 2, last: false, onNext: () => {} }), /quiz__ask/, "not where the reply cannot be continued");
+  assert.match(render.feedback({ item, chosen: 2, last: true, asked: true, onAsk: () => {}, onNext: () => {} }), /disabled=""[^>]*>.*Asked VibhavGPT<\/button>.*See your score/, "once asked, it says so");
+
+  // The button's own click handler, called directly: it marks the question
+  // as asked and sends exactly the explanation request.
+  const sent = [];
+  let marked = 0;
+  const find = (node) => {
+    if (!node || typeof node !== "object") return null;
+    if (Array.isArray(node)) return node.map(find).find(Boolean) ?? null;
+    if (String(node.props?.className ?? "").includes("quiz__ask")) return node;
+    return find(node.props?.children);
+  };
+  const button = find(render.QuizFeedback({ item, chosen: 2, last: false, asked: false, onAsk: (text) => sent.push(text), onAsked: () => { marked += 1; }, onNext: () => {} }));
+  assert.ok(button, "the button is in the panel");
+  button.props.onClick();
+  assert.deepEqual(sent, [explainMessage(item, 2)]);
+  assert.equal(marked, 1);
+  find(render.QuizFeedback({ item, chosen: 2, last: false, asked: true, onAsk: (text) => sent.push(text), onNext: () => {} })).props.onClick();
+  assert.equal(sent.length, 1, "a second click sends nothing");
+
+  // In the app, the quiz in a saved reply sends through the chat's own queue.
+  const app = read("frontend/src/App.jsx");
+  assert.match(app, /if \(parsed\?\.kind === "quiz"\) return <InteractiveQuiz quiz=\{parsed\} onAsk=\{onAsk\} \/>;/);
+  assert.match(app, /onAsk=\{askFromWidget\}/);
+  assert.match(app, /const askFromWidget = \(content\) => \{[\s\S]*?if \(busyRef\.current \|\| busy\) \{[\s\S]*?setQueue\([\s\S]*?void startTurn\(content, \[\]\);/);
+});
+
+test("on phones the widgets tighten, shorten the card, stack their actions and keep 44px touch targets", () => {
+  const css = read("frontend/src/study-widgets.css");
+  const phone = css.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(phone, "a phone layout");
+  assert.match(phone, /\.flashcards__card \{ height: 240px; \}/);
+  assert.match(phone, /\.flashcards__mark, \.quiz__option \{ min-height: 48px; \}/);
+  assert.match(phone, /\.study-widget__icon \{ width: 44px; height: 44px; \}/);
+  assert.match(phone, /\.study-widget__nav \.btn, \.study-widget__actions \.btn, \.quiz__feedback-actions \.btn \{ min-height: 44px;/);
+  assert.match(phone, /\.study-widget__actions, \.quiz__feedback-actions \{ flex-direction: column; align-items: stretch; width: 100%; \}/);
+  assert.match(css, /font-size: clamp\(/, "fluid type");
 });

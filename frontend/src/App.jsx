@@ -2135,15 +2135,19 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
 
 // Whether the reply around a block has finished arriving (AssistantBody).
 const ReplySettledContext = createContext(true);
+// Sends a follow-up message from a widget (a quiz's "Ask VibhavGPT to
+// explain"); null where replies are only shown, not continued.
+const ReplyAskContext = createContext(null);
 
 // A ```flashcards or ```quiz block (study-widgets.js) becomes its widget.
 // Until it parses, a reply still arriving shows a placeholder; a finished
 // reply whose block never parsed shows it as ordinary code.
 function StudyBlock({ language, text, fallback }) {
   const settled = useContext(ReplySettledContext);
+  const onAsk = useContext(ReplyAskContext);
   const parsed = useMemo(() => parseStudyBlock(language, text), [language, text]);
   if (parsed?.kind === "flashcards") return <InteractiveFlashcards deck={parsed} />;
-  if (parsed?.kind === "quiz") return <InteractiveQuiz quiz={parsed} />;
+  if (parsed?.kind === "quiz") return <InteractiveQuiz quiz={parsed} onAsk={onAsk} />;
   if (!settled) return <div className="study-widget study-widget--pending" role="status">{language === "quiz" ? "Preparing your quiz..." : "Preparing your flashcards..."}</div>;
   return fallback;
 }
@@ -2187,8 +2191,9 @@ function CodeBlock({ inline, className, children, ...props }) {
   return STUDY_BLOCK_LANGUAGES.has(language.toLowerCase()) ? <StudyBlock language={language.toLowerCase()} text={text} fallback={block} /> : block;
 }
 
-// `streaming`: the reply is still arriving from the server.
-function AssistantBody({ text, animate, onTick, streaming = false }) {
+// `streaming`: the reply is still arriving from the server. `onAsk` lets
+// its widgets send a follow-up message.
+function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null }) {
   const { shown, done } = useTypewriter(text, { enabled: animate, onTick });
   const settled = !streaming && (!animate || done);
   // Models sometimes use HTML line-break tags. Convert only that harmless
@@ -2197,6 +2202,7 @@ function AssistantBody({ text, animate, onTick, streaming = false }) {
   const rendered = protectPlainDollarSigns(normalizeTexDelimiters(shown).replace(/<br\s*\/?\s*>/gi, "  \n"));
   return (
     <ReplySettledContext.Provider value={settled}>
+    <ReplyAskContext.Provider value={onAsk}>
     <div className="prose" data-typing={animate && !done ? "true" : undefined}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }] ]}
@@ -2213,6 +2219,7 @@ function AssistantBody({ text, animate, onTick, streaming = false }) {
         {rendered}
       </ReactMarkdown>
     </div>
+    </ReplyAskContext.Provider>
     </ReplySettledContext.Provider>
   );
 }
@@ -2722,6 +2729,20 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     await startTurn(content, selectedAttachments);
   }
 
+  // A follow-up sent from a widget in a reply (a quiz's "Ask VibhavGPT to
+  // explain"): queued like a typed message while a reply is still coming in.
+  // The widget's own state is untouched, since the reply it lives in stays.
+  const askFromWidget = (content) => {
+    setSendPulse((count) => count + 1);
+    if (busyRef.current || busy) {
+      queueId.current += 1;
+      setQueue((current) => [...current, { id: queueId.current, content, attachments: [] }]);
+      requestAnimationFrame(() => stickToBottom());
+      return;
+    }
+    void startTurn(content, []);
+  };
+
   function startTurn(content, selectedAttachments) {
     setFailed(null);
     setMessages((current) => [
@@ -2963,6 +2984,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                       text={message.content}
                       animate={Boolean(message.fresh) && index === messages.length - 1}
                       onTick={stickToBottom}
+                      onAsk={askFromWidget}
                     />
                     {message.incomplete && <p className="response-interrupted" role="status">Response interrupted. This partial answer is not saved; retry for a complete response.</p>}
                     <SourcesDisclosure sources={message.sources ?? []} steps={message.activitySummary ?? []} />
