@@ -1,0 +1,41 @@
+/* Mermaid diagrams inside replies (components/DiagramViewer.jsx). Theme
+   tokens only; the diagram's own colours come from the same tokens. */
+
+.diagram-viewer {
+  width: 100%;
+  margin: var(--space-md) 0;
+  box-sizing: border-box;
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-2);
+  overflow: hidden;
+}
+.diagram-viewer__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--color-rule); }
+.diagram-viewer__label { margin-right: auto; color: var(--color-accent); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+.diagram-viewer__action {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--color-rule); border-radius: 999px; color: var(--color-ink); font-size: 0.8rem;
+  transition: background-color 160ms ease;
+}
+.diagram-viewer__action:hover:not(:disabled) { background: var(--color-accent-soft); }
+.diagram-viewer__action:disabled { opacity: 0.45; }
+/* Wide diagrams scroll sideways inside the reply instead of widening it. */
+.diagram-viewer__canvas { display: grid; place-items: center; min-height: 160px; padding: var(--space-md); overflow: auto; }
+.diagram-viewer__canvas svg { max-width: 100%; height: auto; }
+.diagram-viewer__canvas--loading,
+.diagram-viewer--pending { color: var(--color-muted); font-size: 0.9rem; }
+.diagram-viewer--pending { display: flex; align-items: center; min-height: 120px; padding: var(--space-md); }
+
+.diagram-viewer__zoom { display: flex; align-items: center; gap: 6px; margin-top: var(--space-sm); }
+.diagram-viewer__zoom-level { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; color: var(--color-muted); font-size: 0.85rem; }
+.diagram-viewer__stage { max-height: min(70vh, 720px); margin-top: var(--space-sm); overflow: auto; border: 1px solid var(--color-rule); border-radius: 14px; background: var(--color-paper-2); }
+.diagram-viewer__zoomed { width: max-content; min-width: 100%; padding: var(--space-md); transform-origin: top left; transition: scale 160ms ease; }
+.diagram-viewer__zoomed svg { max-width: none; height: auto; }
+
+@media (max-width: 640px) {
+  .diagram-viewer__action { min-height: 44px; }
+  .diagram-viewer__canvas { padding: var(--space-sm); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .diagram-viewer__zoomed, .diagram-viewer__action { transition: none; }
+}

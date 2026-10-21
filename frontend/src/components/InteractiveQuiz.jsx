@@ -1,6 +1,6 @@
-import { useReducer, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { Check, MessageCircleQuestion, RotateCcw, X } from "lucide-react";
-import { explainMessage, initialQuiz, quizReducer, quizScore, scoreMessage } from "../study-widgets.js";
+import { explainMessage, initialQuiz, quizReducer, quizResult, quizScore, scoreMessage } from "../study-widgets.js";
 import "../study-widgets.css";
 
 // A quiz from a ```quiz block (study-widgets.js), one question at a time.
@@ -8,9 +8,18 @@ import "../study-widgets.css";
 // wrong choice turns red with a cross, and the explanation appears. After a
 // wrong answer, "Ask VibhavGPT to explain" sends a follow-up into the chat
 // (`onAsk`); the quiz keeps its place while the reply comes in.
-export default function InteractiveQuiz({ quiz, onAsk = null }) {
+// When the quiz is finished, `onResult` hears the score and the missed
+// questions, once per attempt.
+export default function InteractiveQuiz({ quiz, onAsk = null, onResult = null }) {
   const { questions, title } = quiz;
   const [state, dispatch] = useReducer(quizReducer, undefined, initialQuiz);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!state.finished) { reported.current = false; return; }
+    if (reported.current || !onResult) return;
+    reported.current = true;
+    onResult(quizResult(quiz, state.answers));
+  }, [state, quiz, onResult]);
   const [asked, setAsked] = useState({});
   const total = questions.length;
   const item = questions[state.position];

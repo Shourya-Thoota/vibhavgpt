@@ -10,7 +10,8 @@ import { checkModeration } from "./moderation.js";
 import { callModelStreaming, callModelWithFallback, getModelConfig, IMAGE_DISPLAY_NAME, InferenceUnavailableError } from "./providers.js";
 import { buildIdentitySystemPrompt, buildPreferenceSystemPrompt } from "./prompts.js";
 import { buildProductKnowledgeAddendum, buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
-import { deleteConversation, listConversations, loadConversation, markReplyMissing, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
+import { deleteConversation, listConversations, loadConversation, markReplyMissing, recordStudyResult, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
+import { studyResultNote, withStudyResults } from "./study-results.js";
 import { buildMemorySystemPrompt, buildRelevantMemoryContext, extractAndSaveFacts, getFacts, saveMemoryFromChat, vendorNamePattern } from "../memory/service.js";
 import { config } from "../config.js";
 import { providerNameTerms } from "../security/provider-names.js";
@@ -341,6 +342,20 @@ chatRouter.patch("/conversations/:id", requireSession, async (req, res, next) =>
   }
 });
 
+// A finished flashcard review or quiz, kept with the reply it came from so
+// later turns (on any model) know how the learner did (study-results.js).
+chatRouter.post("/conversations/:id/messages/:messageId/study-results", requireSession, async (req, res, next) => {
+  try {
+    if (!UUID_PATTERN.test(req.params.id) || !UUID_PATTERN.test(req.params.messageId)) return res.status(400).json({ error: "Invalid message." });
+    const note = studyResultNote(req.body);
+    if (!note) return res.status(400).json({ error: "Invalid study result." });
+    const saved = await recordStudyResult(req.authSession.user.id, req.params.id, req.params.messageId, note);
+    return saved ? res.status(204).end() : res.status(404).json({ error: "Message not found." });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 chatRouter.delete("/conversations/:id", requireSession, async (req, res, next) => {
   try {
     if (!UUID_PATTERN.test(req.params.id)) return res.status(400).json({ error: "Invalid conversation." });
@@ -597,7 +612,9 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
         ? [{ type: "text", text: userText }, ...(await imageContentParts(attachedFiles))]
         : userText,
     };
-    const contextOptions = { systemMessages, history, referenceMessages, currentMessage };
+    // The whole saved conversation goes to whichever model answers, with what
+    // the learner did with each reply's flashcards or quiz.
+    const contextOptions = { systemMessages, history: withStudyResults(history), referenceMessages, currentMessage };
     const fittedContext = fitConversationContext(contextOptions);
     if (!fittedContext.ok) {
       console.warn(JSON.stringify({ event: "chat_context_exceeds_budget", requestId: req.chatRequestId ?? null, estimatedTokens: fittedContext.estimatedTokens, maxInputTokens: fittedContext.maxInputTokens, historyMessages: fittedContext.historyMessages ?? history.length }));
@@ -855,6 +872,8 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
 
     return {
       conversationId: saved.conversationId,
+      // The saved reply, so its flashcards or quiz can report their result.
+      messageId: saved.messages.at(-1)?.id ?? null,
       reply,
       model: getModelConfig(modelKey).displayName,
       webSearched: Boolean(search),

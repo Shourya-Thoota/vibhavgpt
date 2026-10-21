@@ -48,6 +48,8 @@ import { updateStatusLabel, updateStore } from "./desktop-updates.js";
 import { parseStudyBlock, STUDY_BLOCK_LANGUAGES } from "./study-widgets.js";
 import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
 import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
+import DiagramViewer from "./components/DiagramViewer.jsx";
+import { isDiagramLanguage } from "./diagrams.js";
 import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
 import { usagePercentage, combinedTokenUsage } from "./usage-percentage.js";
 import { interruptedStreamMessage } from "./stream-recovery.js";
@@ -2138,6 +2140,9 @@ const ReplySettledContext = createContext(true);
 // Sends a follow-up message from a widget (a quiz's "Ask VibhavGPT to
 // explain"); null where replies are only shown, not continued.
 const ReplyAskContext = createContext(null);
+// Records a finished flashcard review or quiz with its reply, so later turns
+// know how it went (src/chat/study-results.js); null where nothing is saved.
+const ReplyResultContext = createContext(null);
 
 // A ```flashcards or ```quiz block (study-widgets.js) becomes its widget.
 // Until it parses, a reply still arriving shows a placeholder; a finished
@@ -2145,11 +2150,18 @@ const ReplyAskContext = createContext(null);
 function StudyBlock({ language, text, fallback }) {
   const settled = useContext(ReplySettledContext);
   const onAsk = useContext(ReplyAskContext);
+  const onResult = useContext(ReplyResultContext);
   const parsed = useMemo(() => parseStudyBlock(language, text), [language, text]);
-  if (parsed?.kind === "flashcards") return <InteractiveFlashcards deck={parsed} />;
-  if (parsed?.kind === "quiz") return <InteractiveQuiz quiz={parsed} onAsk={onAsk} />;
+  if (parsed?.kind === "flashcards") return <InteractiveFlashcards deck={parsed} onResult={onResult} />;
+  if (parsed?.kind === "quiz") return <InteractiveQuiz quiz={parsed} onAsk={onAsk} onResult={onResult} />;
   if (!settled) return <div className="study-widget study-widget--pending" role="status">{language === "quiz" ? "Preparing your quiz..." : "Preparing your flashcards..."}</div>;
   return fallback;
+}
+
+// A ```mermaid block (diagrams.js) is drawn once its reply has arrived.
+function DiagramBlock({ text, fallback }) {
+  const settled = useContext(ReplySettledContext);
+  return <DiagramViewer source={text} settled={settled} fallback={fallback} />;
 }
 
 function CodeBlock({ inline, className, children, ...props }) {
@@ -2188,12 +2200,13 @@ function CodeBlock({ inline, className, children, ...props }) {
       <pre><code className={code.props.className}>{code.props.children}</code></pre>
     </div>
   );
+  if (isDiagramLanguage(language)) return <DiagramBlock text={text} fallback={block} />;
   return STUDY_BLOCK_LANGUAGES.has(language.toLowerCase()) ? <StudyBlock language={language.toLowerCase()} text={text} fallback={block} /> : block;
 }
 
 // `streaming`: the reply is still arriving from the server. `onAsk` lets
 // its widgets send a follow-up message.
-function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null }) {
+function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null, onStudyResult = null }) {
   const { shown, done } = useTypewriter(text, { enabled: animate, onTick });
   const settled = !streaming && (!animate || done);
   // Models sometimes use HTML line-break tags. Convert only that harmless
@@ -2203,6 +2216,7 @@ function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null 
   return (
     <ReplySettledContext.Provider value={settled}>
     <ReplyAskContext.Provider value={onAsk}>
+    <ReplyResultContext.Provider value={onStudyResult}>
     <div className="prose" data-typing={animate && !done ? "true" : undefined}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }] ]}
@@ -2219,6 +2233,7 @@ function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null 
         {rendered}
       </ReactMarkdown>
     </div>
+    </ReplyResultContext.Provider>
     </ReplyAskContext.Provider>
     </ReplySettledContext.Provider>
   );
@@ -2345,6 +2360,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         setModel(conversationModel);
         onModelChange?.(conversationModel);
         setMessages((result.history ?? []).map((message) => ({
+          id: message.id ?? null,
           role: message.role,
           content: message.content,
           attachment: message.attachment ?? null,
@@ -2652,7 +2668,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       if (mountedRef.current) setMessages((current) => [
         ...current,
         // A reply already read as it streamed isn't typed out a second time.
-        { role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny,
+        { id: reply.messageId ?? null, role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny,
           // No shown thinking (empty, or all rule-checking that was scrubbed):
           // no "Thought for X s" pill or drawer for this reply.
           reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined, thoughtSeconds: reasoningSoFar.trim() ? (reply.thoughtSeconds ?? null) : null },
@@ -2741,6 +2757,13 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       return;
     }
     void startTurn(content, []);
+  };
+
+  // A finished flashcard review or quiz is kept with its reply, so the next
+  // turn, on whichever model, knows how it went. Best effort: a failure here
+  // never interrupts the learner.
+  const recordStudyResult = (messageId, result) => {
+    api(`/api/chat/conversations/${conversationId}/messages/${messageId}/study-results`, { method: "POST", body: JSON.stringify(result) }).catch(() => {});
   };
 
   function startTurn(content, selectedAttachments) {
@@ -2985,6 +3008,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                       animate={Boolean(message.fresh) && index === messages.length - 1}
                       onTick={stickToBottom}
                       onAsk={askFromWidget}
+                      onStudyResult={message.id && conversationId ? (result) => recordStudyResult(message.id, result) : null}
                     />
                     {message.incomplete && <p className="response-interrupted" role="status">Response interrupted. This partial answer is not saved; retry for a complete response.</p>}
                     <SourcesDisclosure sources={message.sources ?? []} steps={message.activitySummary ?? []} />

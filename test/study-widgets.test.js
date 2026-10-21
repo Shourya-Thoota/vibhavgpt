@@ -221,7 +221,7 @@ test("a wrong answer offers Ask VibhavGPT to explain, which sends the explanatio
 
   // In the app, the quiz in a saved reply sends through the chat's own queue.
   const app = read("frontend/src/App.jsx");
-  assert.match(app, /if \(parsed\?\.kind === "quiz"\) return <InteractiveQuiz quiz=\{parsed\} onAsk=\{onAsk\} \/>;/);
+  assert.match(app, /if \(parsed\?\.kind === "quiz"\) return <InteractiveQuiz quiz=\{parsed\} onAsk=\{onAsk\} onResult=\{onResult\} \/>;/);
   assert.match(app, /onAsk=\{askFromWidget\}/);
   assert.match(app, /const askFromWidget = \(content\) => \{[\s\S]*?if \(busyRef\.current \|\| busy\) \{[\s\S]*?setQueue\([\s\S]*?void startTurn\(content, \[\]\);/);
 });

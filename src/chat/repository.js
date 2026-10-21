@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { attachments, conversations, messages } from "../db/schema.js";
 import { removeFiles } from "../uploads/service.js";
+import { appendStudyNote } from "./study-results.js";
 
 const wholeSeconds = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
 
@@ -69,6 +70,9 @@ export async function loadConversation(userId, conversationId) {
     // available after a reload just like sources.
     message.activitySummary = persisted.activitySummary;
     message.thoughtSeconds = persisted.thoughtSeconds;
+    // What the learner did with this reply's flashcards or quiz
+    // (study-results.js), for the model's context.
+    message.studyResults = Array.isArray(message.metadata?.studyResults) ? message.metadata.studyResults.filter((note) => typeof note === "string") : [];
     delete message.metadata;
   }
 
@@ -191,6 +195,22 @@ export async function saveUserMessage({ userId, conversationId, modelKey, conten
 // "interrupted" (the user left), with the request's reference id. The message
 // itself is kept. A message that was answered after all (a step after the
 // reply was saved failed) is left alone.
+// Keeps a study result (study-results.js) with one of the user's own replies.
+// Returns false when the reply is not theirs, or is not a reply.
+export async function recordStudyResult(userId, conversationId, messageId, note) {
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .select({ id: messages.id, metadata: messages.metadata })
+      .from(messages)
+      .innerJoin(conversations, eq(conversations.id, messages.conversationId))
+      .where(and(eq(messages.id, messageId), eq(messages.conversationId, conversationId), eq(messages.role, "assistant"), eq(conversations.userId, userId)))
+      .limit(1);
+    if (!row) return false;
+    await tx.update(messages).set({ metadata: appendStudyNote(row.metadata, note) }).where(eq(messages.id, row.id));
+    return true;
+  });
+}
+
 export async function markReplyMissing(messageId, replyStatus, requestId) {
   await db.update(messages)
     .set({ metadata: { replyStatus, requestId } })
