@@ -121,6 +121,21 @@ export function quizScore(questions, answers) {
   return questions.reduce((score, item, index) => score + (answers[index] === item.answer ? 1 : 0), 0);
 }
 
+// What a finished widget reports to the conversation (the server turns it
+// into a short note for the model: src/chat/study-results.js).
+export function deckResult(deck, state) {
+  const { known, learning } = deckSummary(state);
+  return { kind: "flashcards", title: deck.title, total: state.order.length, known, learning };
+}
+
+export function quizResult(quiz, answers) {
+  const missed = quiz.questions
+    .map((item, index) => ({ item, chosen: answers[index] }))
+    .filter(({ item, chosen }) => chosen !== undefined && chosen !== item.answer)
+    .map(({ item, chosen }) => ({ question: item.question, chosen: item.options[chosen], correct: item.options[item.answer] }));
+  return { kind: "quiz", title: quiz.title, total: quiz.questions.length, score: quizScore(quiz.questions, answers), missed };
+}
+
 // What "Ask VibhavGPT to explain" sends after a wrong answer.
 export function explainMessage(item, chosen) {
   return `Can you explain why the correct answer to "${item.question}" is "${item.options[item.answer]}", and why "${item.options[chosen]}" is incorrect?`;

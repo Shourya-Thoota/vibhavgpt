@@ -1,13 +1,21 @@
-import { useReducer } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { Check, ChevronLeft, ChevronRight, RotateCcw, Shuffle } from "lucide-react";
-import { deckReducer, deckSummary, initialDeck } from "../study-widgets.js";
+import { deckReducer, deckResult, deckSummary, initialDeck } from "../study-widgets.js";
 import "../study-widgets.css";
 
 // A deck from a ```flashcards block (study-widgets.js). The card is a button:
 // a click, Space or Enter flips it; the arrow keys move through the deck.
-export default function InteractiveFlashcards({ deck }) {
+// When a run through the deck finishes, `onResult` hears how it went, once.
+export default function InteractiveFlashcards({ deck, onResult = null }) {
   const { cards, title } = deck;
   const [state, dispatch] = useReducer(deckReducer, cards.length, initialDeck);
+  const reported = useRef(false);
+  useEffect(() => {
+    if (!state.finished) { reported.current = false; return; }
+    if (reported.current || !onResult) return;
+    reported.current = true;
+    onResult(deckResult(deck, state));
+  }, [state, deck, onResult]);
   const total = state.order.length;
   const current = cards[state.order[state.position]];
   const { known, learning } = deckSummary(state);
