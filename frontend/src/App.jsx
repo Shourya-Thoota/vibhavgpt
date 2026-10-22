@@ -2116,7 +2116,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           <main className="page page--centered"><TypingDots label="Opening your workspace" /></main>
         ) : page === "chat" ? (
           productMode === "image" ? <ImageWorkspace api={api} />
-          : writingToolsOpen ? <StudyWritingTools api={api} initialTab={writingToolsTab} onBack={() => setStudyView("chat")} />
+          : writingToolsOpen ? <div className="writing-tools-scroll"><StudyWritingTools api={api} initialTab={writingToolsTab} onBack={() => setStudyView("chat")} /></div>
           : renderChat({ mode: productMode, onOpenWritingTools: productMode === "study" ? openWritingTools : undefined })
         ) : page === "memory" ? (
           <Memory onMemoriesAdded={(added) => setMemoryToast(added)} />

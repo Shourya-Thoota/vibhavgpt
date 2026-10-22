@@ -54,7 +54,7 @@ test("the tools render on their own, with no session or document, and a Back to 
   const render = await renderComponents();
   const html = render.tools({ onBack: () => {} });
   assert.match(html, /<button type="button" class="btn btn--secondary writing-tools__back">.*?Back to Study<\/button>/);
-  assert.match(html, /VibhavGPT Writing Tools/);
+  assert.match(html, /<header class="writing-tools__bar"><button type="button" class="btn btn--secondary writing-tools__back">.*?Back to Study<\/button><div role="radiogroup" aria-label="Writing tool"/, "Back and the tool tabs share one bar");
   assert.match(html, /<iframe [^>]*title="AI Detector"/, "the tools load in their own frames, with no session needed");
   assert.doesNotMatch(html, /<script/i);
   assert.doesNotMatch(render.tools({}), /Back to Study/, "no back button without somewhere to go back to");
@@ -70,7 +70,7 @@ test("the chip and the sidebar switch Study to the tools, and Back, New study se
   assert.match(app, /const writingToolsOpen = page === "chat" && productMode === "study" && studyView === "writing";/);
   assert.match(app, /const openWritingTools = \(tab\) => \{\s*setWritingToolsTab\(tab === "humanizer" \? "humanizer" : "detector"\);\s*setStudyView\("writing"\);\s*setSidebarOpen\(false\);\s*go\("chat"\);\s*\};/, "opens at once on the asked-for tool (the Detector by default), and closes the phone drawer");
   assert.match(app, /onOpenWritingTools=\{openWritingTools\}\s*writingToolsActive=\{writingToolsOpen\}/, "the sidebar opens it and shows it active");
-  assert.match(app, /: writingToolsOpen \? <StudyWritingTools api=\{api\} initialTab=\{writingToolsTab\} onBack=\{\(\) => setStudyView\("chat"\)\} \/>/, "Back to Study returns to the study view");
+  assert.match(app, /: writingToolsOpen \? <div className="writing-tools-scroll"><StudyWritingTools api=\{api\} initialTab=\{writingToolsTab\} onBack=\{\(\) => setStudyView\("chat"\)\} \/><\/div>/, "Back to Study returns to the study view");
   assert.match(app, /const newChat = \(\) => \{\s*setStudyView\("chat"\);/, "New study session leaves the tools");
   assert.match(app, /const openConversation = \(conversationId, mode = productMode\) => \{\s*setStudyView\("chat"\);/, "opening a session leaves the tools");
   assert.match(app, /useEffect\(\(\) => \{ if \(productMode !== "study"\) setStudyView\("chat"\); \}, \[productMode\]\);/);
@@ -90,5 +90,5 @@ test("the tools open on whichever tab was chosen, with the other still mounted",
   assert.deepEqual(tabs(render.tools({ initialTab: "humanizer" })), ["detector:none", "humanizer:block"]);
   assert.deepEqual(tabs(render.tools({ initialTab: "detector" })), ["detector:block", "humanizer:none"]);
   assert.deepEqual(tabs(render.tools({})), ["detector:block", "humanizer:none"], "the Detector by default");
-  assert.match(render.tools({ initialTab: "humanizer" }), /<h2 class="writing-tools__title">AI Humanizer<\/h2>/);
+  assert.match(render.tools({ initialTab: "humanizer" }), /data-value="humanizer" aria-checked="true"/, "its tab is the selected one");
 });

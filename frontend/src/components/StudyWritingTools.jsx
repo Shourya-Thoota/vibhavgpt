@@ -59,10 +59,9 @@ export default function StudyWritingTools({ onBack, initialTab = "detector" }) {
   const [tab, setTab] = useState(initialTab === "humanizer" ? "humanizer" : "detector");
   return (
     <section className="writing-tools" aria-label="Writing Tools">
-      <header className="writing-tools__header">
+      {/* One utility bar: Back on the left, the two tools on the right. */}
+      <header className="writing-tools__bar">
         {onBack && <button type="button" className="btn btn--secondary writing-tools__back" onClick={onBack}><ArrowLeft size={15} />Back to Study</button>}
-        <p className="writing-tools__eyebrow">VibhavGPT Writing Tools</p>
-        <h2 className="writing-tools__title">{tab === "detector" ? "AI Detector" : "AI Humanizer"}</h2>
         <Segmented label="Writing tool" value={tab} onChange={setTab} options={[
           { value: "detector", label: "AI Detector", icon: <ScanSearch size={15} /> },
           { value: "humanizer", label: "AI Humanizer", icon: <Wand2 size={15} /> },

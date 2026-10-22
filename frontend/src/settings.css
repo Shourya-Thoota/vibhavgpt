@@ -332,3 +332,21 @@
   .security-passkeys { grid-template-columns: minmax(0, 1fr); }
   .authenticator-enrollment { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* --- Breathing room (desktop and tablet) ------------------------------------
+   More space between the dock and each section, between groups, under
+   group titles, and inside rows, so labels, help text and controls read as
+   separate layers. Phones keep their own tighter layout above. */
+@media (min-width: 761px) {
+  .settings__top { margin-bottom: 40px; }
+  .settings__title { margin-bottom: 20px; }
+  .settings-section__head { margin-bottom: 36px; }
+  .settings-stack { gap: 40px; }
+  .settings-group__head { margin-bottom: 12px; }
+  .settings-group__head p { margin-top: 4px; }
+  .settings-row { gap: 10px 16px; padding: 16px 20px; min-height: 64px; box-sizing: border-box; }
+  .settings-row__text { gap: 4px; }
+  .settings-row__description { line-height: 1.55; }
+  .settings-group__footer { padding: 14px 20px; }
+  .settings__footer { margin-top: 48px; }
+}

@@ -4,20 +4,42 @@
    widgets use their light theme. Nothing clips the frame, so the widget's
    own footer and attribution always show. */
 
+/* Study's main column is fixed to the screen height and clips (the chat
+   brings its own scroller), so the tools get a scroll area of their own:
+   it fills the column and scrolls inside it. */
+.writing-tools-scroll {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule-2) transparent;
+}
+
 .writing-tools {
   width: 100%;
   max-width: 860px;
   margin: 0 auto;
-  padding: var(--space-lg) var(--space-md);
+  /* Little at the top so the card starts high; room at the bottom to
+     scroll well past the widget and the notice. */
+  padding: var(--space-sm) var(--space-md) 80px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: var(--space-sm);
 }
-.writing-tools__header { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); width: 100%; max-width: 820px; margin: 0 auto; }
-.writing-tools__back { align-self: flex-start; }
-.writing-tools__eyebrow { margin: 0; font-size: 0.75rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent); }
-.writing-tools__title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.85rem; letter-spacing: -0.012em; color: var(--color-ink); }
+.writing-tools__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  width: 100%;
+  max-width: 820px;
+  margin: 0 auto;
+}
+.writing-tools__bar > .ui-segmented { margin-left: auto; }
 
 /* The card. The frame inside sets its own height from the widget's
    reports, so the card grows with it instead of cutting anything off. */
@@ -45,7 +67,6 @@
 }
 
 @media (max-width: 640px) {
-  .writing-tools { padding: var(--space-md) var(--space-sm); gap: var(--space-sm); }
-  .writing-tools__title { font-size: 1.5rem; }
+  .writing-tools { padding: var(--space-xs) var(--space-sm) 80px; }
   .writing-tools-widget-wrapper { border-radius: 12px; }
 }
