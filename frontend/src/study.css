@@ -20,6 +20,8 @@ button.generated-attachment{font:inherit;color:inherit;text-align:left;cursor:po
 .chat-materials button{flex-shrink:0;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .study-starters{display:flex;justify-content:center;flex-wrap:wrap;gap:8px;max-width:600px;margin:20px auto 0}
 .study-starters .btn{border-radius:var(--radius-pill);font-size:13px}
+/* The Writing tools chip opens a tool rather than filling the prompt, so it carries the accent. */
+.study-starters .study-starters__tool{display:inline-flex;align-items:center;gap:6px;border-color:var(--color-accent-line);color:var(--color-accent)}
 
 /* On phones Image is a normal document, not a second scroll pane. */
 @media(max-width:760px){

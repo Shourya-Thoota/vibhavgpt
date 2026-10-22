@@ -13,7 +13,7 @@
   gap: var(--space-md);
 }
 .writing-tools__header { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-sm); }
-.writing-tools__back { padding-left: 0; }
+.writing-tools__back { align-self: flex-start; }
 .writing-tools__eyebrow { margin: 0; font-size: 0.75rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-accent); }
 .writing-tools__title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 1.85rem; letter-spacing: -0.012em; color: var(--color-ink); }
 

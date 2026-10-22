@@ -163,5 +163,5 @@ test("the Writing Tools UI is native VibhavGPT: no iframes, scripts, third-party
   assert.match(component, /className="btn btn--primary"/, "the app's own buttons");
   assert.match(css, /\.writing-tools \{\s*width: 100%;\s*max-width: 760px;/);
   assert.doesNotMatch(css, /#[0-9a-f]{3,8}\b/i, "theme tokens only");
-  assert.match(read("frontend/src/components/StudyWorkspace.jsx"), /view === "writing" \? <StudyWritingTools api=\{api\}/, "it lives in Study mode");
+  assert.match(read("frontend/src/App.jsx"), /writingToolsOpen \? <StudyWritingTools api=\{api\}/, "it lives in Study mode");
 });

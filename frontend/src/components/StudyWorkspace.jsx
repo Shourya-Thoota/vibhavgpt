@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { BookOpen, FileText, Plus, ArrowUpRight, PenLine } from "lucide-react";
+import { BookOpen, FileText, Plus, ArrowUpRight } from "lucide-react";
 import { Modal, Select } from "./ui.jsx";
 import { STUDY_ACTIONS } from "../product-modes.js";
-import StudyWritingTools from "./StudyWritingTools.jsx";
 
 export default function StudyWorkspace({ api, apiBase, conversationId, model, onSession, renderChat }) {
   const [session, setSession] = useState(conversationId);
@@ -12,8 +11,6 @@ export default function StudyWorkspace({ api, apiBase, conversationId, model, on
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [action, setAction] = useState(null);
-  // "chat" or "writing" (VibhavGPT Writing Tools in place of the conversation).
-  const [view, setView] = useState("chat");
   const input = useRef(null);
   const pendingSession = useRef(null);
   const active = materials.find((item) => item.id === selected) ?? materials[0];
@@ -51,7 +48,7 @@ export default function StudyWorkspace({ api, apiBase, conversationId, model, on
   }
   function startAction(item) {
     const prompt = active ? `${item.prompt}\nFocus on the material named "${active.name}".` : `${item.prompt}\nI haven't uploaded material yet. Ask me which topic I want to study.`;
-    setAction({ prompt, label: item.label, id: Date.now() }); setDrawer(false); setView("chat");
+    setAction({ prompt, label: item.label, id: Date.now() }); setDrawer(false);
   }
   const panel = <>
     <div className="study-materials__title"><BookOpen size={19} /><h2>Your materials</h2><span>{materials.length}</span></div>
@@ -65,8 +62,6 @@ export default function StudyWorkspace({ api, apiBase, conversationId, model, on
     </> : <div className="study-materials__empty"><FileText size={28} /><strong>A place for your notes</strong><span>Add a PDF, Word document, Markdown or text file, or start with a topic.</span></div>}
     <h3>Work with your material</h3>
     <div className="study-actions">{STUDY_ACTIONS.map((item) => <button type="button" key={item.label} disabled={uploading} onClick={() => startAction(item)}>{item.label}<ArrowUpRight size={14} /></button>)}</div>
-    <h3>Writing tools</h3>
-    <div className="study-actions"><button type="button" aria-pressed={view === "writing"} onClick={() => { setView(view === "writing" ? "chat" : "writing"); setDrawer(false); }}>{view === "writing" ? "Back to study chat" : "AI Detector and Humanizer"}<PenLine size={14} /></button></div>
   </>;
   return <section className="study-workspace">
     {/* No header bar: on wide viewports the materials panel is always
@@ -74,7 +69,7 @@ export default function StudyWorkspace({ api, apiBase, conversationId, model, on
         narrow viewports (where the aside hides) this floats over the
         conversation instead of reserving a dedicated row for it. */}
     <button type="button" className="btn btn--secondary study-materials-toggle" onClick={() => setDrawer(true)}><BookOpen size={17} />Materials ({materials.length})</button>
-    <div className="study-layout"><div className="study-conversation">{view === "writing" ? <StudyWritingTools api={api} onBack={() => setView("chat")} /> : renderChat({ ensureSession, action, onMaterialSaved: (id) => refresh(id).catch((err) => setError(err.message)), studyMode: true })}</div><aside className="study-materials">{panel}</aside></div>
+    <div className="study-layout"><div className="study-conversation">{renderChat({ ensureSession, action, onMaterialSaved: (id) => refresh(id).catch((err) => setError(err.message)), studyMode: true })}</div><aside className="study-materials">{panel}</aside></div>
     <input ref={input} hidden type="file" multiple accept=".pdf,.docx,.md,.txt" onChange={upload} disabled={uploading} aria-label="Upload study materials" />
     <Modal open={drawer} onClose={() => setDrawer(false)} title="Study materials"><button autoFocus type="button" className="btn btn--quiet" onClick={() => setDrawer(false)}>Close materials</button><div className="study-materials-drawer">{panel}</div></Modal>
   </section>;

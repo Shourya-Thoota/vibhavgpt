@@ -12,6 +12,7 @@ import {
   Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
   Moon, Paperclip, Plus, RotateCw, Settings as SettingsIcon,
   Download, Lock, MessageSquareText, Palette, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
+  PenLine,
 } from "lucide-react";
 import SecurityPanel from "./components/SecurityPanel.jsx";
 import ImageWorkspace from "./components/ImageWorkspace.jsx";
@@ -48,6 +49,7 @@ import { updateStatusLabel, updateStore } from "./desktop-updates.js";
 import { parseStudyBlock, STUDY_BLOCK_LANGUAGES } from "./study-widgets.js";
 import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
 import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
+import StudyWritingTools from "./components/StudyWritingTools.jsx";
 import DiagramViewer from "./components/DiagramViewer.jsx";
 import { isDiagramLanguage } from "./diagrams.js";
 import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
@@ -1606,6 +1608,10 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("vibhavgpt-sidebar-collapsed") === "true");
   const [tier, setTier] = useState(null);
   const [chatKey, setChatKey] = useState(0);
+  // Study shows either its conversation ("chat") or VibhavGPT Writing Tools
+  // ("writing"). The tools need no session, so they open straight away.
+  const [studyView, setStudyView] = useState("chat");
+  useEffect(() => { if (productMode !== "study") setStudyView("chat"); }, [productMode]);
   const [lastSelectedModel, setLastSelectedModel] = useState(null);
   const [profileModelReady, setProfileModelReady] = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
@@ -1794,6 +1800,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   };
 
   const newChat = () => {
+    setStudyView("chat");
     setPendingGroup(null);
     setActiveConversationId(null);
     modeSessions.current[productMode] = null;
@@ -1809,6 +1816,12 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // image page. This is a one-off navigation, not a change to the user's
   // sticky default mode, so it updates state directly rather than going
   // through switchMode's /api/profile/product-mode write.
+  const writingToolsOpen = page === "chat" && productMode === "study" && studyView === "writing";
+  const openWritingTools = () => {
+    setStudyView("writing");
+    setSidebarOpen(false);
+    go("chat");
+  };
   const newChatInGroup = (group) => {
     newChat();
     setPendingGroup(group);
@@ -1822,6 +1835,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     return () => window.removeEventListener("desktop:new-chat", onDesktopNewChat);
   }, []);
   const openConversation = (conversationId, mode = productMode) => {
+    setStudyView("chat");
     setPendingGroup(null);
     setActiveConversationId(conversationId);
     modeSessions.current[mode] = conversationId;
@@ -2040,6 +2054,8 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
         newChatInGroup={newChatInGroup}
         openConversation={openConversation}
         onOpenImageSession={(id) => openConversation(id, "chat")}
+        onOpenWritingTools={openWritingTools}
+        writingToolsActive={writingToolsOpen}
         activeConversationId={activeConversationId}
         historyRevision={historyRevision}
         onSignOut={onSignOut}
@@ -2095,7 +2111,8 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           <main className="page page--centered"><TypingDots label="Opening your workspace" /></main>
         ) : page === "chat" ? (
           productMode === "image" ? <ImageWorkspace api={api} />
-          : renderChat({ mode: productMode })
+          : writingToolsOpen ? <StudyWritingTools api={api} onBack={() => setStudyView("chat")} />
+          : renderChat({ mode: productMode, onOpenWritingTools: productMode === "study" ? openWritingTools : undefined })
         ) : page === "memory" ? (
           <Memory onMemoriesAdded={(added) => setMemoryToast(added)} />
         ) : page === "billing" ? (
@@ -2265,7 +2282,7 @@ function CopyButton({ text }) {
   );
 }
 
-function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null }) {
+function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null, onOpenWritingTools }) {
   const [model, setModel] = useState(initialModel || "lumen");
   const studyMode = mode === "study";
   const sentModel = studyMode ? STUDY_MODEL : model;
@@ -2977,6 +2994,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             </h1>
             {mode === "study" && <div className="study-starters" aria-label="Study suggestions">
               {STUDY_STARTERS.map((label) => <button type="button" className="btn btn--secondary" key={label} onClick={() => { setDraft(label); inputRef.current?.focus(); }}>{label}</button>)}
+              {onOpenWritingTools && <button type="button" className="btn btn--secondary study-starters__tool" onClick={onOpenWritingTools}><PenLine size={14} strokeWidth={2} />Writing tools</button>}
             </div>}
           </div>
         ) : (

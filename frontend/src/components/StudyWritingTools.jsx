@@ -153,7 +153,7 @@ export default function StudyWritingTools({ api, onBack }) {
   return (
     <section className="writing-tools" aria-label="VibhavGPT Writing Tools">
       <header className="writing-tools__header">
-        {onBack && <button type="button" className="btn btn--quiet writing-tools__back" onClick={onBack}><ArrowLeft size={15} />Back to study chat</button>}
+        {onBack && <button type="button" className="btn btn--secondary writing-tools__back" onClick={onBack}><ArrowLeft size={15} />Back to Study</button>}
         <p className="writing-tools__eyebrow">VibhavGPT Writing Tools</p>
         <h2 className="writing-tools__title">{tab === "detector" ? "VibhavGPT AI Detector" : "VibhavGPT Humanizer"}</h2>
         <Segmented label="Writing tool" value={tab} onChange={setTab} options={[

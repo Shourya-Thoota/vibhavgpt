@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   BarChart3, Brain, ChevronDown, Code, CreditCard, FileText,
-  LogOut, MessageSquare, Monitor, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Plus,
+  LogOut, MessageSquare, Monitor, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, PenLine, Plus,
   Settings as SettingsIcon, Smartphone, Sun, Trash2, X,
 } from "lucide-react";
 import { SOURCE_REPO_URL } from "../source-repo.js";
@@ -155,8 +155,9 @@ const APP_LINKS = [
  * never change — only the middle section does:
  *   - chat:  "New chat" + the full nav (Chat/Memory/Plan), the Apps links
  *            (Android, Windows) + history.
- *   - study: "New study session" + history only. No main-nav links: those
- *            pages live one mode-switch away in Chat, not duplicated here.
+ *   - study: "New study session", Writing Tools (the AI Detector and
+ *            Humanizer) + history. No main-nav links: those pages live one
+ *            mode-switch away in Chat, not duplicated here.
  *   - image: history only. There's no sidebar-level "new" action distinct
  *            from the page's own always-visible "New image" button, so
  *            adding a second one here would just be a confusing duplicate.
@@ -184,6 +185,8 @@ export default function Sidebar({
   newChatInGroup,
   openConversation,
   onOpenImageSession,
+  onOpenWritingTools,
+  writingToolsActive = false,
   activeConversationId,
   historyRevision,
   onSignOut,
@@ -222,6 +225,16 @@ export default function Sidebar({
           <Plus size={17} strokeWidth={2.2} />
           {!rail && <span>{newLabel}</span>}
         </button>
+      )}
+
+      {variant === "study" && onOpenWritingTools && (
+        <nav className="sidebar__nav" aria-label="Study tools">
+          <button type="button" className="sidebar__link" data-active={writingToolsActive || undefined}
+            aria-current={writingToolsActive ? "page" : undefined} title={rail ? "Writing Tools" : undefined} onClick={onOpenWritingTools}>
+            <PenLine size={17} strokeWidth={1.9} />
+            {!rail && <span>Writing Tools</span>}
+          </button>
+        </nav>
       )}
 
       {variant === "chat" && (
