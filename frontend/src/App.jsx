@@ -12,7 +12,7 @@ import {
   Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
   Moon, Paperclip, Plus, RotateCw, Settings as SettingsIcon,
   Download, Lock, MessageSquareText, Palette, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
-  PenLine,
+  PenLine, ScanSearch, Wand2,
 } from "lucide-react";
 import SecurityPanel from "./components/SecurityPanel.jsx";
 import ImageWorkspace from "./components/ImageWorkspace.jsx";
@@ -1611,6 +1611,8 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // Study shows either its conversation ("chat") or VibhavGPT Writing Tools
   // ("writing"). The tools need no session, so they open straight away.
   const [studyView, setStudyView] = useState("chat");
+  // Which tool the Writing Tools screen opens on.
+  const [writingToolsTab, setWritingToolsTab] = useState("detector");
   useEffect(() => { if (productMode !== "study") setStudyView("chat"); }, [productMode]);
   const [lastSelectedModel, setLastSelectedModel] = useState(null);
   const [profileModelReady, setProfileModelReady] = useState(false);
@@ -1817,7 +1819,10 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // sticky default mode, so it updates state directly rather than going
   // through switchMode's /api/profile/product-mode write.
   const writingToolsOpen = page === "chat" && productMode === "study" && studyView === "writing";
-  const openWritingTools = () => {
+  // The composer's + menu asks for a tool by name; the chip and the sidebar
+  // pass a click event, which opens the Detector.
+  const openWritingTools = (tab) => {
+    setWritingToolsTab(tab === "humanizer" ? "humanizer" : "detector");
     setStudyView("writing");
     setSidebarOpen(false);
     go("chat");
@@ -2111,7 +2116,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           <main className="page page--centered"><TypingDots label="Opening your workspace" /></main>
         ) : page === "chat" ? (
           productMode === "image" ? <ImageWorkspace api={api} />
-          : writingToolsOpen ? <StudyWritingTools api={api} onBack={() => setStudyView("chat")} />
+          : writingToolsOpen ? <StudyWritingTools api={api} initialTab={writingToolsTab} onBack={() => setStudyView("chat")} />
           : renderChat({ mode: productMode, onOpenWritingTools: productMode === "study" ? openWritingTools : undefined })
         ) : page === "memory" ? (
           <Memory onMemoriesAdded={(added) => setMemoryToast(added)} />
@@ -2905,6 +2910,12 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       <MenuLabel>Add to message</MenuLabel>
       <MenuItem icon={<ImageIcon size={16} />} description="Images from your device" onSelect={() => imageInputRef.current?.click()}>Photos</MenuItem>
       <MenuItem icon={<FileText size={16} />} description="PDF, Word, text, CSV or JSON" onSelect={() => fileInputRef.current?.click()}>Files</MenuItem>
+      {onOpenWritingTools && <>
+      <MenuSeparator />
+      <MenuLabel>Writing tools</MenuLabel>
+      <MenuItem icon={<ScanSearch size={16} />} description="Check text for AI writing patterns" onSelect={() => onOpenWritingTools("detector")}>AI Detector</MenuItem>
+      <MenuItem icon={<Wand2 size={16} />} description="Rewrite robotic text into natural human prose" onSelect={() => onOpenWritingTools("humanizer")}>AI Humanizer</MenuItem>
+      </>}
       {mode !== "study" && <>
       <MenuSeparator />
       <MenuLabel>Response mode</MenuLabel>
@@ -3192,6 +3203,19 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
               <span>Files</span>
             </button>
           </div>
+          {onOpenWritingTools && <><p className="add-sheet__label">Writing tools</p>
+          <div className="add-sheet__list">
+            <button type="button" className="add-sheet__row" onClick={() => { closeSheet(); onOpenWritingTools("detector"); }}>
+              <ScanSearch size={19} strokeWidth={1.9} />
+              <span className="add-sheet__copy">AI Detector<small>Check text for AI writing patterns</small></span>
+              <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+            <button type="button" className="add-sheet__row" onClick={() => { closeSheet(); onOpenWritingTools("humanizer"); }}>
+              <Wand2 size={19} strokeWidth={1.9} />
+              <span className="add-sheet__copy">AI Humanizer<small>Rewrite robotic text into natural human prose</small></span>
+              <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </div></>}
           {mode !== "study" && <><div className="add-sheet__list">
             <button type="button" className="add-sheet__row" disabled={busy} onClick={() => setSheet("model")}>
               <Sparkles size={19} strokeWidth={1.9} />

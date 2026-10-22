@@ -68,11 +68,27 @@ test("the Study home screen has a Writing tools chip that opens the tools, not a
 
 test("the chip and the sidebar switch Study to the tools, and Back, New study session or another mode switch back", () => {
   assert.match(app, /const writingToolsOpen = page === "chat" && productMode === "study" && studyView === "writing";/);
-  assert.match(app, /const openWritingTools = \(\) => \{\s*setStudyView\("writing"\);\s*setSidebarOpen\(false\);\s*go\("chat"\);\s*\};/, "opens at once, and closes the phone drawer");
+  assert.match(app, /const openWritingTools = \(tab\) => \{\s*setWritingToolsTab\(tab === "humanizer" \? "humanizer" : "detector"\);\s*setStudyView\("writing"\);\s*setSidebarOpen\(false\);\s*go\("chat"\);\s*\};/, "opens at once on the asked-for tool (the Detector by default), and closes the phone drawer");
   assert.match(app, /onOpenWritingTools=\{openWritingTools\}\s*writingToolsActive=\{writingToolsOpen\}/, "the sidebar opens it and shows it active");
-  assert.match(app, /: writingToolsOpen \? <StudyWritingTools api=\{api\} onBack=\{\(\) => setStudyView\("chat"\)\} \/>/, "Back to Study returns to the study view");
+  assert.match(app, /: writingToolsOpen \? <StudyWritingTools api=\{api\} initialTab=\{writingToolsTab\} onBack=\{\(\) => setStudyView\("chat"\)\} \/>/, "Back to Study returns to the study view");
   assert.match(app, /const newChat = \(\) => \{\s*setStudyView\("chat"\);/, "New study session leaves the tools");
   assert.match(app, /const openConversation = \(conversationId, mode = productMode\) => \{\s*setStudyView\("chat"\);/, "opening a session leaves the tools");
   assert.match(app, /useEffect\(\(\) => \{ if \(productMode !== "study"\) setStudyView\("chat"\); \}, \[productMode\]\);/);
   assert.doesNotMatch(read("frontend/src/components/StudyWorkspace.jsx"), /StudyWritingTools/, "the unused StudyWorkspace no longer pretends to host them");
+});
+
+test("the composer's + menu has AI Detector and AI Humanizer in Study, each opening its own tab", () => {
+  assert.match(app, /\{onOpenWritingTools && <>\s*<MenuSeparator \/>\s*<MenuLabel>Writing tools<\/MenuLabel>\s*<MenuItem icon=\{<ScanSearch size=\{16\} \/>\} description="Check text for AI writing patterns" onSelect=\{\(\) => onOpenWritingTools\("detector"\)\}>AI Detector<\/MenuItem>\s*<MenuItem icon=\{<Wand2 size=\{16\} \/>\} description="Rewrite robotic text into natural human prose" onSelect=\{\(\) => onOpenWritingTools\("humanizer"\)\}>AI Humanizer<\/MenuItem>/, "desktop menu, after Photos and Files");
+  assert.match(app, /onClick=\{\(\) => \{ closeSheet\(\); onOpenWritingTools\("detector"\); \}\}>[\s\S]*?AI Detector<small>Check text for AI writing patterns<\/small>/, "the phone sheet too");
+  assert.match(app, /onClick=\{\(\) => \{ closeSheet\(\); onOpenWritingTools\("humanizer"\); \}\}>[\s\S]*?AI Humanizer<small>Rewrite robotic text into natural human prose<\/small>/);
+  assert.match(app, /<MenuItem icon=\{<FileText size=\{16\} \/>\} description="PDF, Word, text, CSV or JSON"[^\n]*Files<\/MenuItem>\n\s*\{onOpenWritingTools && <>/, "Photos and Files stay first");
+});
+
+test("the tools open on whichever tab was chosen, with the other still mounted", async () => {
+  const render = await renderComponents();
+  const tabs = (html) => [...html.matchAll(/class="writing-tools-widget-wrapper" style="display:(block|none)" data-tab="(\w+)"/g)].map(([, display, tab]) => `${tab}:${display}`);
+  assert.deepEqual(tabs(render.tools({ initialTab: "humanizer" })), ["detector:none", "humanizer:block"]);
+  assert.deepEqual(tabs(render.tools({ initialTab: "detector" })), ["detector:block", "humanizer:none"]);
+  assert.deepEqual(tabs(render.tools({})), ["detector:block", "humanizer:none"], "the Detector by default");
+  assert.match(render.tools({ initialTab: "humanizer" }), /<h2 class="writing-tools__title">AI Humanizer<\/h2>/);
 });

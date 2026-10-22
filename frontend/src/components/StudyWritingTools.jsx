@@ -54,8 +54,9 @@ function WidgetFrame({ widget, visible }) {
   );
 }
 
-export default function StudyWritingTools({ onBack }) {
-  const [tab, setTab] = useState("detector");
+// `initialTab` picks the tool it opens on, for shortcuts like the composer's + menu.
+export default function StudyWritingTools({ onBack, initialTab = "detector" }) {
+  const [tab, setTab] = useState(initialTab === "humanizer" ? "humanizer" : "detector");
   return (
     <section className="writing-tools" aria-label="Writing Tools">
       <header className="writing-tools__header">
