@@ -55,8 +55,8 @@ test("the tools render on their own, with no session or document, and a Back to 
   const html = render.tools({ onBack: () => {} });
   assert.match(html, /<button type="button" class="btn btn--secondary writing-tools__back">.*?Back to Study<\/button>/);
   assert.match(html, /VibhavGPT Writing Tools/);
-  assert.match(html, /VibhavGPT AI Detector/);
-  assert.doesNotMatch(html, /<iframe|<script/i);
+  assert.match(html, /<iframe [^>]*title="AI Detector"/, "the tools load in their own frames, with no session needed");
+  assert.doesNotMatch(html, /<script/i);
   assert.doesNotMatch(render.tools({}), /Back to Study/, "no back button without somewhere to go back to");
 });
 
