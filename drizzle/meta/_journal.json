@@ -114,6 +114,7 @@
     { "idx": 23, "version": "7", "when": 1791158400000, "tag": "0024_conversation_groups", "breakpoints": true },
     { "idx": 24, "version": "7", "when": 1791763200000, "tag": "0025_drop_google_play_tables", "breakpoints": true },
     { "idx": 25, "version": "7", "when": 1791766800000, "tag": "0026_qwen_key_to_lumen", "breakpoints": true },
-    { "idx": 26, "version": "7", "when": 1791770400000, "tag": "0027_qwen_usage_events_to_lumen", "breakpoints": true }
+    { "idx": 26, "version": "7", "when": 1791770400000, "tag": "0027_qwen_usage_events_to_lumen", "breakpoints": true },
+    { "idx": 27, "version": "7", "when": 1792540800000, "tag": "0028_decanet", "breakpoints": true }
   ]
 }

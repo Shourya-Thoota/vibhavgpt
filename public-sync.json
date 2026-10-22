@@ -1,0 +1,8 @@
+{
+  "remote": "https://github.com/Shourya-Thoota/vibhavgpt.git",
+  "branch": "main",
+  "exclude": ["src/decanet/roleplays/"],
+  "overrides": {
+    "src/decanet/roleplays/index.js": "public-overrides/src/decanet/roleplays/index.js"
+  }
+}

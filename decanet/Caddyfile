@@ -1,0 +1,55 @@
+{
+	admin off
+	persist_config off
+	auto_https off
+
+	log {
+		format json
+	}
+
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+# www.decanet.vibhavgpt.com is an alias: send it to the canonical host.
+http://www.decanet.vibhavgpt.com:{$PORT:80} {
+	redir https://decanet.vibhavgpt.com{uri} 308
+}
+
+http://:{$PORT:80} {
+	log {
+		format json
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+		# The judge's audio is a WebRTC stream from OpenAI; the API is api.vibhavgpt.com.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self' https://api.vibhavgpt.com https://*.openai.com wss://*.openai.com; media-src 'self' blob: mediastream:; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests;"
+		Permissions-Policy "microphone=(self), camera=(), geolocation=()"
+		-Server
+	}
+
+	root * dist
+	encode gzip zstd
+
+	@health path /health
+	handle @health {
+		respond 200
+	}
+
+	@assets path /assets/* /fonts/*
+	handle @assets {
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# A single-page app: every other path gets index.html.
+	handle {
+		header Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+}

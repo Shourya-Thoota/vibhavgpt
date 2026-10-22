@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { requireSession } from "../middleware/require-session.js";
 import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, DOWNGRADE_PAUSED, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, tierForPriceLookupKey, verifyWebhookSignature } from "./service.js";
 import { getCurrentUsage } from "../usage/service.js";
+import { applyCheckoutSession, isDecanetCheckoutEvent } from "../decanet/stripe.js";
 
 export const billingRouter = Router();
 
@@ -115,7 +116,9 @@ export const stripeWebhookHandler = [
   async (req, res) => {
     try {
       const event = verifyWebhookSignature(req.body, req.headers["stripe-signature"]);
-      await applySubscriptionEvent(event);
+      // DECANet purchases share this endpoint and are told apart by metadata.
+      if (isDecanetCheckoutEvent(event)) await applyCheckoutSession(event.data.object);
+      else await applySubscriptionEvent(event);
       return res.status(200).json({ received: true });
     } catch (error) {
       console.warn("Billing webhook rejected or failed.", { reason: error.message });
