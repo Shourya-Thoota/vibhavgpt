@@ -21,6 +21,7 @@ import { generationRouter } from "./generation/router.js";
 import { profileRouter } from "./profile/router.js";
 import { visibleNameFields, warnIfNameBlocklistMissing } from "./security/display-name.js";
 import { uploadRouter } from "./uploads/router.js";
+import { studyRouter } from "./study/router.js";
 import { disableTwoFactorWithReauth } from "./middleware/require-two-factor-password.js";
 import { createNativeOAuthRouter } from "./auth/native-oauth.js";
 import { pool } from "./db/client.js";
@@ -172,6 +173,8 @@ app.use("/api/search", searchRouter);
 app.use("/api/security", securityRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/generation", generationRouter);
+// Study mode's Writing Tools (AI Detector and Humanizer).
+app.use("/api/study", studyRouter);
 
 app.use((_req, res) => res.status(404).json({ error: "Not found." }));
 
