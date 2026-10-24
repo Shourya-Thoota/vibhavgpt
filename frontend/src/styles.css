@@ -686,14 +686,26 @@ p { margin: 0; }
 }
 .workspace[data-collapsed="true"] { --sidebar-w: 74px; }
 
+/* The sidebar is a full-height column: its head, New chat, nav and foot keep
+   their size, and the chat history takes the rest and scrolls on its own.
+   Only on a screen too short for even a minimum of history does the column
+   itself scroll, so the account foot is never pushed out of reach. (Menus
+   and dialogs open in a portal, so nothing here clips them.) */
 .sidebar {
   position: sticky;
   top: 0;
   z-index: 30;
   height: 100vh;
+  height: 100dvh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
   padding: 18px 12px 14px;
   border-right: 1px solid var(--line);
   background: var(--paper-deep);
@@ -770,11 +782,12 @@ p { margin: 0; }
   font-weight: 600;
 }
 
+.sidebar > :not(.conversation-history) { flex-shrink: 0; }
 .conversation-history {
   display: flex;
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   flex-direction: column;
-  min-height: 0;
+  min-height: 160px;
   gap: 7px;
   padding-top: 4px;
 }
@@ -790,7 +803,22 @@ p { margin: 0; }
   text-transform: uppercase;
 }
 .conversation-history__head small { font-size: 0.68rem; font-weight: 500; letter-spacing: 0; text-transform: none; }
-.conversation-history__list { display: grid; min-height: 0; gap: 2px; overflow-y: auto; padding: 1px 0; }
+.conversation-history__list {
+  display: grid;
+  align-content: start;
+  flex: 1 1 0%;
+  min-height: 0;
+  gap: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Room under the last chat, so it clears the foot entirely. */
+  padding: 1px 0 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.sidebar::-webkit-scrollbar, .conversation-history__list::-webkit-scrollbar { width: 8px; }
+.sidebar::-webkit-scrollbar-thumb, .conversation-history__list::-webkit-scrollbar-thumb { border-radius: 8px; background: var(--line-strong); border: 2px solid transparent; background-clip: padding-box; }
+.sidebar::-webkit-scrollbar-track, .conversation-history__list::-webkit-scrollbar-track { background: transparent; }
 .conversation-history__empty, .conversation-history__error { padding: 4px 11px; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
 .conversation-history__error { color: var(--danger); }
 .conversation-item { display: flex; align-items: center; min-width: 0; border-radius: var(--r-sm); }
