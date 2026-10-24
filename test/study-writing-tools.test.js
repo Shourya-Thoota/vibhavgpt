@@ -103,7 +103,7 @@ test("each frame sits in a white card that never clips it, so the widget's foote
   assert.match(css, /\.writing-tools-widget-wrapper \{[^}]*max-width: 820px;[^}]*border-radius: 16px;[^}]*border: 1px solid rgba\(0, 0, 0, 0\.08\);[^}]*background: #ffffff;[^}]*box-shadow: 0 4px 20px rgba\(0, 0, 0, 0\.06\);/);
   assert.match(css, /\.writing-tools__notice \{[^}]*margin: 14px auto 0;[^}]*font-size: 13px;[^}]*line-height: 1\.5;[^}]*color: var\(--color-muted\);[^}]*text-align: center;/);
   assert.doesNotMatch(css, /position: absolute|pointer-events: none|::after|::before/, "no overlay or mask over the frame");
-  assert.match(css, /@media \(max-width: 640px\)/, "it adapts to phones");
+  assert.match(css, /@media \(max-width: 760px\)/, "it adapts to phones, at the app's phone width");
 });
 
 test("the tools scroll inside Study's fixed-height column, well past the end of the widget", () => {

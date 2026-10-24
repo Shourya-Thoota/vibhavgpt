@@ -74,8 +74,15 @@ test("in the rendered sidebar, the history sits in the column between the fixed 
   }
 });
 
-test("on phones the drawer is the same full-height column", () => {
+test("on phones the drawer is one full-height scroll column with the account pinned", () => {
   const mobile = readFileSync(new URL("../frontend/src/mobile.css", import.meta.url), "utf8");
   assert.match(mobile, /\.sidebar \{[^}]*height: 100vh;\s*height: 100dvh;/);
-  assert.doesNotMatch(mobile.slice(mobile.indexOf("/* --- Drawer")), /\.conversation-history(__list)? \{[^}]*overflow: (hidden|visible)/, "nothing on phones turns the list's scrolling off");
+  // Head, New chat, nav and Apps fill most of a phone's height, so a nested
+  // history scroller would get a sliver; the drawer scrolls as a whole.
+  const drawer = mobile.slice(mobile.indexOf("/* --- Drawer: one scroll column"));
+  assert.match(drawer, /\.conversation-history \{ flex: 0 0 auto; min-height: auto; \}/);
+  assert.match(drawer, /\.conversation-history__list \{ flex: none; min-height: auto; overflow: visible;/, "chats flow at full height");
+  assert.match(drawer, /\.sidebar__foot \{ display: contents; \}/);
+  assert.match(drawer, /\.sidebar__foot > \.ui-menu \{\s*position: sticky;/, "the account button stays on screen");
+  assert.match(css, /\.sidebar \{[^}]*overflow-y: auto;/, "the drawer itself scrolls");
 });

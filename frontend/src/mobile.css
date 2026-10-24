@@ -295,7 +295,8 @@
   /* The user's own turns keep the brand blue, as a soft rounded pill without
      the tail or glow the desktop bubble has. */
   .bubble--user {
-    max-width: 84%;
+    max-width: 88%;
+    overflow-wrap: anywhere;
     padding: 10px 16px;
     border-radius: var(--radius-card);
     box-shadow: none;
@@ -307,7 +308,7 @@
   /* --- Composer ----------------------------------------------------------- */
 
   .composer-wrap {
-    padding: 4px 12px calc(10px + env(safe-area-inset-bottom));
+    padding: 4px 12px max(12px, var(--safe-bottom));
     background: linear-gradient(to top, var(--paper) 74%, transparent);
   }
 
@@ -335,6 +336,77 @@
   .card--danger .card__body { margin-top: 14px; }
   .subscription__actions { width: 100%; }
   .subscription__actions .btn { flex: 1 1 160px; }
+
+  /* --- Drawer: one scroll column ------------------------------------------ */
+
+  /* Head, New chat, the nav and Apps take about 500px of a phone's height,
+     which left a nested history scroller a sliver under its own headings.
+     On phones the drawer itself is the one scroller: chats flow at full
+     height, and the account button stays pinned to the drawer's bottom. */
+  .sidebar { overscroll-behavior: contain; }
+  .conversation-history { flex: 0 0 auto; min-height: auto; }
+  .conversation-history__list { flex: none; min-height: auto; overflow: visible; padding-bottom: 8px; }
+  .sidebar__foot { display: contents; }
+  .sidebar__foot > :first-child { margin-top: auto; }
+  .sidebar__foot > .ui-menu {
+    position: sticky;
+    bottom: calc(-14px - var(--safe-bottom));
+    z-index: 1;
+    margin: 0 -14px calc(-14px - var(--safe-bottom));
+    padding: 8px 14px calc(14px + var(--safe-bottom));
+    background: var(--paper-deep);
+    box-shadow: 0 -10px 16px -8px var(--paper-deep);
+  }
+
+  /* --- Touch targets and fields ------------------------------------------- */
+
+  /* Anything a thumb presses is at least 44 by 44. */
+  .btn,
+  .btn--quiet,
+  .ui-segmented__option,
+  .swatch,
+  .ui-select__trigger,
+  .code-block__copy { min-height: 44px; }
+  .plan-nudge .btn { min-height: 44px; font-size: 0.9rem; }
+  .checkbox { min-height: 44px; align-items: center; }
+  .composer__row .composer__add-trigger,
+  .composer__row .composer__mic,
+  .composer__row .composer__send { width: 44px; height: 44px; }
+  .composer[data-layout="pill"] .composer__input { min-height: 44px; padding: 11px 6px; }
+  .turn__tools .ui-icon-button { width: 44px; height: 44px; }
+  .input-affix .input { padding-right: 50px; }
+  .input-affix__button { right: 1px; width: 44px; height: 44px; }
+  .conversation-item__actions { width: 44px; height: 44px; margin-right: 0; }
+  /* The + beside Projects and Folders: a full-size target that does not
+     push the heading row taller. */
+  .library__add { width: 44px; height: 44px; margin: -9px -9px -9px 0; }
+  .survey-slider__input { height: 44px; }
+  /* The title-bar tabs stay slim; the hit area reaches 44px. */
+  .mode-tabs__tab::after { content: ""; position: absolute; inset: -6px 0; }
+
+  /* 16px or larger in every field, or iOS zooms the page on focus. */
+  .input,
+  .textarea,
+  .ui-select__trigger { font-size: 1rem; }
+
+  /* --- Dialogs ------------------------------------------------------------ */
+
+  .ui-scrim { padding: max(16px, var(--safe-top)) 16px max(16px, var(--safe-bottom)); }
+  .ui-modal {
+    width: min(100%, 420px);
+    max-height: 90vh;
+    max-height: 90dvh;
+    margin: auto;
+    padding: 24px 20px max(20px, var(--safe-bottom));
+    overscroll-behavior: contain;
+  }
+  .ui-modal__title { font-size: 1.6rem; }
+  .ui-modal__actions { flex-wrap: wrap; }
+  .ui-modal__actions .btn { flex: 1 1 140px; }
+
+  /* --- Settings ----------------------------------------------------------- */
+
+  .settings__layout { padding-bottom: max(32px, var(--safe-bottom)); }
 }
 
 @keyframes screen-in-forward {

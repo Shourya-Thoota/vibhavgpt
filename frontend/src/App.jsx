@@ -1308,9 +1308,13 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
                       }}>
                         <Mail size={15} /> Email me a code
                       </button>
-                      <button className="btn btn--quiet" type="button" disabled={busy || googleBusy} onClick={signInWithPasskey}>
-                        <Fingerprint size={15} /> Use a passkey
-                      </button>
+                      {/* Offered only where the browser can run passkeys at all; any
+                          warning appears only after someone chooses it. */}
+                      {passkeysSupported() && (
+                        <button className="btn btn--quiet" type="button" disabled={busy || googleBusy} onClick={signInWithPasskey}>
+                          <Fingerprint size={15} /> Use a passkey
+                        </button>
+                      )}
                     </div>
                   )}
                   <div className="auth__divider">or</div>

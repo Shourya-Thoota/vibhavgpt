@@ -66,7 +66,22 @@
   text-align: center;
 }
 
-@media (max-width: 640px) {
-  .writing-tools { padding: var(--space-xs) var(--space-sm) 80px; }
-  .writing-tools-widget-wrapper { border-radius: 12px; }
+/* Phones (the app's 760px breakpoint): one column. Back sits above the tabs,
+   the tabs fill the width and scroll sideways inside themselves rather than
+   widen the page, and the frame never outgrows the column. */
+@media (max-width: 760px) {
+  .writing-tools { padding: var(--space-xs) var(--space-sm) calc(80px + var(--safe-bottom)); }
+  .writing-tools__bar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; }
+  .writing-tools__back { align-self: flex-start; }
+  .writing-tools__bar > .ui-segmented {
+    display: flex;
+    max-width: 100%;
+    margin-left: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .writing-tools__bar > .ui-segmented::-webkit-scrollbar { display: none; }
+  .writing-tools__bar > .ui-segmented .ui-segmented__option { flex: 1 0 auto; justify-content: center; }
+  .writing-tools-widget-wrapper { min-width: 0; border-radius: 12px; }
+  .writing-tools-widget-wrapper iframe { min-width: 0; max-width: 100%; }
 }

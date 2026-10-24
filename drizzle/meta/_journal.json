@@ -100,21 +100,117 @@
       "tag": "0012_remove_news_briefings",
       "breakpoints": true
     },
-    { "idx": 12, "version": "7", "when": 1789420000000, "tag": "0013_study_mode", "breakpoints": true },
-    { "idx": 13, "version": "7", "when": 1789430000000, "tag": "0014_image_mode", "breakpoints": true },
-    { "idx": 14, "version": "7", "when": 1789850000000, "tag": "0015_voice_live_sessions", "breakpoints": true },
-    { "idx": 15, "version": "7", "when": 1790114400000, "tag": "0016_credit_denomination_100x", "breakpoints": true },
-    { "idx": 16, "version": "7", "when": 1790208000000, "tag": "0017_voice_live_connection_activity", "breakpoints": true },
-    { "idx": 17, "version": "7", "when": 1790294400000, "tag": "0018_billing_customers", "breakpoints": true },
-    { "idx": 18, "version": "7", "when": 1790380800000, "tag": "0019_image_folders", "breakpoints": true },
-    { "idx": 19, "version": "7", "when": 1790467200000, "tag": "0020_google_play_billing", "breakpoints": true },
-    { "idx": 20, "version": "7", "when": 1790553600000, "tag": "0021_google_play_test_classification", "breakpoints": true },
-    { "idx": 21, "version": "7", "when": 1790640000000, "tag": "0022_memory_enabled", "breakpoints": true },
-    { "idx": 22, "version": "7", "when": 1791072000000, "tag": "0023_token_reservations", "breakpoints": true },
-    { "idx": 23, "version": "7", "when": 1791158400000, "tag": "0024_conversation_groups", "breakpoints": true },
-    { "idx": 24, "version": "7", "when": 1791763200000, "tag": "0025_drop_google_play_tables", "breakpoints": true },
-    { "idx": 25, "version": "7", "when": 1791766800000, "tag": "0026_qwen_key_to_lumen", "breakpoints": true },
-    { "idx": 26, "version": "7", "when": 1791770400000, "tag": "0027_qwen_usage_events_to_lumen", "breakpoints": true },
-    { "idx": 29, "version": "7", "when": 1792713600000, "tag": "0030_onboarding_completion", "breakpoints": true }
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789420000000,
+      "tag": "0013_study_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789430000000,
+      "tag": "0014_image_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789850000000,
+      "tag": "0015_voice_live_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790114400000,
+      "tag": "0016_credit_denomination_100x",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790208000000,
+      "tag": "0017_voice_live_connection_activity",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790294400000,
+      "tag": "0018_billing_customers",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790380800000,
+      "tag": "0019_image_folders",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790467200000,
+      "tag": "0020_google_play_billing",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790553600000,
+      "tag": "0021_google_play_test_classification",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790640000000,
+      "tag": "0022_memory_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791072000000,
+      "tag": "0023_token_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791158400000,
+      "tag": "0024_conversation_groups",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791763200000,
+      "tag": "0025_drop_google_play_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791766800000,
+      "tag": "0026_qwen_key_to_lumen",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791770400000,
+      "tag": "0027_qwen_usage_events_to_lumen",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792713600000,
+      "tag": "0030_onboarding_completion",
+      "breakpoints": true
+    }
   ]
 }

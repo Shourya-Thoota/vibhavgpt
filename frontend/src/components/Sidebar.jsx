@@ -299,7 +299,7 @@ export default function Sidebar({
           <div className="plan-nudge">
             <strong>You're on Free</strong>
             <small>Get higher token allowances and included image and document generations.</small>
-            <button type="button" className="btn btn--secondary" onClick={() => go("billing")} style={{ minHeight: 34, fontSize: "0.83rem" }}>
+            <button type="button" className="btn btn--secondary" onClick={() => go("billing")}>
               See plans
             </button>
           </div>
