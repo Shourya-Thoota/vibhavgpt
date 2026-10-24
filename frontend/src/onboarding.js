@@ -282,6 +282,19 @@ export function writeOnboarding(userId, record) {
   return normalized;
 }
 
+// The account decides whether the survey is done (user.surveyCompleted from
+// /api/me), so a new device or a fresh sign-in never asks again. Saved answers
+// from the account win over this browser's copy; localStorage is only a cache,
+// and the fallback when the account has not heard yet (an older build, or a
+// save that failed). The "Call me" name is never on the account record.
+export function onboardingForUser(user) {
+  const cached = readOnboarding(user?.id);
+  const record = user?.onboarding && typeof user.onboarding === "object"
+    ? normalizeOnboarding({ ...user.onboarding, preferred_name: cached.preferred_name })
+    : cached;
+  return { ...record, onboarding_completed: user?.surveyCompleted === true || cached.onboarding_completed };
+}
+
 /* --- Readouts ------------------------------------------------------------ */
 
 const band = (value) => (value < NEUTRAL_LOW ? 0 : value > NEUTRAL_HIGH ? 2 : 1);

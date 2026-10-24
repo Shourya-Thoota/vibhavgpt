@@ -39,6 +39,11 @@ export const userProfiles = pgTable(
     // over-length Live Comet sessions exceed the abuse threshold. Cleared by
     // an admin after review.
     voiceSuspendedAt: timestamp("voice_suspended_at", { withTimezone: true }),
+    // The onboarding survey, finished or skipped, on any device. Answers are
+    // null after a skip; the "Call me" name is never stored here.
+    onboardingCompleted: boolean("onboarding_completed").default(false).notNull(),
+    onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+    onboardingAnswers: jsonb("onboarding_answers"),
     ...timestamps,
   },
   (table) => [index("user_profiles_admin_idx").on(table.isAdmin)],

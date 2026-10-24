@@ -1,7 +1,8 @@
 import { canonicalModelKey } from "../../frontend/src/token-quotas.js";
 import { Router } from "express";
 import { accessError, accessPayload } from "../../frontend/src/access-status.js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { normalizeOnboarding } from "../../frontend/src/onboarding.js";
 import { db } from "../db/client.js";
 import { userProfiles } from "../db/schema.js";
 import { requireSession } from "../middleware/require-session.js";
@@ -27,6 +28,36 @@ function profileResponse(profile) {
     productMode: profile?.productMode ?? "chat",
     thinkingEffort: profile?.thinkingEffort ?? "normal",
   };
+}
+
+// Stored answers are re-validated with the client's own rules. The "Call me"
+// name is dropped: it lives in the personal instructions, where it is reviewed.
+export function storedOnboardingAnswers(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const { onboarding_completed: _completed, preferred_name: _name, ...answers } = normalizeOnboarding(raw);
+  return answers;
+}
+
+export function onboardingResponse(profile) {
+  return {
+    surveyCompleted: profile?.onboardingCompleted === true,
+    surveyCompletedAt: profile?.onboardingCompletedAt ?? null,
+    onboarding: storedOnboardingAnswers(profile?.onboardingAnswers),
+  };
+}
+
+// The survey fields of /api/me.
+export async function surveyStatus(userId) {
+  const [profile] = await db
+    .select({
+      onboardingCompleted: userProfiles.onboardingCompleted,
+      onboardingCompletedAt: userProfiles.onboardingCompletedAt,
+      onboardingAnswers: userProfiles.onboardingAnswers,
+    })
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, userId))
+    .limit(1);
+  return onboardingResponse(profile);
 }
 
 export const profileRouter = Router();
@@ -85,6 +116,31 @@ profileRouter.patch("/product-mode", async (req, res, next) => {
     await db.insert(userProfiles).values({ userId: req.authSession.user.id, productMode })
       .onConflictDoUpdate({ target: userProfiles.userId, set: { productMode, updatedAt: new Date() } });
     return res.json({ productMode });
+  } catch (error) { return next(error); }
+});
+
+// Finishing or skipping the survey marks it done for the account, so no other
+// device asks again. Finishing (and later Settings tweaks) also send the
+// answers; a skip sends none and leaves any earlier answers in place. The first
+// completion time is kept. There is no "not completed": re-running the survey
+// from Settings does not undo it.
+profileRouter.patch("/onboarding", async (req, res, next) => {
+  try {
+    if (req.body?.completed !== true) return res.status(400).json({ error: "Only finishing the survey can be saved." });
+    const userId = req.authSession.user.id;
+    const answers = storedOnboardingAnswers(req.body?.answers);
+    const set = { onboardingCompleted: true, onboardingCompletedAt: sql`coalesce(${userProfiles.onboardingCompletedAt}, now())`, updatedAt: new Date() };
+    if (answers) set.onboardingAnswers = answers;
+    const [profile] = await db
+      .insert(userProfiles)
+      .values({ userId, onboardingCompleted: true, onboardingCompletedAt: new Date(), onboardingAnswers: answers })
+      .onConflictDoUpdate({ target: userProfiles.userId, set })
+      .returning({
+        onboardingCompleted: userProfiles.onboardingCompleted,
+        onboardingCompletedAt: userProfiles.onboardingCompletedAt,
+        onboardingAnswers: userProfiles.onboardingAnswers,
+      });
+    return res.json(onboardingResponse(profile));
   } catch (error) { return next(error); }
 });
 

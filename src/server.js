@@ -18,7 +18,7 @@ import { voiceRouter } from "./voice/router.js";
 import { startLiveUsageReconciliationJob } from "./voice/live-usage.js";
 import { securityRouter } from "./security/router.js";
 import { generationRouter } from "./generation/router.js";
-import { profileRouter } from "./profile/router.js";
+import { profileRouter, surveyStatus } from "./profile/router.js";
 import { visibleNameFields, warnIfNameBlocklistMissing } from "./security/display-name.js";
 import { uploadRouter } from "./uploads/router.js";
 import { disableTwoFactorWithReauth } from "./middleware/require-two-factor-password.js";
@@ -160,7 +160,9 @@ app.get("/api/me", async (req, res) => {
   // A stored name that fails the name check is withheld here, so no screen
   // shows it; the app falls back to a neutral name instead.
   const names = visibleNameFields(session.user, profile.rows[0]?.custom_instructions);
-  return res.status(200).json({ user: { ...session.user, ...names, hasPassword: credential.rowCount > 0 } });
+  // Survey completion rides along so a new device never re-asks.
+  const survey = await surveyStatus(session.user.id);
+  return res.status(200).json({ user: { ...session.user, ...names, hasPassword: credential.rowCount > 0, ...survey } });
 });
 
 app.use("/api/chat", chatRouter);

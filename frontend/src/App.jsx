@@ -59,7 +59,7 @@ import { CODING_NUDGE_COPY, shouldSuggestNebula } from "./coding-nudge.js";
 import Onboarding, { PersonalitySlider } from "./components/Onboarding.jsx";
 import {
   accentForTheme, CAPABILITY_OPTIONS, landingModeFor, mergeInstructions, personalityHeadline,
-  defaultOnboarding, EXPERTISE_OPTIONS, PERSONALITY_AXES, readOnboarding, responseStyleForPersonality, ROLE_OPTIONS, stripManagedInstructions,
+  defaultOnboarding, EXPERTISE_OPTIONS, onboardingForUser, PERSONALITY_AXES, readOnboarding, responseStyleForPersonality, ROLE_OPTIONS, stripManagedInstructions,
   THEME_OPTIONS, UNIT_OPTIONS, writeOnboarding,
 } from "./onboarding.js";
 import { checkDirectAndroidUpdate } from "./direct-distribution.js";
@@ -639,7 +639,7 @@ export default function App() {
   // The guarded /onboarding route: a deep link to a survey this account has
   // already finished is not a second survey, it is the workspace. Re-running it
   // deliberately goes through Settings, which opens the view directly.
-  if (user && window.location.pathname === "/onboarding" && readOnboarding(user.id).onboarding_completed) {
+  if (user && window.location.pathname === "/onboarding" && onboardingForUser(user).onboarding_completed) {
     window.history.replaceState(null, "", "/app");
   }
   return user ? (
@@ -1567,6 +1567,15 @@ const ONBOARDING_PATH = "/onboarding";
 // buildPreferenceSystemPrompt), and the capability answer becomes the stored
 // product mode. The existing instructions are read first so a user's own text
 // in Settings survives — mergeInstructions only rewrites its own block.
+// Survey completion (and the answers, when there are any) is saved on the
+// account so every device knows. A skip sends no answers.
+function saveSurveyStatus(answers) {
+  return api("/api/profile/onboarding", {
+    method: "PATCH",
+    body: JSON.stringify(answers ? { completed: true, answers } : { completed: true }),
+  });
+}
+
 async function persistOnboardingProfile(record) {
   const current = await api("/api/profile/preferences", { cache: "no-store" }).catch(() => null);
   await api("/api/profile/preferences", {
@@ -1639,8 +1648,11 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // The survey runs in front of the workspace rather than above sign-in, so it
   // can read the account's tier (for the honest credit-cost hints), write the
   // landing tab straight into productMode, and reuse the live appearance.
-  const [onboarding, setOnboarding] = useState(() => readOnboarding(user.id));
-  const [surveyOpen, setSurveyOpen] = useState(() => !readOnboarding(user.id).onboarding_completed);
+  // Whether it shows is the account's answer (user.surveyCompleted); this
+  // browser's copy is refreshed from it and only fills in when it is silent.
+  const [onboarding, setOnboarding] = useState(() => writeOnboarding(user.id, onboardingForUser(user)));
+  const [surveyOpen, setSurveyOpen] = useState(() => !onboarding.onboarding_completed);
+  const surveySaving = useRef(false);
   const [surveyToast, setSurveyToast] = useState("");
   const [memoryToast, setMemoryToast] = useState(null);
   const [pendingRecap, setPendingRecap] = useState(null);
@@ -1906,7 +1918,24 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     return saved;
   }, [user.id]);
 
-  const finishSurvey = useCallback((record) => {
+  // A browser that finished the survey before completion lived on the account
+  // tells the account once, so its other devices stop asking. Only completion
+  // is sent: an old copy cannot tell real answers from a skip's defaults.
+  useEffect(() => {
+    if (user.surveyCompleted !== true && readOnboarding(user.id).onboarding_completed) void saveSurveyStatus().catch(() => {});
+  }, [user.id, user.surveyCompleted]);
+
+  // Finishing and skipping save to the account before the survey closes. A
+  // failed save still lets the user in: this browser's copy remembers, and the
+  // effect above retries on the next load.
+  const finishSurvey = useCallback(async (record) => {
+    if (surveySaving.current) return;
+    surveySaving.current = true;
+    try {
+      await saveSurveyStatus({ ...record, onboarding_completed: true }).catch(() => null);
+    } finally {
+      surveySaving.current = false;
+    }
     const saved = leaveSurvey({ ...record, onboarding_completed: true });
     appearance.setAccentId(accentForTheme(saved.theme));
     // The sky question was answered on the last screen, so it is a choice.
@@ -1922,9 +1951,16 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     });
   }, [appearance, leaveSurvey, user.id]);
 
-  // Skipping records that the survey has been seen, so it does not reappear on
-  // the next load, but writes nothing to the account: a skip is not an answer.
-  const skipSurvey = useCallback(() => {
+  // Skipping records on the account that the survey has been seen, so no
+  // device shows it again, but saves no answers or settings: a skip is not an answer.
+  const skipSurvey = useCallback(async () => {
+    if (surveySaving.current) return;
+    surveySaving.current = true;
+    try {
+      await saveSurveyStatus().catch(() => null);
+    } finally {
+      surveySaving.current = false;
+    }
     leaveSurvey({ ...onboarding, onboarding_completed: true });
   }, [leaveSurvey, onboarding]);
 
@@ -1940,6 +1976,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     const saved = writeOnboarding(user.id, record);
     setOnboarding(saved);
     appearance.setAccentId(accentForTheme(saved.theme));
+    void saveSurveyStatus(saved).catch(() => {});
     try {
       await persistOnboardingProfile(saved);
     } catch (error) {
