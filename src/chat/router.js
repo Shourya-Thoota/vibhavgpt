@@ -10,7 +10,7 @@ import { checkModeration } from "./moderation.js";
 import { callModelStreaming, callModelWithFallback, getModelConfig, IMAGE_DISPLAY_NAME, InferenceUnavailableError } from "./providers.js";
 import { buildIdentitySystemPrompt, buildPreferenceSystemPrompt } from "./prompts.js";
 import { buildProductKnowledgeAddendum, buildProductKnowledgeSystemPrompt } from "../../frontend/src/product-knowledge.js";
-import { deleteConversation, listConversations, loadConversation, markReplyMissing, recordStudyResult, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
+import { deleteConversation, InvalidCursorError, listConversations, loadConversation, loadConversationPage, markReplyMissing, recordStudyResult, renameConversation, saveExchange, saveUserMessage, setConversationModel } from "./repository.js";
 import { studyResultNote, withImagePrompts, withStudyResults } from "./study-results.js";
 import { buildMemorySystemPrompt, buildRelevantMemoryContext, extractAndSaveFacts, getFacts, saveMemoryFromChat, vendorNamePattern } from "../memory/service.js";
 import { config } from "../config.js";
@@ -303,12 +303,21 @@ chatRouter.get("/conversations", requireSession, async (req, res, next) => {
   }
 });
 
+// One page of a conversation: the newest messages, or with ?before=<message
+// id> the page just before that message. hasMore and nextCursor say whether,
+// and from where, to load earlier messages; clients that ignore them get the
+// newest page exactly as before.
 chatRouter.get("/conversations/:id", requireSession, async (req, res, next) => {
   try {
     if (!UUID_PATTERN.test(req.params.id)) return res.status(400).json({ error: "Invalid conversation." });
-    const record = await loadConversation(req.authSession.user.id, req.params.id);
+    const hasCursor = Object.prototype.hasOwnProperty.call(req.query ?? {}, "before");
+    const before = hasCursor ? req.query.before : null;
+    // One plain message id: never a repeated parameter, an object or an empty value.
+    if (hasCursor && (typeof before !== "string" || !UUID_PATTERN.test(before))) return res.status(400).json({ error: "Invalid cursor." });
+    const record = await loadConversationPage(req.authSession.user.id, req.params.id, { before });
     return record ? res.json(record) : res.status(404).json({ error: "Conversation not found." });
   } catch (error) {
+    if (error instanceof InvalidCursorError) return res.status(400).json({ error: "Invalid cursor." });
     return next(error);
   }
 });
@@ -388,6 +397,7 @@ async function generateNaturalLanguageImage({ userId, conversationId, modelKey, 
     activitySummary,
     userMessageId,
     imagePrompt: expansion.expanded ? expansion.prompt : "",
+    replyModel: "image",
   });
   const attachment = await createStoredAttachment({
     userId,
@@ -406,6 +416,7 @@ async function generateNaturalLanguageImage({ userId, conversationId, modelKey, 
     // The byline shown over the reply. Never the image model's own name:
     // vendor and model names stay out of everything the user sees.
     model: IMAGE_DISPLAY_NAME,
+    modelKey: "image",
     webSearched: false,
     sources: [],
     activitySummary,
@@ -431,7 +442,7 @@ async function generateNaturalLanguageDocument({ userId, conversationId, modelKe
   const reply = forGoogleDocs
     ? "I created your Word document (.docx), which opens in Google Docs. Upload it to Google Drive and open it with Google Docs, or use File > Open in Google Docs."
     : `I created your ${label}.`;
-  const saved = await saveExchange({ userId, conversationId, modelKey, userContent: requestText, reply, activitySummary, mode, attachmentIds, userMessageId });
+  const saved = await saveExchange({ userId, conversationId, modelKey, userContent: requestText, reply, activitySummary, mode, attachmentIds, userMessageId, replyModel: null });
   const attachment = await createStoredAttachment({
     userId,
     conversationId: saved.conversationId,
@@ -447,6 +458,7 @@ async function generateNaturalLanguageDocument({ userId, conversationId, modelKe
     conversationId: saved.conversationId,
     reply: saved.messages[1].content,
     model: "VibhavGPT",
+    modelKey: null,
     webSearched: false,
     sources: [],
     activitySummary,
@@ -569,6 +581,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
           ...saved,
           reply,
           model: getModelConfig(modelKey).displayName,
+          modelKey,
           webSearched: false,
           sources: [],
           activitySummary,
@@ -882,6 +895,7 @@ async function generateChat(req, onStatus = () => {}, onDelta = null, onUserMess
       messageId: saved.messages.at(-1)?.id ?? null,
       reply,
       model: getModelConfig(modelKey).displayName,
+      modelKey,
       webSearched: Boolean(search),
       sources: search ? sourceList(search) : [],
       activitySummary,

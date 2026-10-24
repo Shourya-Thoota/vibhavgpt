@@ -37,17 +37,18 @@ function writeOpen(mode, ids) {
 }
 
 function ConversationRow({ conversation, active, onOpen, onRename, onMove, onDelete }) {
+  const name = conversation.title || "Untitled chat";
   return (
     <div className="conversation-item" data-active={active || undefined}>
-      <button type="button" className="conversation-item__open" onClick={() => onOpen(conversation.id)}>
-        <span>{conversation.title || "Untitled chat"}</span>
+      <button type="button" className="conversation-item__open" title={name} aria-current={active ? "page" : undefined} onClick={() => onOpen(conversation.id)}>
+        <span>{name}</span>
         <small>{relativeConversationTime(conversation.updatedAt)}</small>
       </button>
       <Menu
-        label={`Actions for ${conversation.title}`}
+        label={`Chat options for ${name}`}
         align="end"
         trigger={({ ref, open, toggle }) => (
-          <button ref={ref} type="button" className="conversation-item__actions" aria-label={`Actions for ${conversation.title}`} aria-expanded={open} onClick={toggle}>
+          <button ref={ref} type="button" className="conversation-item__actions" aria-label={`Chat options for ${name}`} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
             <MoreHorizontal size={17} strokeWidth={2} />
           </button>
         )}

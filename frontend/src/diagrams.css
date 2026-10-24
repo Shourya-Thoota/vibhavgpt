@@ -24,6 +24,16 @@
 .diagram-viewer__canvas svg { max-width: 100%; height: auto; }
 .diagram-viewer__canvas--loading,
 .diagram-viewer--pending { color: var(--color-muted); font-size: 0.9rem; }
+/* Held at a steady height until the drawing arrives, so the thread moves less. */
+.diagram-viewer__canvas--loading { min-height: 220px; }
+
+/* Show source / Hide source under a drawn diagram, and the block it reveals. */
+.diagram-viewer__source-bar { display: flex; justify-content: flex-end; padding: 0 10px 10px; }
+.diagram-viewer__source { padding: 0 10px 10px; }
+.diagram-viewer__source .code-block { margin: 0; }
+
+/* A diagram mermaid could not draw: a quiet note above its source. */
+.diagram-viewer-failed__note { margin: var(--space-md) 0 6px; color: var(--color-muted); font-size: 0.82rem; }
 .diagram-viewer--pending { display: flex; align-items: center; min-height: 120px; padding: var(--space-md); }
 
 .diagram-viewer__zoom { display: flex; align-items: center; gap: 6px; margin-top: var(--space-sm); }
@@ -32,7 +42,8 @@
 .diagram-viewer__zoomed { width: max-content; min-width: 100%; padding: var(--space-md); transform-origin: top left; transition: scale 160ms ease; }
 .diagram-viewer__zoomed svg { max-width: none; height: auto; }
 
-@media (max-width: 640px) {
+/* Phones (the app's 760px breakpoint): every toolbar button is a full-size target. */
+@media (max-width: 760px) {
   .diagram-viewer__action { min-height: 44px; }
   .diagram-viewer__canvas { padding: var(--space-sm); }
 }

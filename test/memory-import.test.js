@@ -48,5 +48,5 @@ test("Study uses its independent server-selected route", () => {
   const app = readFileSync(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /const sentModel = studyMode \? STUDY_MODEL : model;/);
   assert.match(app, /\{!studyMode && <Select/);
-  assert.match(app, /studyMode \? "VibhavGPT" : message\.model/);
+  assert.match(app, /studyMode \? "VibhavGPT" : modelLabel\(message\.model\)/);
 });

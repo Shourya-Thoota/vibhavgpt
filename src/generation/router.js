@@ -40,7 +40,7 @@ generationRouter.post("/document", async (req, res, next) => {
     // Client-provided plans must not bypass generation or content validation.
     const rendered = await generateDocument({ userId, format, prompt, history: existing?.history ?? [], sourceContext: attachmentContext(documents) });
     const label = documentLabel(format);
-    const saved = await saveExchange({ userId: req.authSession.user.id, conversationId: req.body?.conversationId || null, modelKey: canonicalModelKey(req.body?.model || "lumen"), userContent: prompt, reply: `I created your ${label}.` });
+    const saved = await saveExchange({ userId: req.authSession.user.id, conversationId: req.body?.conversationId || null, modelKey: canonicalModelKey(req.body?.model || "lumen"), userContent: prompt, reply: `I created your ${label}.`, replyModel: null });
     const attachment = await createStoredAttachment({ userId: req.authSession.user.id, conversationId: saved.conversationId, originalName: rendered.filename, mimeType: rendered.mimeType, kind: "generated-file", buffer: rendered.buffer });
     await persistAssistantAttachment({ userId: req.authSession.user.id, conversationId: saved.conversationId, messageId: saved.messages[1].id, attachment });
     return res.status(201).json({ conversationId: saved.conversationId, message: saved.messages[1], attachment: { id: attachment.id, name: attachment.originalName, mimeType: attachment.mimeType, kind: attachment.kind, sizeBytes: attachment.sizeBytes, downloadUrl: `/api/generation/${attachment.id}/download` }, baseUrl: baseUrl(req) });
@@ -101,7 +101,7 @@ generationRouter.post("/image", async (req, res, next) => {
       // One request is one user turn, however many variations it produces.
       const saved = index === 0
         ? await saveExchange({ userId, conversationId: savedConversationId, modelKey: "image", userContent: prompt, reply, mode: standalone ? "image" : undefined })
-        : await addAssistantReply({ userId, conversationId: savedConversationId, reply });
+        : await addAssistantReply({ userId, conversationId: savedConversationId, reply, modelKey: "image" });
       savedConversationId = saved.conversationId;
       const assistantMessage = saved.messages[saved.messages.length - 1];
       const generationMeta = { aspectRatio, style: style || null, variationIndex: index, referenceApplied: referenceImage ? generated.referenceApplied : null };

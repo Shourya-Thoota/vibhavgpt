@@ -3,12 +3,13 @@ import test from "node:test";
 import { interruptedStreamMessage } from "../frontend/src/stream-recovery.js";
 test("interrupted code is kept verbatim and clearly marked unsaved and incomplete", () => {
   const text = "Here is the code:\n\n\`\`\`html\n<html>partial";
-  const message = interruptedStreamMessage(text, "VibhavGPT Vesper");
+  // The chat passes the model key the reply was requested from (App.jsx).
+  const message = interruptedStreamMessage(text, "vesper");
   assert.equal(message.content, text);
   assert.equal(message.incomplete, true);
   assert.equal(message.fresh, false);
-  assert.equal(message.model, "VibhavGPT Vesper");
-  assert.equal(interruptedStreamMessage("  ", "VibhavGPT Vesper"), null);
+  assert.equal(message.model, "vesper");
+  assert.equal(interruptedStreamMessage("  ", "vesper"), null);
 });
 
 test("a real interrupted provider stream keeps the already-rendered code rather than replacing it with an error", async () => {

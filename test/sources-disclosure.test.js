@@ -22,7 +22,8 @@ test("sources are grouped by site, counted once per URL, and only web links are 
 });
 
 test("a finished reply has one thinking control at the top and no bottom Thought button", () => {
-  const start = app.indexOf('<article className="turn" key={index}>');
+  // The saved reply: the first assistant turn, ahead of the streaming one.
+  const start = app.indexOf('<article className="turn">');
   const end = app.indexOf("{busy && (", start);
   assert.ok(start > 0 && end > start, "found the finished assistant message");
   const reply = app.slice(start, end);

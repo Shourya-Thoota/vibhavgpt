@@ -1,5 +1,5 @@
-import { canonicalModelKey } from "../../frontend/src/token-quotas.js";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { canonicalModelKey, TOKEN_MODEL_NAMES } from "../../frontend/src/token-quotas.js";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { attachments, conversations, messages } from "../db/schema.js";
 import { removeFiles } from "../uploads/service.js";
@@ -15,11 +15,22 @@ export function messageActivityMetadata(metadata) {
   };
 }
 
+// The product that wrote a reply is kept with it, so a reloaded conversation
+// labels each reply by its own model, not by whichever one is selected now.
+// Only known keys are stored: the chat models and the image tier.
+const REPLY_MODEL_KEYS = new Set([...Object.keys(TOKEN_MODEL_NAMES), "image"]);
+export function replyModelKey(value) {
+  const key = canonicalModelKey(String(value ?? "").toLowerCase());
+  return REPLY_MODEL_KEYS.has(key) ? key : null;
+}
+
 // Only these fields are stored with a reply. The model's thinking text is
 // shown live and never saved; how long it thought is the one thing kept.
-export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null, imagePrompt = "" } = {}) {
+export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null, imagePrompt = "", model = null } = {}) {
   const prompt = String(imagePrompt ?? "").trim().slice(0, 1500);
+  const replyModel = replyModelKey(model);
   return {
+    ...(replyModel ? { model: replyModel } : {}),
     ...(prompt ? { imagePrompt: prompt } : {}),
     ...(sources.length ? { sources } : {}),
     ...(activitySummary.length ? { activitySummary } : {}),
@@ -27,31 +38,39 @@ export function assistantMessageMetadata({ sources = [], activitySummary = [], t
   };
 }
 
-export async function loadConversation(userId, conversationId) {
+// A conversation's messages in one total order, newest first: by time, then
+// a reply after the message it answers (older exchanges were saved with one
+// shared timestamp), then by id, so rows that tie on both still sort the same
+// way every time. Context and visible history use the same order.
+const ROLE_RANK = sql`case when ${messages.role} = 'assistant' then 1 else 0 end`;
+const NEWEST_FIRST = [desc(messages.createdAt), sql`${ROLE_RANK} desc`, desc(messages.id)];
+const MESSAGE_COLUMNS = { id: messages.id, role: messages.role, content: messages.content, createdAt: messages.createdAt, metadata: messages.metadata };
+const ATTACHMENT_COLUMNS = { id: attachments.id, messageId: attachments.messageId, originalName: attachments.originalName, mimeType: attachments.mimeType, kind: attachments.kind, sizeBytes: attachments.sizeBytes };
+
+// Every history page holds this many messages.
+export const HISTORY_PAGE_SIZE = 80;
+
+export class InvalidCursorError extends Error {
+  constructor() {
+    super("Invalid cursor.");
+    this.name = "InvalidCursorError";
+  }
+}
+
+async function ownedConversation(userId, conversationId) {
   const [conversation] = await db
     .select()
     .from(conversations)
     .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
     .limit(1);
-
   if (!conversation) return null;
   conversation.model = canonicalModelKey(conversation.model);
+  return conversation;
+}
 
-  // Bound provider context without accidentally preserving only the beginning
-  // of a long conversation. A bulk exchange insert gives its user and
-  // assistant rows the same PostgreSQL transaction timestamp, so make the
-  // role tie-breaker explicit before restoring chronological order.
-  const recentHistory = await db
-    .select({ id: messages.id, role: messages.role, content: messages.content, createdAt: messages.createdAt, metadata: messages.metadata })
-    .from(messages)
-    .where(eq(messages.conversationId, conversation.id))
-    .orderBy(desc(messages.createdAt), sql`case when ${messages.role} = 'assistant' then 0 else 1 end`)
-    .limit(80);
-  const history = recentHistory.reverse();
-  const attachmentRows = await db
-    .select({ id: attachments.id, messageId: attachments.messageId, originalName: attachments.originalName, mimeType: attachments.mimeType, kind: attachments.kind, sizeBytes: attachments.sizeBytes })
-    .from(attachments)
-    .where(eq(attachments.conversationId, conversation.id));
+// Turns stored rows into the messages the client and the model see. Raw
+// metadata never leaves here; only these fields are surfaced.
+export function presentMessages(rows, attachmentRows = []) {
   const byMessage = new Map(attachmentRows.map((row) => [row.messageId, {
     id: row.id,
     name: row.originalName,
@@ -61,26 +80,94 @@ export async function loadConversation(userId, conversationId) {
     downloadUrl: `/api/uploads/${row.id}/download`,
     previewUrl: row.kind === "generated-image" ? `/api/uploads/${row.id}/preview` : null,
   }]));
-  for (const message of history) {
-    message.attachment = byMessage.get(message.id) ?? null;
+  return rows.map(({ metadata, ...message }) => {
     // Surfaced as a plain array so the client renders a reloaded answer's
     // citations exactly the way it renders a freshly streamed one.
-    const persisted = messageActivityMetadata(message.metadata);
-    message.sources = persisted.sources;
-    // This is deliberately a small, server-generated activity record, never
-    // private reasoning. Keeping it with the message makes the disclosure
-    // available after a reload just like sources.
-    message.activitySummary = persisted.activitySummary;
-    message.thoughtSeconds = persisted.thoughtSeconds;
-    // What the learner did with this reply's flashcards or quiz
-    // (study-results.js), for the model's context.
-    message.studyResults = Array.isArray(message.metadata?.studyResults) ? message.metadata.studyResults.filter((note) => typeof note === "string") : [];
-    // The prompt a generated image was made from, for the model's context.
-    message.imagePrompt = typeof message.metadata?.imagePrompt === "string" ? message.metadata.imagePrompt : "";
-    delete message.metadata;
+    const persisted = messageActivityMetadata(metadata);
+    return {
+      ...message,
+      attachment: byMessage.get(message.id) ?? null,
+      sources: persisted.sources,
+      // This is deliberately a small, server-generated activity record, never
+      // private reasoning. Keeping it with the message makes the disclosure
+      // available after a reload just like sources.
+      activitySummary: persisted.activitySummary,
+      thoughtSeconds: persisted.thoughtSeconds,
+      // What the learner did with this reply's flashcards or quiz
+      // (study-results.js), for the model's context.
+      studyResults: Array.isArray(metadata?.studyResults) ? metadata.studyResults.filter((note) => typeof note === "string") : [],
+      // The prompt a generated image was made from, for the model's context.
+      imagePrompt: typeof metadata?.imagePrompt === "string" ? metadata.imagePrompt : "",
+      // The model that wrote a reply, or null: user messages, voice lines and
+      // replies saved before models were recorded carry none.
+      model: message.role === "assistant" ? replyModelKey(metadata?.model) : null,
+    };
+  });
+}
+
+// The conversation with its newest 80 messages: what the model's context is
+// built from (the chat, document and voice routes, and ownership checks).
+// Visible history pages through every message with loadConversationPage.
+export async function loadConversation(userId, conversationId) {
+  const conversation = await ownedConversation(userId, conversationId);
+  if (!conversation) return null;
+
+  // Bound provider context without accidentally preserving only the beginning
+  // of a long conversation: take the newest rows, then restore chronological order.
+  const recentHistory = await db
+    .select(MESSAGE_COLUMNS)
+    .from(messages)
+    .where(eq(messages.conversationId, conversation.id))
+    .orderBy(...NEWEST_FIRST)
+    .limit(80);
+  const attachmentRows = await db
+    .select(ATTACHMENT_COLUMNS)
+    .from(attachments)
+    .where(eq(attachments.conversationId, conversation.id));
+
+  return { conversation, history: presentMessages(recentHistory.reverse(), attachmentRows) };
+}
+
+// One page of visible history: the newest messages, or with "before" (the id
+// of the oldest message the client has) the ones just before it. Keyset, not
+// offset, so messages added meanwhile never shift a page. The cursor is looked
+// up inside this conversation and its position compared in SQL, so a client
+// never supplies a time and can't reach another conversation through it.
+export async function loadConversationPage(userId, conversationId, { before = null } = {}) {
+  const conversation = await ownedConversation(userId, conversationId);
+  if (!conversation) return null;
+
+  let olderThanCursor;
+  if (before !== null) {
+    const [cursor] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(and(eq(messages.id, before), eq(messages.conversationId, conversation.id)))
+      .limit(1);
+    if (!cursor) throw new InvalidCursorError();
+    olderThanCursor = sql`(${messages.createdAt}, ${ROLE_RANK}, ${messages.id}) < (
+      select anchor.created_at, case when anchor.role = 'assistant' then 1 else 0 end, anchor.id
+      from messages anchor where anchor.id = ${before} and anchor.conversation_id = ${conversation.id}
+    )`;
   }
 
-  return { conversation, history };
+  // One extra row says whether anything older remains.
+  const rows = await db
+    .select(MESSAGE_COLUMNS)
+    .from(messages)
+    .where(and(eq(messages.conversationId, conversation.id), olderThanCursor))
+    .orderBy(...NEWEST_FIRST)
+    .limit(HISTORY_PAGE_SIZE + 1);
+  const hasMore = rows.length > HISTORY_PAGE_SIZE;
+  const page = rows.slice(0, HISTORY_PAGE_SIZE).reverse();
+  const attachmentRows = page.length
+    ? await db
+      .select(ATTACHMENT_COLUMNS)
+      .from(attachments)
+      .where(and(eq(attachments.conversationId, conversation.id), inArray(attachments.messageId, page.map((message) => message.id))))
+    : [];
+  const history = presentMessages(page, attachmentRows);
+  return { conversation, history, hasMore, nextCursor: hasMore ? history[0].id : null };
 }
 
 export async function listConversations(userId) {
@@ -227,7 +314,9 @@ export async function markReplyMissing(messageId, replyStatus, requestId) {
 // Saves a finished exchange. With userMessageId, the user's message was
 // already saved by saveUserMessage: only the reply is added (and the
 // message's missing-reply mark cleared). Without it, both are saved together.
-export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "" }) {
+// The reply records replyModel, which is the conversation's model unless the
+// reply came from elsewhere (an image, or a document, which records none).
+export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "", replyModel = modelKey }) {
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
@@ -257,7 +346,7 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
     // history, rather than relying on arbitrary order for equal timestamps.
     const userCreatedAt = new Date();
     const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
-    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds, imagePrompt });
+    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds, imagePrompt, model: replyModel });
     // Sources ride along in the assistant row's metadata so a reloaded
     // conversation can still show what an answer was grounded in. They
     // were previously returned on the live response only, which meant
@@ -345,16 +434,17 @@ export async function saveVoiceTranscript({ userId, conversationId, modelKey, se
 // variations) should read as one user turn, not a repeated one. Callers save
 // the user turn once with saveExchange, then add each further assistant
 // reply here.
-export async function addAssistantReply({ userId, conversationId, reply }) {
+export async function addAssistantReply({ userId, conversationId, reply, modelKey = null }) {
   const [saved] = await db
     .update(conversations)
     .set({ updatedAt: new Date() })
     .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
     .returning({ id: conversations.id });
   if (!saved) throw Object.assign(new Error("Conversation not found."), { status: 404 });
+  const metadata = assistantMessageMetadata({ model: modelKey });
   const [message] = await db
     .insert(messages)
-    .values({ conversationId, role: "assistant", content: reply })
+    .values({ conversationId, role: "assistant", content: reply, ...(Object.keys(metadata).length ? { metadata } : {}) })
     .returning({ id: messages.id, role: messages.role, content: messages.content });
   return { conversationId, messages: [message] };
 }

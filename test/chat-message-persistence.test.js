@@ -225,3 +225,85 @@ test("the app keeps a first message's conversation as soon as it exists", async 
   assert.match(app, /if \(event === "conversation"\) onConversation\?\.\(data\);/);
   assert.match(app, /onConversation: \(saved\) => \{\s*if \(!saved\?\.conversationId \|\| saved\.conversationId === conversationId\) return;\s*setConversationId\(saved\.conversationId\);\s*onConversationSaved\?\.\(saved\.conversationId, !mountedRef\.current\);/);
 });
+
+// Each reply keeps the model that wrote it (metadata.model), so a reloaded
+// conversation labels it correctly after the user switches models. User
+// messages never carry a model.
+test("a reply keeps its model through a failed first try and a retry; user messages carry none", async (t) => {
+  const userId = "persist-model";
+  const base = await serve(t, userId);
+  model = "fail";
+  const saved = eventOf(await stream(base, { message: "Which model answers this?" }), "conversation");
+  model = "answer";
+  const done = eventOf(await stream(base, { message: "Which model answers this?", conversationId: saved.conversationId }), "complete");
+  assert.deepEqual([done.modelKey, done.model], ["nova", "VibhavGPT Nova"]);
+  let rows = await thread(userId);
+  assert.deepEqual(rows.map((row) => [row.role, row.metadata.model ?? null]), [["user", null], ["assistant", "nova"]], "the retry's reply records its model");
+  assert.deepEqual(rows[0].metadata, {}, "the user message stays model-free, its missing-reply mark cleared");
+
+  // A later message that fails is marked on its own row; earlier replies keep their model.
+  model = "fail";
+  await stream(base, { message: "And a follow-up?", conversationId: saved.conversationId });
+  model = "answer";
+  rows = await thread(userId);
+  assert.deepEqual(rows.map((row) => [row.role, row.metadata.model ?? null, row.metadata.replyStatus ?? null]), [
+    ["user", null, null], ["assistant", "nova", null], ["user", null, "failed"],
+  ]);
+});
+
+test("replies saved before models were recorded, voice lines and unknown keys load with no model", async () => {
+  const { loadConversation, replyModelKey } = await import("../src/chat/repository.js");
+  const { rows: [conversation] } = await client.query("INSERT INTO conversations (user_id, title, model) VALUES ('persist-legacy', 'Old chat', 'nebula') RETURNING id");
+  const insert = (role, content, metadata, seconds) => client.query("INSERT INTO messages (conversation_id, role, content, metadata, created_at) VALUES ($1, $2, $3, $4, now() - make_interval(secs => $5))", [conversation.id, role, content, JSON.stringify(metadata), seconds]);
+  await insert("user", "q1", {}, 6);
+  await insert("assistant", "an old reply", {}, 5);
+  await insert("assistant", "an unknown model", { model: "gpt-4o" }, 4);
+  await insert("assistant", "a voice line", { source: "voice" }, 3);
+  await insert("assistant", "a renamed model", { model: "spark" }, 2);
+  await insert("user", "a user row can't claim a model", { model: "nebula" }, 1);
+  const loaded = await loadConversation("persist-legacy", conversation.id);
+  assert.deepEqual(loaded.history.map((message) => [message.content, message.model]), [
+    ["q1", null], ["an old reply", null], ["an unknown model", null], ["a voice line", null], ["a renamed model", "lumen"], ["a user row can't claim a model", null],
+  ]);
+  assert.ok(loaded.history.every((message) => !("metadata" in message)), "raw metadata is never returned");
+  assert.equal(await loadConversation("someone-else", conversation.id), null, "only the owner can load it");
+  assert.deepEqual(["nova", "NEBULA", "study", "image", "ultra", "gpt-4o", "", null, undefined, {}].map(replyModelKey), ["nova", "nebula", "study", "image", "nebula", null, null, null, null, null], "only known model keys are ever stored");
+});
+
+test("a study note on a reply, and extra image replies, keep their model", async () => {
+  const { addAssistantReply, recordStudyResult } = await import("../src/chat/repository.js");
+  const { rows: [conversation] } = await client.query("INSERT INTO conversations (user_id, title, model) VALUES ('persist-notes', 'Quiz', 'nebula') RETURNING id");
+  const { rows: [reply] } = await client.query("INSERT INTO messages (conversation_id, role, content, metadata) VALUES ($1, 'assistant', 'a quiz', $2) RETURNING id", [conversation.id, JSON.stringify({ model: "nebula" })]);
+  assert.equal(await recordStudyResult("persist-notes", conversation.id, reply.id, "Quiz: 2 of 2 correct."), true);
+  const { rows: [noted] } = await client.query("SELECT metadata FROM messages WHERE id = $1", [reply.id]);
+  assert.deepEqual(noted.metadata, { model: "nebula", studyResults: ["Quiz: 2 of 2 correct."] });
+
+  const extra = await addAssistantReply({ userId: "persist-notes", conversationId: conversation.id, reply: "variation 2", modelKey: "image" });
+  const plain = await addAssistantReply({ userId: "persist-notes", conversationId: conversation.id, reply: "no model given" });
+  const { rows } = await client.query("SELECT id, metadata FROM messages WHERE id = ANY($1::uuid[])", [[extra.messages[0].id, plain.messages[0].id]]);
+  assert.deepEqual(Object.fromEntries(rows.map((row) => [row.id, row.metadata])), { [extra.messages[0].id]: { model: "image" }, [plain.messages[0].id]: {} });
+});
+
+test("the context loader still returns the newest 80, and the shared presenter keeps every field", async () => {
+  const { loadConversation, presentMessages } = await import("../src/chat/repository.js");
+  const { rows: [conversation] } = await client.query("INSERT INTO conversations (user_id, title, model) VALUES ('persist-window', 'Long', 'nova') RETURNING id");
+  await client.query(`INSERT INTO messages (conversation_id, role, content, created_at)
+    SELECT $1, CASE WHEN g % 2 = 1 THEN 'user' ELSE 'assistant' END, 'w' || g, timestamptz '2026-03-01' + make_interval(secs => g)
+    FROM generate_series(1, 100) g`, [conversation.id]);
+  const loaded = await loadConversation("persist-window", conversation.id);
+  assert.equal(loaded.history.length, 80);
+  assert.deepEqual([loaded.history[0].content, loaded.history.at(-1).content], ["w21", "w100"], "the newest 80, oldest first");
+
+  const createdAt = new Date("2026-03-02T00:00:00Z");
+  const [reply] = presentMessages([{
+    id: "m-1", role: "assistant", content: "An answer", createdAt,
+    metadata: { model: "nebula", sources: [{ title: "S" }], activitySummary: ["Searched"], thoughtSeconds: 4, studyResults: ["Quiz: 1 of 1", 7], imagePrompt: "a cat", replyStatus: "x" },
+  }], [{ id: "file-1", messageId: "m-1", originalName: "cat.png", mimeType: "image/png", kind: "generated-image", sizeBytes: 10 }]);
+  assert.deepEqual(reply, {
+    id: "m-1", role: "assistant", content: "An answer", createdAt,
+    attachment: { id: "file-1", name: "cat.png", mimeType: "image/png", kind: "generated-image", sizeBytes: 10, downloadUrl: "/api/uploads/file-1/download", previewUrl: "/api/uploads/file-1/preview" },
+    sources: [{ title: "S" }], activitySummary: ["Searched"], thoughtSeconds: 4, studyResults: ["Quiz: 1 of 1"], imagePrompt: "a cat", model: "nebula",
+  });
+  const [user] = presentMessages([{ id: "m-2", role: "user", content: "Hi", createdAt, metadata: { model: "nebula" } }]);
+  assert.deepEqual([user.model, user.attachment, "metadata" in user], [null, null, false]);
+});

@@ -831,34 +831,63 @@ p { margin: 0; }
 .sidebar::-webkit-scrollbar-track, .conversation-history__list::-webkit-scrollbar-track { background: transparent; }
 .conversation-history__empty, .conversation-history__error { padding: 4px 11px; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
 .conversation-history__error { color: var(--danger); }
-.conversation-item { display: flex; align-items: center; min-width: 0; border-radius: var(--r-sm); }
-.conversation-item:hover, .conversation-item[data-active] { background: var(--surface-2); }
-.conversation-item[data-active] { box-shadow: inset 2px 0 0 var(--accent); }
+/* A recent chat: the whole row opens it, the title and its time share one
+   line, and the menu keeps its own 44px column so a long title ellipsizes
+   before it rather than running underneath. */
+.conversation-item { display: flex; align-items: center; min-width: 0; min-height: 44px; border-radius: var(--r-sm); }
+.conversation-item:hover:not([data-active]) { background: var(--surface-2); }
+.conversation-item[data-active] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .conversation-item__open {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  align-self: stretch;
   min-width: 0;
   flex: 1;
-  gap: 2px;
-  padding: 8px 5px 8px 12px;
+  gap: 8px;
+  padding: 11px 2px 11px 12px;
+  border-radius: inherit;
   color: var(--ink-2);
   text-align: left;
 }
 .conversation-item__open > span { overflow: hidden; font-size: 0.8rem; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
-.conversation-item__open small { color: var(--faint); font-size: 0.69rem; }
+.conversation-item__open small { color: var(--faint); font-size: 0.68rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.conversation-item[data-active] .conversation-item__open { color: var(--ink); }
+.conversation-item[data-active] .conversation-item__open > span { font-weight: 600; }
+/* Inset, so the list's own overflow clipping never cuts the ring off. */
+.conversation-item__open:focus-visible,
+.conversation-item__actions:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
 .conversation-item__actions {
+  position: relative;
   display: inline-grid;
   place-items: center;
   flex: 0 0 auto;
-  width: 30px;
-  height: 30px;
-  margin-right: 4px;
-  border-radius: var(--radius-pill);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--r-sm);
   color: var(--muted);
   opacity: 0;
-  transition: background-color 150ms var(--ease), color 150ms var(--ease), opacity 150ms var(--ease);
+  transition: color 150ms var(--ease), opacity 150ms var(--ease);
 }
-.conversation-item:hover .conversation-item__actions, .conversation-item:focus-within .conversation-item__actions { opacity: 1; }
-.conversation-item__actions:hover { background: var(--surface); color: var(--ink); }
+/* The visible pill is smaller than the 44px target around it. */
+.conversation-item__actions::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: var(--radius-pill);
+  transition: background-color 150ms var(--ease);
+}
+.conversation-item__actions > svg { position: relative; }
+.conversation-item:hover .conversation-item__actions,
+.conversation-item:focus-within .conversation-item__actions,
+.conversation-item[data-active] .conversation-item__actions,
+.conversation-item__actions[aria-expanded="true"] { opacity: 1; }
+.conversation-item__actions:hover, .conversation-item__actions[aria-expanded="true"] { color: var(--ink); }
+.conversation-item__actions:hover::before, .conversation-item__actions[aria-expanded="true"]::before { background: var(--surface); }
+/* Touch screens never hover, so the menu stays in sight there. */
+@media (hover: none), (pointer: coarse) {
+  .conversation-item__actions { opacity: 1; }
+}
 
 .sidebar__foot { margin-top: auto; display: grid; gap: 10px; }
 
@@ -978,6 +1007,24 @@ p { margin: 0; }
 
 .turn { display: grid; gap: 8px; min-width: 0; }
 .turn--user { justify-items: end; }
+/* "Now using Nebula": a hairline with a quiet label where the thread moved to
+   another model. Worked out from the replies' own models; never stored. */
+.model-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 550;
+  letter-spacing: 0.01em;
+}
+.model-switch::before,
+.model-switch::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+/* "Load earlier messages" above a long conversation's newest page, and the
+   quiet line that replaces it once the first message is on screen. */
+.load-earlier { display: grid; justify-items: center; gap: 8px; }
+.load-earlier__error { color: var(--danger); font-size: 0.84rem; text-align: center; }
+.history-start { color: var(--muted); font-size: 0.76rem; font-weight: 550; text-align: center; }
 .turn__byline {
   display: flex;
   align-items: center;
@@ -2044,8 +2091,6 @@ p { margin: 0; }
 .sidebar__link:active { transform: translateX(2px) scale(0.985); }
 .sidebar__new:hover:not(:disabled) { transform: translateY(-1px) scale(1.012); }
 .sidebar__new:active:not(:disabled) { transform: scale(0.985); }
-
-.conversation-item:hover { transform: translateX(2px); }
 
 /* Popovers open from the corner they are anchored to, so the panel appears to
    grow out of its trigger instead of expanding from its own middle. The

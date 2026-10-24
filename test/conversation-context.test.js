@@ -93,9 +93,11 @@ test("switching from Nova to Nebula mid-chat sends Nebula every earlier turn, th
 
   const switched = await fetch(`${base}/api/chat/conversations/${first.conversationId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nebula" }) });
   assert.equal(switched.status, 200, "the same conversation, now on Nebula");
-  await send({ model: "nebula", conversationId: first.conversationId, message: "Add a step for water to the diagram" });
+  const nebulaReply = await send({ model: "nebula", conversationId: first.conversationId, message: "Add a step for water to the diagram" });
 
   assert.equal(requests[2].model, "fixture-nebula", "Nebula answers");
+  assert.equal(nebulaReply.conversationId, first.conversationId, "still the same conversation");
+  assert.deepEqual([nebulaReply.modelKey, nebulaReply.model], ["nebula", "VibhavGPT Nebula"], "the live reply names its model by key and by its old display name");
   assert.deepEqual(historyOf(requests[2]), [
     { role: "user", content: "Draw photosynthesis as a flowchart" },
     { role: "assistant", content: DIAGRAM },
@@ -107,6 +109,40 @@ test("switching from Nova to Nebula mid-chat sends Nebula every earlier turn, th
   const system = (request) => request.messages.filter((message) => message.role === "system").map((message) => message.content).join("\n");
   assert.match(system(requests[2]), /language mermaid/);
   assert.match(system(requests[1]), /language mermaid/);
+
+  // Reloaded, or opened on another device: every turn is there, and each
+  // reply keeps the model that wrote it. User messages carry no model.
+  const reloaded = await (await fetch(`${base}/api/chat/conversations/${first.conversationId}`)).json();
+  assert.equal(reloaded.conversation.id, first.conversationId);
+  assert.equal(reloaded.conversation.model, "nebula", "the conversation's current model");
+  assert.deepEqual(reloaded.history.map((message) => [message.role, message.model]), [
+    ["user", null], ["assistant", "nova"],
+    ["user", null], ["assistant", "nova"],
+    ["user", null], ["assistant", "nebula"],
+  ]);
+  assert.deepEqual(reloaded.history.map((message) => message.content).slice(0, 2), ["Draw photosynthesis as a flowchart", DIAGRAM], "nothing rewritten");
+});
+
+test("another account can't read, switch or write to someone else's conversation", async (t) => {
+  const { base, send } = await serve(t, "isolation-owner", ["The owner's answer."]);
+  const owned = await send({ model: "nova", message: "A private question" });
+  const stranger = { "x-test-user": "isolation-stranger", "Content-Type": "application/json" };
+  const rows = async () => (await client.query("SELECT role, content, metadata FROM messages WHERE conversation_id = $1 ORDER BY created_at", [owned.conversationId])).rows;
+  const before = await rows();
+
+  const read = await fetch(`${base}/api/chat/conversations/${owned.conversationId}`, { headers: stranger });
+  assert.equal(read.status, 404);
+  assert.doesNotMatch(await read.text(), /private question|owner's answer/, "nothing of the conversation leaks");
+  const switched = await fetch(`${base}/api/chat/conversations/${owned.conversationId}`, { method: "PATCH", headers: stranger, body: JSON.stringify({ model: "nebula" }) });
+  assert.equal(switched.status, 404);
+  const streamed = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: stranger, body: JSON.stringify({ model: "nova", conversationId: owned.conversationId, message: "Let me in" }) })).text();
+  const error = streamed.split("\n\n").find((block) => /^event:\s*error$/m.test(block));
+  assert.equal(JSON.parse(error.match(/^data:\s*(.+)$/m)[1]).status, 404);
+  assert.doesNotMatch(streamed, /event:\s*(conversation|complete)/, "no conversation is opened or answered");
+
+  assert.deepEqual(await rows(), before, "the owner's messages are unchanged");
+  assert.equal((await client.query("SELECT model FROM conversations WHERE id = $1", [owned.conversationId])).rows[0].model, "nova", "the owner's model is unchanged");
+  assert.equal(Number((await client.query("SELECT count(*) FROM conversations WHERE user_id = 'isolation-stranger'")).rows[0].count), 0, "nothing saved for the stranger");
 });
 
 test("a finished quiz is kept with its reply, and the next model sees the score and the missed questions", async (t) => {
@@ -166,9 +202,34 @@ test("finished widgets report once to their reply, through the chat", () => {
   const app = read("frontend/src/App.jsx");
   assert.match(app, /onStudyResult=\{message\.id && conversationId \? \(result\) => recordStudyResult\(message\.id, result\) : null\}/);
   assert.match(app, /api\(`\/api\/chat\/conversations\/\$\{conversationId\}\/messages\/\$\{messageId\}\/study-results`, \{ method: "POST", body: JSON\.stringify\(result\) \}\)\.catch\(\(\) => \{\}\)/, "best effort");
-  assert.match(app, /\{ id: reply\.messageId \?\? null, role: "assistant"/, "a fresh reply knows its id");
+  assert.match(app, /\{ id: reply\.messageId \?\? null, clientKey: nextClientKey\(\), role: "assistant"/, "a fresh reply knows its id");
   assert.match(app, /id: message\.id \?\? null,\n\s*role: message\.role,/, "so does a reloaded one");
   for (const file of ["InteractiveFlashcards.jsx", "InteractiveQuiz.jsx"]) {
     assert.match(read(`frontend/src/components/${file}`), /if \(!state\.finished\) \{ reported\.current = false; return; \}\n\s*if \(reported\.current \|\| !onResult\) return;\n\s*reported\.current = true;/, `${file} reports each finish once`);
   }
+});
+
+// Visible history pages through every message, but the model's context stays
+// the bounded newest window: a long conversation never sends its oldest turns,
+// and a pagination cursor sent to the chat route changes nothing.
+test("past 80 messages the model still gets only the newest window, whatever cursor is sent", async (t) => {
+  const { base, send, requests } = await serve(t, "long-context", ["Latest answer.", "Another answer."]);
+  const started = await send({ model: "nova", message: "The newest question" });
+  // 120 older turns, saved before that exchange.
+  await client.query(`INSERT INTO messages (conversation_id, role, content, created_at)
+    SELECT $1, CASE WHEN g % 2 = 1 THEN 'user' ELSE 'assistant' END, 'old turn ' || g, now() - make_interval(hours => 1, secs => -g)
+    FROM generate_series(1, 120) g`, [started.conversationId]);
+  const page = await (await fetch(`${base}/api/chat/conversations/${started.conversationId}`)).json();
+  assert.equal(page.hasMore, true, "the screen can page further back");
+
+  const asked = (await fetch(`${base}/api/chat/stream?before=${page.nextCursor}`, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "nova", conversationId: started.conversationId, message: "One more", before: page.nextCursor }),
+  })).text();
+  assert.match(await asked, /event:\s*complete/);
+  const context = historyOf(requests.at(-1)).map((message) => message.content);
+  assert.ok(context.length <= 81, `bounded: ${context.length} turns`);
+  assert.ok(context.includes("The newest question") && context.includes("Latest answer."), "the newest turns are there");
+  assert.ok(context.includes("old turn 120"), "the newest older turns are there");
+  for (const old of ["old turn 1", "old turn 2", "old turn 42"]) assert.equal(context.includes(old), false, `${old} is outside the window`);
 });

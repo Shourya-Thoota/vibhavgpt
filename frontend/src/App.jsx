@@ -1,4 +1,4 @@
-import { Children, createContext, isValidElement, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Children, createContext, Fragment, isValidElement, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
@@ -50,6 +50,8 @@ import { parseStudyBlock, STUDY_BLOCK_LANGUAGES } from "./study-widgets.js";
 import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
 import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
 import StudyWritingTools from "./components/StudyWritingTools.jsx";
+import { createReplyLabels } from "./model-labels.js";
+import { mergeOlderPage, messageKey, restoredScrollTop } from "./conversation-pages.js";
 import DiagramViewer from "./components/DiagramViewer.jsx";
 import { isDiagramLanguage } from "./diagrams.js";
 import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
@@ -1480,6 +1482,8 @@ const MODELS = [
   { value: "nebula", label: "Nebula", full: "VibhavGPT Nebula", description: "Strong reasoning for demanding, high-complexity work. Reads images.", badges: [{ label: "Premium", tone: "premium" }, { label: "Vision" }] },
   { value: "vesper", label: "Vesper", full: "VibhavGPT Vesper", description: "Flagship. Highest reasoning capacity for the most difficult problems. Reads images.", badges: [{ label: "Top Tier", tone: "top-tier" }, { label: "Vision" }] },
 ];
+// Saved replies are labeled by the model that wrote them (model-labels.js).
+const { modelLabel, modelSwitches } = createReplyLabels(MODELS);
 const VISION_MODELS = ["nova", "nebula", "vesper"];
 const STUDY_MODEL = "study";
 
@@ -2328,6 +2332,26 @@ function CopyButton({ text }) {
   );
 }
 
+// A saved message as the chat shows it, from any page of history.
+function historyMessage(message) {
+  return {
+    id: message.id ?? null,
+    role: message.role,
+    content: message.content,
+    attachment: message.attachment ?? null,
+    sources: message.sources ?? [],
+    activitySummary: message.activitySummary ?? [],
+    thoughtSeconds: message.thoughtSeconds ?? null,
+    model: message.model ?? null,
+    createdAt: message.createdAt,
+    fresh: false,
+  };
+}
+
+// Only a cursor the server says leads somewhere opens "Load earlier messages";
+// a server that sends neither field has no earlier pages to offer.
+const olderCursorFrom = (result) => (result?.hasMore === true && typeof result.nextCursor === "string" ? result.nextCursor : null);
+
 function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null, onOpenWritingTools }) {
   const [model, setModel] = useState(initialModel || "lumen");
   const studyMode = mode === "study";
@@ -2343,6 +2367,19 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const [sendPulse, setSendPulse] = useState(0);
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
+  // The model the pending reply was requested from, for its live byline.
+  const [streamingModel, setStreamingModel] = useState(null);
+  // Earlier pages of a long conversation (conversation-pages.js).
+  const [olderCursor, setOlderCursor] = useState(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderError, setOlderError] = useState("");
+  const [reachedStart, setReachedStart] = useState(false);
+  const olderInFlightRef = useRef(false);
+  const prependAnchorRef = useRef(null);
+  const skipBottomScrollRef = useRef(false);
+  // Messages added on this screen get a stable key until they have an id.
+  const clientKeyRef = useRef(0);
+  const nextClientKey = () => `local-${(clientKeyRef.current += 1)}`;
   const activeRequestRef = useRef(null);
   const [error, setError] = useState("");
   const [attachments, setAttachments] = useState([]);
@@ -2395,6 +2432,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const preferredModelRef = useRef(undefined);
 
   const modelInfo = MODELS.find((entry) => entry.value === model) ?? MODELS[0];
+  const replySwitches = useMemo(() => modelSwitches(messages), [messages]);
+  const activeConversationRef = useRef(conversationId);
+  activeConversationRef.current = conversationId;
   const modelOptions = MODELS.map((entry) => {
     const allowed = modelAllowedForTier(entry.value, tier, creditBalance);
     return {
@@ -2422,17 +2462,8 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         const conversationModel = modelAllowedForTier(restoredModel, tier, creditBalance) ? restoredModel : "lumen";
         setModel(conversationModel);
         onModelChange?.(conversationModel);
-        setMessages((result.history ?? []).map((message) => ({
-          id: message.id ?? null,
-          role: message.role,
-          content: message.content,
-          attachment: message.attachment ?? null,
-          sources: message.sources ?? [],
-          activitySummary: message.activitySummary ?? [],
-          thoughtSeconds: message.thoughtSeconds ?? null,
-          createdAt: message.createdAt,
-          fresh: false,
-        })));
+        setMessages((result.history ?? []).map(historyMessage));
+        setOlderCursor(olderCursorFrom(result));
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoadingConversation(false); });
@@ -2448,7 +2479,23 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   }, []);
   useEffect(() => { if (streamText) stickToBottom(); }, [streamText, stickToBottom]);
 
+  // After an earlier page goes in above, keep the message the reader was on
+  // exactly where it was, before the browser paints.
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    const node = scrollRef.current;
+    if (!anchor || !node) return;
+    prependAnchorRef.current = null;
+    skipBottomScrollRef.current = true;
+    node.scrollTop = restoredScrollTop({ ...anchor, afterHeight: node.scrollHeight });
+  }, [messages]);
+
   useEffect(() => {
+    // An earlier page was just added above: stay put instead of jumping down.
+    if (skipBottomScrollRef.current) {
+      skipBottomScrollRef.current = false;
+      return;
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, busy]);
 
@@ -2550,6 +2597,33 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     );
   }
 
+  // One earlier page above what is shown. One request at a time, never while
+  // a reply streams, and a reply for a conversation no longer open is dropped.
+  async function loadEarlier() {
+    if (olderInFlightRef.current || !olderCursor || busyRef.current || !conversationId) return;
+    const requestedFor = conversationId;
+    olderInFlightRef.current = true;
+    setLoadingOlder(true);
+    setOlderError("");
+    try {
+      const result = await api(`/api/chat/conversations/${encodeURIComponent(requestedFor)}?before=${encodeURIComponent(olderCursor)}`);
+      if (!mountedRef.current || activeConversationRef.current !== requestedFor) return;
+      const node = scrollRef.current;
+      // Measured as the page goes in, so scrolling during the request is kept too.
+      prependAnchorRef.current = node ? { beforeHeight: node.scrollHeight, beforeTop: node.scrollTop } : null;
+      setMessages((current) => mergeOlderPage(current, (result.history ?? []).map(historyMessage)));
+      const next = olderCursorFrom(result);
+      setOlderCursor(next);
+      if (!next) setReachedStart(true);
+    } catch {
+      // The cursor stays, so the same button tries again.
+      if (mountedRef.current && activeConversationRef.current === requestedFor) setOlderError("Couldn't load earlier messages.");
+    } finally {
+      olderInFlightRef.current = false;
+      if (mountedRef.current) setLoadingOlder(false);
+    }
+  }
+
   async function changeModel(nextModel) {
     if (modelSaving || busyRef.current || nextModel === model) return;
     if (!modelAllowedForTier(nextModel, tier, creditBalance)) {
@@ -2634,6 +2708,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     busyRef.current = true;
     const controller = new AbortController();
     activeRequestRef.current = controller;
+    setStreamingModel(sentModel);
     setBusy(true);
     setError("");
     setLiveSources([]);
@@ -2731,7 +2806,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       if (mountedRef.current) setMessages((current) => [
         ...current,
         // A reply already read as it streamed isn't typed out a second time.
-        { id: reply.messageId ?? null, role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.model ?? modelInfo.full, fresh: !streamedAny,
+        { id: reply.messageId ?? null, clientKey: nextClientKey(), role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.modelKey ?? null, fresh: !streamedAny,
           // No shown thinking (empty, or all rule-checking that was scrubbed):
           // no "Thought for X s" pill or drawer for this reply.
           reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined, thoughtSeconds: reasoningSoFar.trim() ? (reply.thoughtSeconds ?? null) : null },
@@ -2741,8 +2816,8 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       if (mountedRef.current) setFailed(null);
     } catch (err) {
       if (mountedRef.current) {
-        const partial = interruptedStreamMessage(visibleStream || previousStream, modelInfo.full);
-        if (partial) setMessages((current) => [...current, partial]);
+        const partial = interruptedStreamMessage(visibleStream || previousStream, streamingModel ?? sentModel);
+        if (partial) setMessages((current) => [...current, { ...partial, clientKey: nextClientKey() }]);
         setError(err.access?.reason === "quota" ? "" : err.message);
       }
       // Keep the attempt so the banner can offer a retry; without this the
@@ -2774,7 +2849,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     if (!autoPrompt || autoPromptSent.current) return;
     autoPromptSent.current = true;
     recapRef.current = autoPrompt.memoryRecap ?? null;
-    setMessages((current) => [...current, { role: "user", content: autoPrompt.text }]);
+    setMessages((current) => [...current, { clientKey: nextClientKey(), role: "user", content: autoPrompt.text }]);
     void deliver(autoPrompt.text, []).finally(() => { recapRef.current = null; });
     onAutoPromptSent?.();
   // Runs once per opened recap; deliver reads current state through refs.
@@ -2834,6 +2909,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     setMessages((current) => [
       ...current,
       {
+        clientKey: nextClientKey(),
         role: "user",
         content: content || "Attached file(s)",
         attachments: selectedAttachments.map((attachment) => ({
@@ -3051,9 +3127,25 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           </div>
         ) : (
           <div className="chat__thread">
-            {messages.map((message, index) =>
-              message.role === "user" ? (
-                <article className="turn turn--user" key={index}>
+            {olderCursor ? (
+              <div className="load-earlier">
+                {olderError && <p className="load-earlier__error" role="alert">{olderError}</p>}
+                <button type="button" className="btn btn--secondary load-earlier__button" onClick={loadEarlier} disabled={loadingOlder || busy} aria-busy={loadingOlder || undefined}>
+                  {loadingOlder ? "Loading earlier messages…" : olderError ? "Try again" : "Load earlier messages"}
+                </button>
+              </div>
+            ) : reachedStart ? (
+              <p className="history-start">Start of conversation</p>
+            ) : null}
+            {messages.map((message, index) => (
+              <Fragment key={messageKey(message)}>
+              {!studyMode && replySwitches.has(index) && (
+                <div className="model-switch" role="separator" aria-label={`Now using ${replySwitches.get(index)}`}>
+                  <span>Now using {replySwitches.get(index)}</span>
+                </div>
+              )}
+              {message.role === "user" ? (
+                <article className="turn turn--user">
                   <div className="bubble bubble--user">{message.content}</div>
                   {message.attachments?.length > 0 && (
                     <ul className="attached">
@@ -3066,10 +3158,10 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                   )}
                 </article>
               ) : (
-                <article className="turn" key={index}>
+                <article className="turn">
                   <div className="turn__byline">
                     <span className="turn__mark"><img src={BRAND_ICON} alt="" /></span>
-                    {studyMode ? "VibhavGPT" : message.model ?? modelInfo.full}
+                    {studyMode ? "VibhavGPT" : modelLabel(message.model)}
                   </div>
                   <div className="bubble bubble--assistant bubble--wide">
                     <ReasoningTrace text={message.reasoning ?? ""} seconds={message.thoughtSeconds ?? null} />
@@ -3093,13 +3185,14 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                     <CopyButton text={message.content} />
                   </div>
                 </article>
-              ),
-            )}
+              )}
+              </Fragment>
+            ))}
             {busy && (
               <article className="turn">
                 <div className="turn__byline">
                   <span className="turn__mark"><img src={BRAND_ICON} alt="" /></span>
-                  {studyMode ? "VibhavGPT" : modelInfo.full}
+                  {studyMode ? "VibhavGPT" : modelLabel(streamingModel ?? sentModel)}
                 </div>
                 <div className={`bubble bubble--assistant${streamText ? " bubble--wide" : ""}`}>
                   {liveReasoning && streamText && <ReasoningTrace text={liveReasoning} seconds={liveThought} />}
