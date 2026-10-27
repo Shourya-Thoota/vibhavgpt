@@ -9,14 +9,14 @@
 .library .conversation-history__list { gap: 0; }
 
 .library__section { display: grid; gap: 1px; }
-.library__section + .library__section { margin-top: var(--space-md); }
+.library__section + .library__section { margin-top: var(--space-xs); }
 
 .library__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   min-height: 26px;
-  padding: 0 var(--space-2xs) var(--space-3xs) 11px;
+  padding: 0 var(--space-2xs) 0 11px;
   color: var(--color-muted);
   font-size: 0.74rem;
   font-weight: 600;
@@ -51,6 +51,12 @@
   align-items: center;
   min-width: 0;
   border-radius: var(--radius-pill);
+}
+/* With a mouse or trackpad on a desktop-width window, a project or folder row is
+   36px: its menu button was what made the row 44px. Touch screens and the phone
+   drawer keep the 44px target, and chat rows are untouched. */
+@media (hover: hover) and (pointer: fine) and (min-width: 761px) {
+  .library-group__row .conversation-item__actions { height: 36px; }
 }
 .library-group__row:hover { background: var(--color-paper-2); }
 .library-group__row:hover .conversation-item__actions,

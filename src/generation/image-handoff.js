@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { callImagePromptModel } from "../chat/providers.js";
 import { stripThoughts } from "../chat/thought-filter.js";
 
@@ -126,4 +127,28 @@ export async function expandImagePrompt(request, history = [], { callModel = cal
     }
     return fallback;
   }
+}
+
+// --- Recording how the prompt was built --------------------------------------
+//
+// Kept with the image reply: where its context came from, how long the
+// request and the final prompt were, and the prompt's hash. Never the final
+// prompt itself; a rewrite is already kept on its own (imagePrompt).
+
+export const IMAGE_CONTEXT_SOURCES = ["rewrite", "handoff", "none"];
+
+export function imageContextSource(expansion) {
+  if (expansion?.expanded) return "rewrite";
+  return String(expansion?.context ?? "").trim() ? "handoff" : "none";
+}
+
+export function imagePromptRecord({ request, expansion, finalPrompt, contextSource = imageContextSource(expansion) }) {
+  if (!IMAGE_CONTEXT_SOURCES.includes(contextSource)) throw new TypeError(`Unknown image context source: ${contextSource}`);
+  const prompt = String(finalPrompt ?? "");
+  return {
+    contextSource,
+    requestChars: String(request ?? "").length,
+    promptChars: prompt.length,
+    promptSha256: createHash("sha256").update(prompt).digest("hex"),
+  };
 }

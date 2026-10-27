@@ -4,15 +4,15 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { readFile } from "node:fs/promises";
 
 process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:5432/test";
-const { config } = await import("../src/config.js");
-const { createLiveCometSession, LiveCometConfigError, VoiceSessionError, sanitizeCometTimings } = await import("../src/voice/live-comet.js");
-const { creditsForLiveSessionReservation, creditsForLiveSessionSettlement, LIVE_VOICE_MODEL, MINI_POOL_SECONDS, PRO_FLAGSHIP_MONTHLY_SECONDS, liveSessionSettlement, realtimeUsageCost, staleLiveSessionCondition } = await import("../src/voice/live-usage.js");
+const { sanitizeCometTimings } = await import("../src/voice/live-comet.js");
+const { creditsForLiveSessionReservation, creditsForLiveSessionSettlement, MINI_POOL_SECONDS, PRO_FLAGSHIP_MONTHLY_SECONDS, liveSessionSettlement, realtimeUsageCost, staleLiveSessionCondition } = await import("../src/voice/live-usage.js");
 const { creditsForVoiceSeconds } = await import("../src/usage/service.js");
 
-const user = { id: "test-user", name: "Test" };
-const reservation = { id: "session-1", model: LIVE_VOICE_MODEL, reservedSeconds: 120 };
+// Voice is retired: no route starts a session (see src/voice/router.js and the
+// last test below). What stays covered here is the code that still runs, which
+// settles and reconciles a call that was connected before voice was removed.
 
-test("voice monthly quota table keeps Plus limited while Pro Comet is unlimited", () => {
+test("settling an earlier call: the quota table keeps Plus limited and Pro unlimited", () => {
   assert.equal(MINI_POOL_SECONDS.free, 0);
   assert.equal(MINI_POOL_SECONDS.plus, 600);
   assert.equal(PRO_FLAGSHIP_MONTHLY_SECONDS, Infinity);
@@ -22,42 +22,14 @@ test("voice monthly quota table keeps Plus limited while Pro Comet is unlimited"
   assert.equal(creditsForLiveSessionSettlement({ status: "completed", actualSeconds: 60 }, "pro"), 0);
 });
 
-test("voice session uses the direct stage's realtime calls multipart SDP exchange", async () => {
-  let request;
-  const result = await createLiveCometSession(user, "offer-sdp", {
-    apiKey: "test-key", reserve: async () => reservation, instructionsForUser: async () => "hello",
-    fetchImpl: async (url, options) => { request = { url, options }; return { ok: true, text: async () => "answer-sdp" }; },
-  });
-  assert.equal(request.url, `${config.providerBaseUrls.study}/realtime/calls`);
-  assert.equal(request.options.headers.Authorization, "Bearer test-key");
-  assert.equal(request.options.body.get("sdp"), "offer-sdp");
-  const session = JSON.parse(request.options.body.get("session"));
-  assert.equal(session.type, "realtime");
-  assert.equal(session.model, config.voice.realtimeModel);
-  assert.equal(session.instructions, "hello");
-  assert.equal(session.audio.input.transcription.model, config.voice.transcriptionModel);
-  assert.equal(session.audio.output.voice, config.voice.voiceName);
-  assert.equal(LIVE_VOICE_MODEL, session.model);
-  assert.equal(result.sdp, "answer-sdp");
-  assert.equal(Object.hasOwn(result, "model"), false);
-});
-
-test("quota rejection makes no upstream call and remains client-safe", async () => {
-  let called = false;
-  await assert.rejects(() => createLiveCometSession(user, "offer", {
-    apiKey: "test-key", reserve: async () => { throw new VoiceSessionError(); }, fetchImpl: async () => { called = true; },
-  }), (error) => error instanceof VoiceSessionError && /voice is temporarily unavailable/i.test(error.message));
-  assert.equal(called, false);
-});
-
-test("voice charges per second at 15 credits per minute rounded once", () => {
+test("settling an earlier call charges per second at 15 credits per minute rounded once", () => {
   assert.equal(creditsForVoiceSeconds(1), 1);
   assert.equal(creditsForVoiceSeconds(4), 1);
   assert.equal(creditsForVoiceSeconds(5), 2);
   assert.equal(creditsForVoiceSeconds(60), 15);
 });
 
-test("Comet latency diagnostics accept only the six sanitized timing milestones", () => {
+test("an earlier call's end report keeps only the six sanitized timing milestones", () => {
   assert.deepEqual(sanitizeCometTimings([
     { event: "message_submitted", timestampMs: 10, elapsedMs: 0, content: "redacted" },
     { event: "audio_playback_started", timestampMs: 300, elapsedMs: 290 },
@@ -68,7 +40,7 @@ test("Comet latency diagnostics accept only the six sanitized timing milestones"
   ]);
 });
 
-test("Realtime usage estimate includes cached input and the separate transcription model", () => {
+test("settling an earlier call: the realtime usage estimate includes cached input and the separate transcription model", () => {
   assert.deepEqual(realtimeUsageCost({ inputAudio: 300, cachedInputText: 100, outputAudio: 600, outputText: 100 }), {
     inputTokens: 400, outputTokens: 700, costMicros: 15_246,
   });
@@ -77,7 +49,7 @@ test("Realtime usage estimate includes cached input and the separate transcripti
   assert.equal(realtimeUsageCost(null), null);
 });
 
-test("stale voice reconciliation emits a timestamp-typed cutoff query", () => {
+test("reconciling unfinished earlier calls emits a timestamp-typed cutoff query", () => {
   const query = new PgDialect().sqlToQuery(staleLiveSessionCondition(new Date("2026-09-22T00:00:00.000Z")));
   assert.equal(
     query.sql,
@@ -86,22 +58,13 @@ test("stale voice reconciliation emits a timestamp-typed cutoff query", () => {
   assert.deepEqual(query.params, [new Date("2026-09-22T00:00:00.000Z"), 120]);
 });
 
-test("failed live-session setup maps errors and invokes the reservation refund cleanup", async () => {
-  let refunded = null;
-  await assert.rejects(() => createLiveCometSession(user, "offer", {
-    apiKey: "test-key", reserve: async () => reservation, instructionsForUser: async () => "hello",
-    fetchImpl: async () => ({ ok: false, status: 503 }), cancel: async (userId, sessionId) => { refunded = { userId, sessionId }; },
-  }), (error) => error instanceof LiveCometConfigError && error.message === "Voice is temporarily unavailable. Please try again shortly.");
-  assert.deepEqual(refunded, { userId: user.id, sessionId: reservation.id });
-});
-
-test("a failed-before-connect session is abandoned and refunds its entire reservation", () => {
+test("an earlier call that failed before connecting is abandoned and refunds its entire reservation", () => {
   const settlement = liveSessionSettlement({ reservedSeconds: 900, connectedAt: null, lastActivityAt: null }, new Date("2026-09-23T01:00:00.000Z"));
   assert.deepEqual(settlement, { status: "abandoned", actualSeconds: 0 });
   assert.equal(creditsForLiveSessionSettlement(settlement), 0);
 });
 
-test("stale connected sessions settle at their final authenticated heartbeat, not the reservation cap", () => {
+test("stale connected earlier calls settle at their final authenticated heartbeat, not the reservation cap", () => {
   const settlement = liveSessionSettlement({
     reservedSeconds: 900,
     connectedAt: new Date("2026-09-23T00:00:00.000Z"),
@@ -111,7 +74,7 @@ test("stale connected sessions settle at their final authenticated heartbeat, no
   assert.equal(creditsForLiveSessionSettlement(settlement), 12);
 });
 
-test("voice connection activity migration and router endpoints are present", async () => {
+test("the lifecycle routes and migration that settle an earlier call are still present", async () => {
   const [migration, router] = await Promise.all([
     readFile(new URL("../drizzle/0017_voice_live_connection_activity.sql", import.meta.url), "utf8"),
     readFile(new URL("../src/voice/router.js", import.meta.url), "utf8"),

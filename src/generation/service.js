@@ -90,8 +90,11 @@ function imageUnavailableError() {
   return accessError("service", { feature: "Image generation", code: "service-unavailable" });
 }
 
+// `preparePrompt`, when given, turns `prompt` into the one actually sent. It
+// runs only once the plan check has passed, so a request the plan refuses
+// does no work first, and anything it throws refunds the reservation.
 export async function generateImage(
-  { userId, prompt, aspectRatio, size, referenceImage },
+  { userId, prompt, aspectRatio, size, referenceImage, preparePrompt },
   {
     reserve = reserveImageGeneration,
     finalize = finalizeUsage,
@@ -107,7 +110,7 @@ export async function generateImage(
     const selectedAspectRatio = IMAGE_ASPECT_RATIOS[aspectRatio] ?? IMAGE_ASPECT_RATIOS.square;
     const request = {
       model: config.imageGenerationModel,
-      prompt,
+      prompt: preparePrompt ? await preparePrompt(prompt) : prompt,
       n: 1,
       aspect_ratio: selectedAspectRatio,
       output_format: "png",

@@ -1,31 +1,64 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { fetchPrivateFile, isPrivateFileUrl } from "../api.js";
 import { Modal } from "./ui.jsx";
+import { scrollRoot } from "./DiagramViewer.jsx";
 import { DirectDownload } from "../native-download.js";
 
-function usePrivateFile(path) {
+// How close to the visible area a lazy file must come before it downloads.
+export const NEAR_VIEW_MARGIN = "600px";
+
+// Downloads a protected file and hands each result to onResult. A lazy one
+// waits until `node` comes within NEAR_VIEW_MARGIN of its scrolling area (at
+// once where IntersectionObserver is missing). Returns the cleanup, which
+// stops the watch, abandons the request and frees the blob URL.
+export function startPrivateFile(path, onResult, {
+  lazy = false, node = null, root = null, Observer = globalThis.IntersectionObserver, load = fetchPrivateFile,
+  createUrl = (blob) => URL.createObjectURL(blob), revokeUrl = (url) => URL.revokeObjectURL(url),
+} = {}) {
+  const controller = new AbortController();
+  let objectUrl;
+  let observer = null;
+  const begin = () => {
+    load(path, { signal: controller.signal }).then((blob) => {
+      if (controller.signal.aborted) return;
+      objectUrl = createUrl(blob);
+      onResult({ path, url: objectUrl, blob });
+    }).catch((error) => { if (!controller.signal.aborted) onResult({ path, error: error.message }); });
+  };
+  if (lazy && node && typeof Observer === "function") {
+    observer = new Observer((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      observer = null;
+      begin();
+    }, { root, rootMargin: NEAR_VIEW_MARGIN });
+    observer.observe(node);
+  } else {
+    begin();
+  }
+  return () => { observer?.disconnect(); controller.abort(); if (objectUrl) revokeUrl(objectUrl); };
+}
+
+function usePrivateFile(path, { lazy = false, nodeRef = null } = {}) {
   const [result, setResult] = useState({});
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!path) return;
-    const controller = new AbortController();
-    let objectUrl;
     setResult({ path });
-    fetchPrivateFile(path, { signal: controller.signal }).then((blob) => {
-      if (controller.signal.aborted) return;
-      objectUrl = URL.createObjectURL(blob);
-      setResult({ path, url: objectUrl, blob });
-    }).catch((error) => { if (!controller.signal.aborted) setResult({ path, error: error.message }); });
-    return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [path, attempt]);
+    const node = nodeRef?.current ?? null;
+    return startPrivateFile(path, setResult, { lazy, node, root: lazy ? scrollRoot(node) : null });
+  }, [path, attempt, lazy]);
   return { ...(result.path === path ? result : {}), retry: () => setAttempt((value) => value + 1) };
 }
 
-export function PrivateImage({ src, alt, ...props }) {
+// `lazy`: download only once the image is close to view, so a long chat
+// full of images fetches just the ones being read.
+export function PrivateImage({ src, alt, lazy = false, ...props }) {
+  const holderRef = useRef(null);
   const privatePath = isPrivateFileUrl(src) ? src : null;
-  const { url, error } = usePrivateFile(privatePath);
-  if (privatePath && !url) return <span className="private-media-status" role="status">{error || "Loading image…"}</span>;
+  const { url, error } = usePrivateFile(privatePath, { lazy, nodeRef: holderRef });
+  if (privatePath && !url) return <span ref={holderRef} className="private-media-status" role="status">{error || "Loading image…"}</span>;
   return <img {...props} src={privatePath ? url : src} alt={alt} />;
 }
 

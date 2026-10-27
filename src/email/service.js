@@ -1,5 +1,6 @@
 import { config } from "../config.js";
 import { safeDisplayName } from "../security/display-name.js";
+import { logFailure } from "../security/error-log.js";
 
 const APP_URL = "https://vibhavgpt.com";
 const SUPPORT_URL = "mailto:support@pansophy.com";
@@ -83,8 +84,9 @@ export async function sendOtpEmail({ email, otp, type }) {
     body: JSON.stringify({ from: config.emailFrom, to: [email], subject: message.subject, text: message.text, html: message.html }),
   });
   if (!response.ok) {
-    const details = await response.json().catch(() => null);
-    console.error("OTP email delivery failed", { status: response.status, type, from: config.emailFrom, providerMessage: details?.message ?? null });
+    // Only the HTTP status and which kind of code it was (the helper maps an unknown kind to "other"):
+    // not the provider's message, the sender or the recipient.
+    logFailure("otp_email_delivery_failed", { status: response.status }, { kind: type });
     throw new Error("We couldn't send your code. Please try again.");
   }
 }

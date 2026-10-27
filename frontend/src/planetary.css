@@ -16,13 +16,17 @@ body { background: var(--paper); }
 }
 .workspace[data-page="billing"], .workspace[data-page="usage"] { --planet-image: url('/planets/venus.webp'); --orbit-color: var(--planet-venus); }
 .workspace__main { min-width: 0; background: transparent; }
-.sidebar { background: color-mix(in srgb, var(--paper-deep) 96%, transparent); padding: 24px 14px 16px; gap: 22px; }
+.sidebar { background: color-mix(in srgb, var(--paper-deep) 96%, transparent); padding: 24px 14px 16px; gap: 14px; }
+/* A short window scrolls as one column with the account pinned (styles.css), and
+   the pinned bar's offsets assume the same 14px bottom padding as the drawer. */
+@media (max-height: 720px) {
+  .sidebar { padding-bottom: calc(14px + var(--safe-bottom)); }
+}
 .sidebar__head { padding-inline: 8px; }
 .sidebar__new { border-radius: var(--radius-pill); min-height: 46px; background: var(--accent-soft); border-color: var(--accent-line); box-shadow: none; }
 .sidebar__link { border-radius: var(--radius-pill); min-height: 42px; }
 .sidebar__link[data-active="true"] { background: var(--accent-soft); color: var(--accent); }
 .account { border-radius: var(--radius-pill); }
-.plan-nudge { border-color: var(--accent-line); background: linear-gradient(125deg, var(--accent-soft), transparent); }
 .ui-select__trigger, .field input, .field textarea { border-radius: var(--radius-input); }
 .ui-select__list, .ui-menu__panel { background: var(--surface-raised); border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
 .ui-modal { background: var(--surface); }

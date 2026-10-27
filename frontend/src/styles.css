@@ -696,11 +696,14 @@ p { margin: 0; }
 }
 .workspace[data-collapsed="true"] { --sidebar-w: 74px; }
 
-/* The sidebar is a full-height column: its head, New chat, nav and foot keep
-   their size, and the chat history takes the rest and scrolls on its own.
-   Only on a screen too short for even a minimum of history does the column
-   itself scroll, so the account foot is never pushed out of reach. (Menus
-   and dialogs open in a portal, so nothing here clips them.) */
+/* The sidebar is a full-height column: its head, New chat, nav, Resources and
+   foot keep their size, and the chat history takes the rest and scrolls on its
+   own. The history may shrink to nothing (min-height: 0), so at
+   a normal height the column itself never overflows and the history is the only
+   thing that scrolls. A window too short for that switches to the one-column
+   scroll at the end of this block (max-height: 720px), where the column is the
+   only scroller and the account stays pinned. (Menus and dialogs open in a
+   portal, so nothing here clips them.) */
 .sidebar {
   position: sticky;
   top: 0;
@@ -781,7 +784,7 @@ p { margin: 0; }
   background: var(--accent);
   content: "";
 }
-/* Apps: links out to the download pages, headed like the library sections. */
+/* Resources: links out to the public pages, headed like the library sections. */
 .sidebar__apps-label {
   display: flex;
   align-items: center;
@@ -797,9 +800,8 @@ p { margin: 0; }
   display: flex;
   flex: 1 1 0%;
   flex-direction: column;
-  min-height: 160px;
+  min-height: 0;
   gap: 7px;
-  padding-top: 4px;
 }
 .conversation-history__head {
   display: flex;
@@ -822,7 +824,7 @@ p { margin: 0; }
   overflow-y: auto;
   overscroll-behavior: contain;
   /* Room under the last chat, so it clears the foot entirely. */
-  padding: 1px 0 24px;
+  padding: 0 0 24px;
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
@@ -889,19 +891,83 @@ p { margin: 0; }
   .conversation-item__actions { opacity: 1; }
 }
 
-.sidebar__foot { margin-top: auto; display: grid; gap: 10px; }
+.sidebar__foot { margin-top: auto; display: grid; gap: 4px; }
 
+/* The free-plan reminder: one quiet row, the tier on the left and the plans link on
+   the right. No card, no background, no copy. A pointer gets a 36px row; a phone or
+   a touch screen gets the 44px target. */
 .plan-nudge {
-  display: grid;
-  gap: 9px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 4px 0 12px;
 }
-.plan-nudge strong { font-size: 0.84rem; font-weight: 600; }
-.plan-nudge small { color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
-.plan-nudge .btn { min-height: 34px; font-size: 0.83rem; }
+.plan-nudge__tier { color: var(--muted); font-size: 0.8rem; font-weight: 500; }
+.plan-nudge__action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--r-sm);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.plan-nudge__action:hover { background: var(--surface-2); }
+/* Inset, so the sidebar's own overflow clipping never cuts the ring off. */
+.plan-nudge__action:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+@media (max-width: 760px), (pointer: coarse) {
+  .plan-nudge, .plan-nudge__action { min-height: 44px; }
+}
+
+/* The rail's tooltip: one label, fixed to the window so the rail's own clipping
+   cannot cut it off. Shown for hover and keyboard focus; opacity only. */
+.sidebar__tip {
+  position: fixed;
+  z-index: 60;
+  transform: translateY(-50%);
+  padding: 6px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xs);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 500;
+  pointer-events: none;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar__tip { animation: sidebar-tip-in var(--dur-micro) var(--ease-out); }
+}
+@keyframes sidebar-tip-in { from { opacity: 0; } }
+
+/* One scroll column, for a phone's drawer and for a desktop window under 720px
+   tall. The column scrolls as a whole: chats flow at full height and the
+   account button stays pinned to the bottom. A nested history scroller would
+   otherwise be left a sliver under its own headings with the controls above it,
+   and a person would have to scroll the column and then the list just to reach
+   the first chat. */
+@media (max-width: 760px), (max-height: 720px) {
+  .sidebar { overscroll-behavior: contain; }
+  .conversation-history { flex: 0 0 auto; min-height: auto; }
+  .conversation-history__list { flex: none; min-height: auto; overflow: visible; padding-bottom: 8px; }
+  .sidebar__foot { display: contents; }
+  .sidebar__foot > :first-child { margin-top: auto; }
+  .sidebar__foot > .ui-menu {
+    position: sticky;
+    bottom: calc(-14px - var(--safe-bottom));
+    z-index: 1;
+    margin: 0 -14px calc(-14px - var(--safe-bottom));
+    padding: 8px 14px calc(14px + var(--safe-bottom));
+    background: var(--paper-deep);
+    box-shadow: 0 -10px 16px -8px var(--paper-deep);
+  }
+}
 
 .account {
   display: flex;

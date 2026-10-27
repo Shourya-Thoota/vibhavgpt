@@ -4,6 +4,7 @@ import { db } from "../db/client.js";
 import { creditLedger, usageEvents, userProfiles, voiceLiveSessions } from "../db/schema.js";
 import { creditsForVoiceSeconds, getCreditBalance, getCurrentUsage } from "../usage/service.js";
 import { accessError } from "../../frontend/src/access-status.js";
+import { logFailure } from "../security/error-log.js";
 
 export const LIVE_SESSION_CAP_SECONDS = 15 * 60;
 export const MINI_POOL_SECONDS = { free: 0, plus: 10 * 60 };
@@ -227,5 +228,5 @@ export async function reconcileStaleLiveSessions(now = new Date()) {
 }
 
 let reconcileTimer = null;
-export function startLiveUsageReconciliationJob() { if (reconcileTimer) return reconcileTimer; reconcileTimer = setInterval(() => { reconcileStaleLiveSessions().catch((error) => console.error("Voice usage reconciliation failed", error)); }, RECONCILE_INTERVAL_MS); reconcileTimer.unref?.(); return reconcileTimer; }
+export function startLiveUsageReconciliationJob({ reconcile = reconcileStaleLiveSessions } = {}) { if (reconcileTimer) return reconcileTimer; reconcileTimer = setInterval(() => { reconcile().catch((error) => logFailure("voice_usage_reconciliation_failed", error)); }, RECONCILE_INTERVAL_MS); reconcileTimer.unref?.(); return reconcileTimer; }
 export function stopLiveUsageReconciliationJob() { if (reconcileTimer) clearInterval(reconcileTimer); reconcileTimer = null; }

@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { requireSession } from "../middleware/require-session.js";
 import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, DOWNGRADE_PAUSED, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, tierForPriceLookupKey, verifyWebhookSignature } from "./service.js";
 import { getCurrentUsage } from "../usage/service.js";
+import { logFailure } from "../security/error-log.js";
 
 export const billingRouter = Router();
 
@@ -113,12 +114,14 @@ billingRouter.get("/credit-purchases", requireSession, async (req, res, next) =>
 export const stripeWebhookHandler = [
   express.raw({ type: "application/json" }),
   async (req, res) => {
+    let stage = "verify";
     try {
       const event = verifyWebhookSignature(req.body, req.headers["stripe-signature"]);
+      stage = "apply";
       await applySubscriptionEvent(event);
       return res.status(200).json({ received: true });
     } catch (error) {
-      console.warn("Billing webhook rejected or failed.", { reason: error.message });
+      logFailure("billing_webhook_failed", error, { stage }, "warn");
       return res.status(400).json({ error: "Webhook could not be verified." });
     }
   },

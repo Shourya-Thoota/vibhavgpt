@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { logFailure } from "../security/error-log.js";
 import { primaryProviderApproved } from "./providers.js";
 
 const hostOf = (url) => { try { return new URL(url).host; } catch { return null; } };
@@ -135,9 +136,7 @@ export async function checkModeration(userMessage, { fetchImpl = fetch } = {}) {
       category: "",
     };
   } catch (error) {
-    console.warn("Content classifier unavailable; applying local guard only.", {
-      reason: error instanceof Error ? error.message : "unknown",
-    });
+    logFailure("content_classifier_unavailable", error, {}, "warn");
     return { flagged: false, category: "" };
   }
 }

@@ -224,6 +224,8 @@
     height: 100dvh;
     padding-top: calc(14px + env(safe-area-inset-top));
     padding-bottom: calc(14px + env(safe-area-inset-bottom));
+    /* The 14px section gap is for the desktop column; the drawer keeps its own. */
+    gap: 22px;
     border-radius: 0 var(--r-lg) var(--r-lg) 0;
     /* Opaque over the page; the desktop column's slight translucency reads
        as the conversation bleeding through once the drawer overlaps it. */
@@ -339,24 +341,10 @@
 
   /* --- Drawer: one scroll column ------------------------------------------ */
 
-  /* Head, New chat, the nav and Apps take about 500px of a phone's height,
-     which left a nested history scroller a sliver under its own headings.
-     On phones the drawer itself is the one scroller: chats flow at full
-     height, and the account button stays pinned to the drawer's bottom. */
-  .sidebar { overscroll-behavior: contain; }
-  .conversation-history { flex: 0 0 auto; min-height: auto; }
-  .conversation-history__list { flex: none; min-height: auto; overflow: visible; padding-bottom: 8px; }
-  .sidebar__foot { display: contents; }
-  .sidebar__foot > :first-child { margin-top: auto; }
-  .sidebar__foot > .ui-menu {
-    position: sticky;
-    bottom: calc(-14px - var(--safe-bottom));
-    z-index: 1;
-    margin: 0 -14px calc(-14px - var(--safe-bottom));
-    padding: 8px 14px calc(14px + var(--safe-bottom));
-    background: var(--paper-deep);
-    box-shadow: 0 -10px 16px -8px var(--paper-deep);
-  }
+  /* On phones the drawer itself is the one scroller: chats flow at full
+     height, and the account button stays pinned to the drawer's bottom. Those
+     rules live in styles.css (the sidebar's "One scroll column" block), which
+     a short desktop window shares with the drawer. */
 
   /* --- Touch targets and fields ------------------------------------------- */
 
@@ -367,7 +355,6 @@
   .swatch,
   .ui-select__trigger,
   .code-block__copy { min-height: 44px; }
-  .plan-nudge .btn { min-height: 44px; font-size: 0.9rem; }
   .checkbox { min-height: 44px; align-items: center; }
   .composer__row .composer__add-trigger,
   .composer__row .composer__mic,

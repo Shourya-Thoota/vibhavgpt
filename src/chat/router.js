@@ -18,7 +18,7 @@ import { providerNameTerms } from "../security/provider-names.js";
 import { reportChatReplyFailure } from "../sentry.js";
 import { createThinkingRelay } from "./reasoning-stream.js";
 import { createThoughtFilter, stripThoughts } from "./thought-filter.js";
-import { expandImagePrompt } from "../generation/image-handoff.js";
+import { expandImagePrompt, imagePromptRecord } from "../generation/image-handoff.js";
 import { composeImagePrompt, createStoredAttachment, documentLabel, generateDocument, generateImage } from "../generation/service.js";
 import { cancelUsageReservation, createUsageTracker, reserveUsage } from "../usage/service.js";
 import { searchWeb } from "../search/service.js";
@@ -380,11 +380,21 @@ chatRouter.delete("/conversations/:id", requireSession, async (req, res, next) =
 // rewrites it into one standalone prompt, or, when that model is not
 // available, the latest reply goes with it (generation/image-handoff.js).
 // The prompt actually used is kept with the image reply, so later turns know
-// what the picture shows.
+// what the picture shows. The rewrite runs inside generateImage, after the
+// plan check, so a request the plan refuses never reaches the rewriter.
 async function generateNaturalLanguageImage({ userId, conversationId, modelKey, prompt, mode, attachmentIds = [], userMessageId = null, history = [], requestId, signal }) {
-  const expansion = await expandImagePrompt(prompt, history, { requestId, signal });
-  const imagePrompt = composeImagePrompt(expansion.prompt, "", { context: expansion.context, textRequest: prompt });
-  const generated = await generateImage({ userId, prompt: imagePrompt });
+  let expansion = null;
+  let imagePrompt = "";
+  const generated = await generateImage({
+    userId,
+    prompt,
+    preparePrompt: async (request) => {
+      expansion = await expandImagePrompt(request, history, { requestId, signal });
+      imagePrompt = composeImagePrompt(expansion.prompt, "", { context: expansion.context, textRequest: request });
+      return imagePrompt;
+    },
+  });
+  const record = imagePromptRecord({ request: prompt, expansion, finalPrompt: imagePrompt });
   const activitySummary = buildActivitySummary({ query: prompt, actions: { imageGenerated: true } });
   const saved = await saveExchange({
     userId,
@@ -397,8 +407,10 @@ async function generateNaturalLanguageImage({ userId, conversationId, modelKey, 
     activitySummary,
     userMessageId,
     imagePrompt: expansion.expanded ? expansion.prompt : "",
+    imageContext: { source: record.contextSource, requestChars: record.requestChars, promptChars: record.promptChars, promptSha256: record.promptSha256 },
     replyModel: "image",
   });
+  // The request is the image's prompt in the library, as on the Image page.
   const attachment = await createStoredAttachment({
     userId,
     conversationId: saved.conversationId,
@@ -406,6 +418,7 @@ async function generateNaturalLanguageImage({ userId, conversationId, modelKey, 
     mimeType: "image/png",
     kind: "generated-image",
     buffer: generated.buffer,
+    prompt,
   });
   await db.update(attachments)
     .set({ conversationId: saved.conversationId, messageId: saved.messages[1].id, updatedAt: new Date() })

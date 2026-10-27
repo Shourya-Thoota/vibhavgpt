@@ -14,215 +14,7 @@
     <script src="/theme/page-scroll-boot.js"></script>
     <link rel="stylesheet" href="/theme/vibhav.css">
     <link rel="stylesheet" href="/theme/public-pages.css">
-<style>
-    :root {
-      --paper-2: var(--color-paper-2);
-      --paper-3: var(--color-paper-3);
-      --rule: var(--color-rule);
-      --rule-2: var(--color-rule-2);
-      --sky-blue: var(--color-sky-blue);
-      --display: var(--font-display);
-      --body: var(--font-body);
-      --mono: var(--font-mono);
-    }
-    * { box-sizing: border-box; }
-    html { -webkit-text-size-adjust: 100%; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background-color: var(--paper);
-      background-image:
-        radial-gradient(1px 1px at 37px 61px, var(--star), transparent 100%),
-        radial-gradient(1px 1px at 173px 211px, var(--star), transparent 100%),
-        radial-gradient(1px 1px at 89px 263px, var(--star), transparent 100%),
-        radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--sky-blue) 20%, transparent), transparent 62%),
-        radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 66%);
-      background-size: 293px 293px, 347px 347px, 331px 331px, auto, auto;
-      background-attachment: fixed;
-      color: var(--ink);
-      font-family: var(--body);
-      line-height: 1.55;
-    }
-    a { color: inherit; }
-    :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
-
-    .shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 64px; }
-
-    .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-    .brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--display); font-size: 1.15rem; text-decoration: none; }
-    .brand img { width: 30px; height: 30px; border-radius: 10px; }
-    .nav-link { color: var(--muted); font-size: 0.94rem; text-decoration: none; }
-    .nav-link:hover { color: var(--ink); }
-
-    /* Hero: the words and the download on the left, the app itself on the
-       right, drawn as a desktop window showing the real greeting screen. */
-    .hero {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
-      gap: 56px;
-      align-items: center;
-      padding: 64px 0 56px;
-    }
-    h1 {
-      max-width: 11ch;
-      margin: 0;
-      font-family: var(--display);
-      font-size: clamp(2.8rem, 5.4vw + 0.6rem, 5rem);
-      font-weight: 400;
-      letter-spacing: -0.025em;
-      line-height: 1;
-    }
-    .lede { max-width: 46ch; margin: 20px 0 0; color: var(--ink-2); font-size: 1.12rem; }
-    .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 32px; }
-    .download {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 52px;
-      padding: 0 24px;
-      border-radius: var(--radius-control);
-      background: var(--accent);
-      color: var(--accent-ink);
-      font-weight: 700;
-      text-decoration: none;
-      transition: background-color 120ms var(--ease);
-    }
-    .download:hover { background: var(--accent-hover); }
-    .download svg { width: 18px; height: 18px; }
-    .download-meta { color: var(--muted); font-size: 0.9rem; }
-    .web-link { margin-top: 18px; color: var(--muted); font-size: 0.92rem; }
-    .web-link a { color: var(--ink-2); text-underline-offset: 3px; }
-
-    .window {
-      width: 100%;
-      aspect-ratio: 16 / 10;
-      overflow: hidden;
-      border: 1px solid var(--rule-2);
-      border-radius: 12px;
-      background: var(--paper-deep);
-      box-shadow: 0 30px 70px -30px rgb(2 8 18 / 90%);
-    }
-    .window__bar { display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-bottom: 1px solid var(--rule); font-size: 11px; color: var(--muted); }
-    .window__bar img { width: 14px; height: 14px; }
-    .window__controls { display: flex; gap: 14px; margin-left: auto; color: var(--faint); letter-spacing: 0.2em; }
-    .window__body { display: grid; grid-template-columns: 26% minmax(0, 1fr); height: calc(100% - 30px); }
-    .window__side { display: grid; align-content: start; gap: 7px; padding: 14px 10px; border-right: 1px solid var(--rule); background: var(--paper-2); }
-    .window__side i { display: block; height: 7px; border-radius: 4px; background: var(--rule-2); }
-    .window__side i:first-child { height: 18px; margin-bottom: 6px; border-radius: 7px; background: var(--paper-3); }
-    .window__side i:nth-child(3) { width: 70%; }
-    .window__side i:nth-child(5) { width: 82%; }
-    .window__main {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background:
-        radial-gradient(ellipse 90% 60% at 85% 0%, color-mix(in srgb, var(--sky-blue) 24%, transparent), transparent 70%),
-        var(--paper);
-    }
-    .window__planet { width: 58px; height: 58px; border-radius: 50%; object-fit: cover; filter: drop-shadow(0 10px 22px rgb(2 8 18 / 70%)); }
-    .window__greeting { margin: 12px 0 0; font-family: var(--display); font-size: 1.25rem; line-height: 1.1; }
-    .window__composer {
-      position: absolute;
-      right: 14%;
-      bottom: 12%;
-      left: 14%;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 32px;
-      padding: 0 5px 0 12px;
-      border: 1px solid var(--rule-2);
-      border-radius: 12px;
-      background: var(--paper-2);
-      color: var(--faint);
-      font-size: 10px;
-    }
-    .window__composer i { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); }
-
-    .facts {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      margin: 0;
-      border-top: 1px solid var(--rule);
-      border-bottom: 1px solid var(--rule);
-    }
-    .facts div { padding: 20px 20px 20px 0; }
-    .facts div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
-    .facts dt { color: var(--muted); font-size: 0.82rem; }
-    /* Figures in the sans: Prata's old-style 1 reads as an l in "1.0.0". */
-    .facts dd { margin: 6px 0 0; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-
-    .columns { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; margin-top: 56px; }
-    h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weight: 400; }
-
-    /* Installing is a real sequence, so it is numbered. */
-    .steps { display: grid; gap: 18px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
-    .steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; color: var(--ink-2); counter-increment: step; }
-    .steps li::before { content: counter(step); color: var(--accent); font-size: 1.7rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
-    .steps strong { color: var(--ink); font-weight: 600; }
-    .note { margin: 20px 0 0; padding-left: 54px; color: var(--muted); font-size: 0.9rem; }
-
-    .notes { display: grid; gap: 8px; margin: 0; padding-left: 1.1em; color: var(--ink-2); }
-    .notes kbd { padding: 1px 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); font-family: var(--mono); font-size: 0.82em; }
-    .verify { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--rule); }
-    .verify h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
-    .verify p { margin: 6px 0 0; color: var(--muted); font-size: 0.88rem; }
-    .checksum-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; }
-    .checksum {
-      flex: 1;
-      min-width: 0;
-      padding: 10px 12px;
-      border-radius: 10px;
-      background: var(--paper-deep);
-      color: var(--ink-2);
-      font: 500 0.78rem/1.5 var(--mono);
-      overflow-wrap: anywhere;
-    }
-    .copy {
-      flex: 0 0 auto;
-      min-height: 38px;
-      padding: 0 14px;
-      border: 1px solid var(--rule-2);
-      border-radius: 10px;
-      background: transparent;
-      color: var(--ink-2);
-      font: 600 0.84rem var(--body);
-      cursor: pointer;
-    }
-    .copy:hover { border-color: var(--accent); color: var(--ink); }
-    .command { margin-top: 10px; color: var(--faint); font-size: 0.82rem; }
-    .command code { color: var(--ink-2); font-family: var(--mono); font-size: 0.78rem; overflow-wrap: anywhere; }
-
-    .footer {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 24px;
-      margin-top: 64px;
-      padding-top: 22px;
-      border-top: 1px solid var(--rule);
-      color: var(--muted);
-      font-size: 0.86rem;
-    }
-    .footer span { margin-right: auto; }
-    .footer a { color: var(--muted); text-underline-offset: 3px; }
-    .footer a:hover { color: var(--ink); }
-
-    @media (max-width: 860px) {
-      .hero { grid-template-columns: minmax(0, 1fr); gap: 40px; padding: 40px 0; }
-      .window { max-width: 440px; justify-self: center; }
-      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .facts div:nth-child(3) { padding-left: 0; border-left: 0; }
-      .facts div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
-      .columns { grid-template-columns: minmax(0, 1fr); gap: 44px; }
-    }
-    @media (max-width: 420px) {
-      .download { width: 100%; justify-content: center; }
-      .facts dd { font-size: 1.12rem; }
-      .window__greeting { font-size: 1rem; }
-    }
-  </style>
+<link rel="stylesheet" href="/theme/apps-pages.css">
 
 <title>VibhavGPT Windows: Official Desktop App Download and Setup</title>
     <meta name="description" content="Download the official VibhavGPT Windows app for Windows 10 and 11 from Pansophy LLC, with install steps, requirements and file checks. Made by Vibhav Thoota.">
@@ -238,17 +30,20 @@
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="VibhavGPT Windows: Official Desktop App Download and Setup">
     <meta name="twitter:description" content="Download the official VibhavGPT Windows app for Windows 10 and 11 from Pansophy LLC, with install steps, requirements and file checks. Made by Vibhav Thoota.">
-    <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://vibhavgpt.com/home"},{"@type":"ListItem","position":2,"name":"Windows","item":"https://vibhavgpt.com/vibhavgpt-windows"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does Windows show a SmartScreen warning?","acceptedAnswer":{"@type":"Answer","text":"The installer is not yet signed with a code-signing certificate, so SmartScreen does not recognize the publisher and shows a warning before it runs. Download the installer only from this official VibhavGPT page and compare its SHA-256 checksum with the one shown here. If they match, select More info and then Run anyway to continue with the installation."}},{"@type":"Question","name":"Which versions of Windows are supported?","acceptedAnswer":{"@type":"Answer","text":"VibhavGPT for Windows runs on 64-bit editions of Windows 10 and Windows 11. It needs an internet connection, because the app opens the same live VibhavGPT workspace you use in a browser. This installer is built for x64 processors, so 32-bit editions of Windows cannot run it. If your computer cannot run it, you can still use VibhavGPT in any modern browser."}},{"@type":"Question","name":"Can I use the same account on the web and Windows?","acceptedAnswer":{"@type":"Answer","text":"Yes. Sign in with your existing VibhavGPT account, by email or with the same sign-in option you use on the web, to use the same projects, chats and saved memory on your computer. Signing in with an external account opens your default browser and then returns you to the app. Chat, image creation and Study are available according to your plan and allowances, exactly as they are on the web."}},{"@type":"Question","name":"How do I check or remove the app?","acceptedAnswer":{"@type":"Answer","text":"Compare the installer's SHA-256 digest with the checksum shown in Verify your download; the command on this page calculates it. A matching checksum confirms that the file matches this release. To remove the app, open Settings, then Apps, find VibhavGPT and choose Uninstall. Removing the app does not delete your account; manage your data on the website."}}]}]}</script>
+    <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android, Windows","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://vibhavgpt.com/home"},{"@type":"ListItem","position":2,"name":"Windows","item":"https://vibhavgpt.com/vibhavgpt-windows"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Why does Windows show a SmartScreen warning?","acceptedAnswer":{"@type":"Answer","text":"The installer is not yet signed with a code-signing certificate, so SmartScreen does not recognize the publisher and shows a warning before it runs. Download the installer only from this official VibhavGPT page and compare its SHA-256 checksum with the one shown here. If they match, select More info and then Run anyway to continue with the installation."}},{"@type":"Question","name":"Which versions of Windows are supported?","acceptedAnswer":{"@type":"Answer","text":"VibhavGPT for Windows runs on 64-bit editions of Windows 10 and Windows 11. It needs an internet connection, because the app opens the same live VibhavGPT workspace you use in a browser. This installer is built for x64 processors, so 32-bit editions of Windows cannot run it. If your computer cannot run it, you can still use VibhavGPT in any modern browser."}},{"@type":"Question","name":"Can I use the same account on the web and Windows?","acceptedAnswer":{"@type":"Answer","text":"Yes. Sign in with your existing VibhavGPT account, by email or with the same sign-in option you use on the web, to use the same projects, chats and saved memory on your computer. Signing in with an external account opens your default browser and then returns you to the app. Chat, image creation and Study are available according to your plan and allowances, exactly as they are on the web."}},{"@type":"Question","name":"How do I check or remove the app?","acceptedAnswer":{"@type":"Answer","text":"Compare the installer's SHA-256 digest with the checksum shown in Verify your download; the command on this page calculates it. A matching checksum confirms that the file matches this release. To remove the app, open Settings, then Apps, find VibhavGPT and choose Uninstall. Removing the app does not delete your account; manage your data on the website."}}]}]}</script>
 </head>
 <body>
   <main class="shell">
     <nav class="nav" aria-label="VibhavGPT">
       <a class="brand" href="/home"><img src="/brand/vibhavgpt-icon-64.png" alt=""> <span>VibhavGPT</span></a>
-      <a class="nav-link" href="/app">Open workspace</a>
+      <div class="nav__links">
+        <a class="nav-link" href="/apps">All apps</a>
+        <a class="nav-link" href="/app">Open workspace</a>
+      </div>
     </nav>
 
     <section class="hero">
-      <div>
+      <div class="rise">
         <h1>VibhavGPT Windows</h1>
         <p class="lede">Chat, create images and study in a window of its own, with the same account, projects and memory you use on the web.</p>
         <div class="cta-row">
@@ -261,16 +56,9 @@
         <p class="web-link">Prefer not to install anything? <a href="/app">Use VibhavGPT in your browser</a>.</p>
       </div>
 
-      <div class="window" aria-hidden="true">
-        <div class="window__bar"><img src="/brand/vibhavgpt-icon-32.png" alt="">VibhavGPT<span class="window__controls"><span>&#8211;</span><span>&#9633;</span><span>&#10005;</span></span></div>
-        <div class="window__body">
-          <div class="window__side"><i></i><i></i><i></i><i></i><i></i><i></i></div>
-          <div class="window__main">
-            <img class="window__planet" src="/planets/earth.webp" alt="">
-            <p class="window__greeting">Ready when you are</p>
-            <div class="window__composer">Ask anything<i></i></div>
-          </div>
-        </div>
+      <div class="device device--window device--lg rise" style="--i: 1" aria-hidden="true">
+        <div class="device__bar"><img src="/brand/vibhavgpt-icon-32.png" alt=""><span class="device__controls"><b></b><b></b><b></b></span></div>
+        <div class="device__screen"><img class="device__planet" src="/planets/earth.webp" alt=""></div>
       </div>
     </section>
 
@@ -311,6 +99,12 @@
         </div>
       </section>
     </div>
+
+    <section class="also rise" aria-labelledby="also-title">
+      <h2 id="also-title">Also for Android</h2>
+      <p>Want VibhavGPT on your phone too? The Android app uses the same account, projects and memory.</p>
+      <a class="button" href="/android">See Android install steps</a>
+    </section>
 
     <!-- public-faq -->
       <footer class="footer">

@@ -20,8 +20,6 @@
     "usage:verify-flow": "node scripts/verify-usage-flow.js",
     "account:verify-flow": "node scripts/verify-account-flow.js",
     "admin:verify-flow": "node scripts/verify-admin-flow.js",
-    "voice:verify-flow": "node scripts/verify-voice-flow.js",
-    "voice:verify-vocabulary": "node scripts/verify-transcription-vocabulary.js",
     "upload:verify-flow": "node scripts/verify-upload-flow.js",
     "image-upload:verify-flow": "node scripts/verify-image-upload-flow.js",
     "chat:verify-sports-search": "node scripts/verify-sports-search-flow.js",

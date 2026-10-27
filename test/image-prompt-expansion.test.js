@@ -1,6 +1,7 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
@@ -26,11 +27,19 @@ mock.module(new URL("../src/middleware/require-session.js", import.meta.url).hre
 });
 const real = await import(new URL("../src/generation/service.js?real", import.meta.url).href);
 const imagePrompts = [];
+const storedAttachments = [];
+// When set, the real generateImage runs with these dependencies (the real
+// plan check, a stubbed provider) instead of the capture below.
+let realImageDependencies = null;
 mock.module(new URL("../src/generation/service.js", import.meta.url).href, {
   namedExports: {
     ...real,
-    generateImage: async ({ prompt }) => { imagePrompts.push(prompt); return { buffer: Buffer.from("png") }; },
-    createStoredAttachment: async () => ({ id: "00000000-0000-4000-8000-000000000002" }),
+    generateImage: async (args) => {
+      if (realImageDependencies) return real.generateImage(args, realImageDependencies);
+      imagePrompts.push(args.preparePrompt ? await args.preparePrompt(args.prompt) : args.prompt);
+      return { buffer: Buffer.from("png") };
+    },
+    createStoredAttachment: async (args) => { storedAttachments.push(args); return { id: "00000000-0000-4000-8000-000000000002" }; },
   },
 });
 const { cleanRewrite, expandImagePrompt, IMAGE_PROMPT_REWRITER, imageRewriteMessages, shouldExpandImagePrompt } = await import("../src/generation/image-handoff.js");
@@ -152,4 +161,151 @@ test("in a chat, the image is drawn from the rewritten prompt, keeps its words, 
   const { rows } = await client.query("SELECT content, metadata FROM messages WHERE conversation_id = $1 AND role = 'assistant' ORDER BY created_at", [first.conversationId]);
   assert.equal(rows[1].content, "I created this image for you.", "the saved reply itself is unchanged");
   assert.equal(rows[1].metadata.imagePrompt, REWRITE);
+});
+
+// --- Context recorded, fallback unchanged, rewrite only after the plan check --
+
+const sha256 = (text) => createHash("sha256").update(text).digest("hex");
+
+// The real /api/chat routes for one user, every outbound call stubbed and
+// sorted: rewriter calls, other small-model calls, chat replies and images.
+async function chatApp(t, userId) {
+  const { config } = await import("../src/config.js");
+  config.moderationApiKey = "";
+  config.providerKeys.paid = "fixture-key";
+  config.chatModels.nova = "fixture-nova";
+  config.lumenPrimaryApproved = true;
+  config.providerKeys.primaryFree = "fixture-primary-key";
+  config.providerBaseUrls.primaryFree = "https://primary.fixture.invalid/v1";
+  config.searchIntentModel = "fixture-small";
+  const { default: express } = await import("express");
+  const { chatRouter } = await import("../src/chat/router.js");
+  const calls = { rewriter: [], other: [], chat: [], images: [] };
+  const frame = (chunk) => `data: ${JSON.stringify(chunk)}\n\n`;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    const href = String(url);
+    if (href.startsWith("http://127.0.0.1")) return realFetch(url, init);
+    if (href.startsWith(config.providerBaseUrls.primaryFree)) {
+      const body = JSON.parse(init.body);
+      if (body.messages?.[0]?.content === IMAGE_PROMPT_REWRITER) {
+        calls.rewriter.push(body);
+        return Response.json(completion(REWRITE));
+      }
+      calls.other.push(body);
+      return Response.json(completion("{}"));
+    }
+    if (href.startsWith(config.providerBaseUrls.paid)) {
+      if (href.endsWith("/images")) {
+        calls.images.push(JSON.parse(init.body));
+        return Response.json({ data: [{ b64_json: Buffer.from("png").toString("base64") }], usage: {} });
+      }
+      if (href.includes("/generation")) return new Response("{}", { status: 404 });
+      calls.chat.push(JSON.parse(init.body));
+      return new Response([
+        { choices: [{ delta: { content: VOCAB } }] },
+        { choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 40, completion_tokens: 60 } },
+      ].map(frame).join(""), { headers: { "Content-Type": "text/event-stream" } });
+    }
+    throw new Error(`Unexpected outbound request in test: ${new URL(href).host}`);
+  };
+  await client.query("INSERT INTO user_profiles (user_id, memory_enabled) VALUES ($1, false) ON CONFLICT DO NOTHING", [userId]);
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { req.authSession = { user: { id: userId } }; next(); });
+  app.use("/api/chat", chatRouter);
+  const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
+  t.after(() => { globalThis.fetch = realFetch; return new Promise((resolve) => server.close(resolve)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const send = async (body) => {
+    const text = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", ...body }) })).text();
+    const events = text.split("\n\n").map((block) => [block.match(/^event:\s*(\S+)/m)?.[1], block.match(/^data:\s*(.+)$/m)?.[1]]).filter(([event, data]) => event && data);
+    const find = (name) => { const found = events.find(([event]) => event === name); return found ? JSON.parse(found[1]) : null; };
+    return { complete: find("complete"), error: find("error") };
+  };
+  return { calls, send };
+}
+
+const imageContextOf = async (conversationId) => {
+  const { rows } = await client.query("SELECT metadata FROM messages WHERE conversation_id = $1 AND role = 'assistant' AND metadata ? 'imageContext'", [conversationId]);
+  assert.equal(rows.length, 1, "one image reply records its context");
+  return rows[0].metadata.imageContext;
+};
+
+test("an image drawn on earlier turns gets the enriched prompt, recorded as a rewrite with the request as its library prompt", async (t) => {
+  const app = await chatApp(t, "enriched-user");
+  const first = await app.send({ message: "Give me the key vocab for DNA replication" });
+  imagePrompts.length = 0;
+  storedAttachments.length = 0;
+  const request = "Create an image with all the vocab Study listed";
+  const image = await app.send({ message: request, conversationId: first.complete.conversationId });
+  assert.equal(image.complete.reply, "I created this image for you.");
+  assert.equal(app.calls.rewriter.length, 1);
+  assert.equal(imagePrompts.length, 1);
+  const sent = imagePrompts[0];
+  assert.ok(sent.includes(REWRITE), "the image model gets the rewrite");
+  assert.notEqual(sent, real.composeImagePrompt(request, ""), "and not the bare request");
+  assert.deepEqual(await imageContextOf(first.complete.conversationId), { source: "rewrite", requestChars: request.length, promptChars: sent.length, promptSha256: sha256(sent) });
+  assert.equal(storedAttachments.at(-1).prompt, request, "the library shows the request");
+  const { loadConversation } = await import("../src/chat/repository.js");
+  const reloaded = (await loadConversation("enriched-user", first.complete.conversationId)).history.at(-1);
+  assert.deepEqual(reloaded.imageContext, { source: "rewrite" }, "only the source leaves the server");
+});
+
+test("with no earlier turns the image model gets exactly the old prompt, with no rewriter call, recorded as none", async (t) => {
+  const app = await chatApp(t, "fresh-user");
+  imagePrompts.length = 0;
+  const request = "Create an image of a red fox in fresh snow";
+  const image = await app.send({ message: request });
+  assert.equal(image.complete.reply, "I created this image for you.");
+  assert.equal(app.calls.rewriter.length, 0, "no rewriter call");
+  assert.deepEqual(imagePrompts, [real.composeImagePrompt(request, "")], "byte for byte the old prompt");
+  const context = await imageContextOf(image.complete.conversationId);
+  assert.equal(context.source, "none");
+  assert.equal(context.promptSha256, sha256(real.composeImagePrompt(request, "")));
+});
+
+test("a Free plan's chat image is refused before the rewriter or the image model is called", async (t) => {
+  const { reserveImageGeneration } = await import("../src/usage/service.js");
+  const { saveExchange } = await import("../src/chat/repository.js");
+  realImageDependencies = { reserve: reserveImageGeneration };
+  t.after(() => { realImageDependencies = null; });
+  const userId = "free-plan-user";
+  const app = await chatApp(t, userId);
+  // Earlier turns that the request would otherwise be rewritten from.
+  const seeded = await saveExchange({ userId, conversationId: null, modelKey: "nova", userContent: "Give me the key vocab for DNA replication", reply: VOCAB });
+  const result = await app.send({ message: "Create an image with all the vocab Study listed", conversationId: seeded.conversationId });
+  assert.equal(result.complete, null);
+  assert.equal(result.error?.status, 429, "the plan error");
+  assert.equal(result.error.code, "usage-limit");
+  assert.equal(app.calls.rewriter.length, 0, "no rewriter call");
+  assert.equal(app.calls.images.length, 0, "no image call");
+});
+
+test("past the plan check, a failed rewrite or a failed image still refunds; a refused plan never prepares a prompt", async () => {
+  const reserve = async () => ({ id: "event-1", creditReservationId: "credit-1" });
+  const cancelled = [];
+  const cancel = async (...args) => { cancelled.push(args); };
+  const finalize = async () => assert.fail("nothing to settle");
+  const imageRequests = [];
+  await assert.rejects(real.generateImage(
+    { userId: "u", prompt: "Draw that", preparePrompt: async () => { throw new Error("rewrite broke"); } },
+    { reserve, cancel, finalize, apiKey: "fixture-key", fetchImpl: async () => { imageRequests.push(1); return Response.json({}); } },
+  ));
+  assert.deepEqual(cancelled, [["event-1", "credit-1"]], "the rewrite's failure refunds");
+  assert.equal(imageRequests.length, 0);
+
+  await assert.rejects(real.generateImage(
+    { userId: "u", prompt: "Draw that", preparePrompt: async (prompt) => `${prompt}, enriched` },
+    { reserve, cancel, finalize, apiKey: "fixture-key", fetchImpl: async (_url, init) => { imageRequests.push(JSON.parse(init.body).prompt); return new Response("{}", { status: 500 }); } },
+  ));
+  assert.deepEqual(imageRequests, ["Draw that, enriched"], "the prepared prompt is the one sent");
+  assert.equal(cancelled.length, 2, "the image's failure refunds");
+
+  const prepared = [];
+  await assert.rejects(real.generateImage(
+    { userId: "u", prompt: "Draw that", preparePrompt: async (prompt) => { prepared.push(prompt); return prompt; } },
+    { reserve: async () => { throw Object.assign(new Error("Upgrade to create images."), { status: 429 }); }, cancel, finalize, apiKey: "fixture-key", fetchImpl: async () => assert.fail("no image call") },
+  ), { status: 429 });
+  assert.equal(prepared.length, 0, "no rewrite for a refused plan");
 });

@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { config } from "../config.js";
+import { logFailure } from "../security/error-log.js";
 import { db } from "../db/client.js";
 import { billingCustomers, creditLedger, subscriptions } from "../db/schema.js";
 
@@ -414,10 +415,7 @@ async function cancelConflictingStripeSubscription(subscriptionId) {
   try {
     await stripeClient().subscriptions.cancel(subscriptionId);
   } catch (error) {
-    console.warn("Conflicting Stripe subscription cancellation failed.", {
-      code: /^[a-z0-9_.-]{1,60}$/i.test(String(error?.code ?? "")) ? error.code : "stripe-error",
-      status: Number.isInteger(error?.statusCode) ? error.statusCode : null,
-    });
+    logFailure("stripe_conflicting_cancel_failed", error, {}, "warn");
     throw error;
   }
 }

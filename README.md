@@ -13,7 +13,7 @@ VibhavGPT is a private AI workspace for chat, image creation and study, with mem
 * 🔎 **Web search**: answers with current information and sources
 * 🎨 **Image creation**: generate images and work with images you upload
 * 📚 **Study mode**: guided study sessions that teach step by step
-* 🎙️ **Voice**: talk to it live
+* 🎙️ **Dictation**: speak a message with your device's own speech recognition (web browsers that support it and the Android app); VibhavGPT receives only the text you send, never the audio. Live voice calls have been retired
 * 📄 **Documents**: generate documents and export them to Google Docs
 * 📎 **Uploads**: attach files and images to a chat
 * 💳 **Plans and usage**: free, Plus and Pro tiers with clear usage limits, billed through Stripe
@@ -47,7 +47,7 @@ You need Node.js and a PostgreSQL database.
 cp .env.example .env
 ```
 
-At minimum set `DATABASE_URL`, a `BETTER_AUTH_SECRET` of 32 or more characters, `BETTER_AUTH_URL` and `CLIENT_ORIGINS`. Chat, search, images and voice also need the inference, search and model settings described in `.env.example`.
+At minimum set `DATABASE_URL`, a `BETTER_AUTH_SECRET` of 32 or more characters, `BETTER_AUTH_URL` and `CLIENT_ORIGINS`. Chat, search and images also need the inference, search and model settings described in `.env.example`.
 
 2. Start the API on port 3001:
 

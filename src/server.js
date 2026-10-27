@@ -14,7 +14,7 @@ import { usageRouter } from "./usage/router.js";
 import { billingRouter, stripeWebhookHandler } from "./billing/router.js";
 import { accountRouter } from "./account/router.js";
 import { searchRouter } from "./search/router.js";
-import { voiceRouter } from "./voice/router.js";
+import { VOICE_REMOVED, voiceRouter } from "./voice/router.js";
 import { startLiveUsageReconciliationJob } from "./voice/live-usage.js";
 import { securityRouter } from "./security/router.js";
 import { generationRouter } from "./generation/router.js";
@@ -25,6 +25,8 @@ import { disableTwoFactorWithReauth } from "./middleware/require-two-factor-pass
 import { createNativeOAuthRouter } from "./auth/native-oauth.js";
 import { pool } from "./db/client.js";
 import { Sentry, reportServerError } from "./sentry.js";
+import { logApiError } from "./security/error-log.js";
+import { parserFailureMessage } from "./security/request-error-message.js";
 
 export const app = express();
 app.disable("x-powered-by");
@@ -125,8 +127,13 @@ app.use("/api/native-auth", createNativeOAuthRouter({ auth, authBaseUrl: config.
 
 app.post("/api/webhooks/stripe", ...stripeWebhookHandler);
 
-// Voice uploads are base64-encoded JSON, which expands their size by roughly a third.
-app.use("/api/voice", express.json({ limit: "28mb" }), voiceRouter);
+// Voice has been retired (see voice/router.js). The two entry points that used to start a
+// session always answer 410, so they answer here, before any JSON parser reads a body they
+// will never use. The lifecycle routes that settle an earlier call remain in the router,
+// which gives each one a parser sized to its own body (the 28 MB limit that base64-encoded
+// audio uploads once needed is gone).
+app.post(["/api/voice/transcribe", "/api/voice/live/session"], (_req, res) => res.status(410).json(VOICE_REMOVED));
+app.use("/api/voice", voiceRouter);
 
 // Multipart parsing belongs only to the upload router. Keeping it isolated
 // avoids accepting files on unrelated JSON endpoints.
@@ -207,7 +214,7 @@ app.use(async (error, _req, res, _next) => {
       sqlState: /^[0-9A-Z]{5}$/.test(String(error?.code ?? "")) ? error.code : null,
     }));
   } else {
-    console.error("Unhandled API error", error);
+    logApiError(error, _req);
   }
   const status = error.status ?? 500;
   // Only server errors (5xx) are reported, tagged with the chat reference id
@@ -215,7 +222,7 @@ app.use(async (error, _req, res, _next) => {
   if (config.sentryDsn && reportServerError(error, { status, requestId: _req.chatRequestId ?? null, route: _req.baseUrl || null })) {
     await Sentry.flush(2000).catch(() => {});
   }
-  res.status(status).json({ error: status < 500 ? (error.message ?? "Request could not be completed.") : "Something went wrong. Please try again.", code: status < 500 ? error.code : undefined });
+  res.status(status).json({ error: status < 500 ? (parserFailureMessage(error) ?? error.message ?? "Request could not be completed.") : "Something went wrong. Please try again.", code: status < 500 ? error.code : undefined });
 });
 
 export function startServer() {

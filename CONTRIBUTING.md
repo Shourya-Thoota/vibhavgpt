@@ -14,7 +14,7 @@ You need Node.js 24 (the version production runs) and a PostgreSQL database.
    cp .env.example .env
    ```
 
-   At minimum set `DATABASE_URL`, a `BETTER_AUTH_SECRET` of 32 or more characters, `BETTER_AUTH_URL` and `CLIENT_ORIGINS`. Chat, search, images and voice also need the inference, search and model settings described in `.env.example`. Never commit a real `.env` or any key.
+   At minimum set `DATABASE_URL`, a `BETTER_AUTH_SECRET` of 32 or more characters, `BETTER_AUTH_URL` and `CLIENT_ORIGINS`. Chat, search and images also need the inference, search and model settings described in `.env.example`. Never commit a real `.env` or any key.
 
 2. Install, run the database migrations, and start the API on port 3001:
 

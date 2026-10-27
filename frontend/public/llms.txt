@@ -15,6 +15,8 @@ and AI crawlers are allowed by robots.txt; the sitemap lists canonical pages.
 - [Privacy Policy](https://vibhavgpt.com/privacy): Information about data handling and privacy.
 - [Guarantee](https://vibhavgpt.com/guarantee): No training on chats, no data sales, no ads, and export or deletion controls.
 - [Account deletion](https://vibhavgpt.com/account-deletion): Deletion routes, cancellation reminder, and data retention.
+- [Apps](https://vibhavgpt.com/apps): The official Android and Windows apps, with links to each app's install steps and download.
+- [Sources](https://vibhavgpt.com/sources): Links to the public source code and Vibhav Thoota's YouTube channel.
 - [Android](https://vibhavgpt.com/android): Official APK download, installation instructions, and release verification.
 - [Windows](https://vibhavgpt.com/vibhavgpt-windows): Official Windows 10 and 11 desktop installer, installation instructions, and release verification.
 

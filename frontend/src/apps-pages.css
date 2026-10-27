@@ -1,0 +1,330 @@
+/* Shared by the three public app pages: /apps, /android and /vibhavgpt-windows.
+   Colours, type and motion come from the tokens in /theme/vibhav.css, so both
+   themes work. The only raw colour is the QR code's fixed dark-on-light panel,
+   which a phone camera has to read in either theme. */
+
+:root {
+  --paper-2: var(--color-paper-2);
+  --paper-3: var(--color-paper-3);
+  --rule: var(--color-rule);
+  --rule-2: var(--color-rule-2);
+  --sky-blue: var(--color-sky-blue);
+  --display: var(--font-display);
+  --body: var(--font-body);
+  --mono: var(--font-mono);
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  overflow-x: clip;
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(1px 1px at 37px 61px, var(--star), transparent 100%),
+    radial-gradient(1px 1px at 173px 211px, var(--star), transparent 100%),
+    radial-gradient(1px 1px at 89px 263px, var(--star), transparent 100%),
+    radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--sky-blue) 20%, transparent), transparent 62%),
+    radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 66%);
+  background-size: 293px 293px, 347px 347px, 331px 331px, auto, auto;
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--body);
+  line-height: 1.55;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+.shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 64px; }
+
+/* --- Navigation --------------------------------------------------------- */
+
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.nav__links { display: flex; align-items: center; flex-wrap: wrap; gap: 0 20px; }
+.brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-family: var(--display); font-size: 1.15rem; text-decoration: none; }
+.brand img { width: 30px; height: 30px; border-radius: var(--radius-icon); }
+.nav-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 0.94rem; text-decoration: none; white-space: nowrap; }
+.nav-link:hover { color: var(--ink); }
+
+/* --- Type --------------------------------------------------------------- */
+
+h1, h2, h3 { min-width: 0; overflow-wrap: anywhere; font-style: normal; }
+h1 {
+  max-width: 11ch;
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(2.8rem, 5.4vw + 0.6rem, 5rem);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  line-height: 1;
+}
+h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weight: 400; }
+.lede { max-width: 46ch; margin: 20px 0 0; color: var(--ink-2); font-size: 1.12rem; }
+
+/* --- Buttons and links -------------------------------------------------- */
+
+/* .download is the one filled action on a platform page. On the apps page the
+   plain .button is outlined, and only a platform that matches the visitor's
+   device (see the page's small script) is filled. */
+.download, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 24px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+.download, [data-recommended] .button { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+.button:hover { border-color: var(--accent); }
+.download:hover, [data-recommended] .button:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.download svg, .button svg { flex: 0 0 auto; width: 18px; height: 18px; }
+.download-meta { color: var(--muted); font-size: 0.9rem; }
+.direct {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink-2);
+  font-size: 0.94rem;
+  text-underline-offset: 3px;
+}
+.direct:hover { color: var(--ink); }
+.cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; margin-top: 32px; }
+.web-link { margin: 18px 0 0; color: var(--muted); font-size: 0.92rem; }
+.web-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-2); text-underline-offset: 3px; }
+
+/* --- Device frames: drawn shapes around the brand planet, no interface ----
+   A phone with its side buttons, a monitor on a stand with a window title bar,
+   and two plain frames for the Sources page. Only tokens are used, so both
+   themes work; nothing in them is text, a screenshot or a claim. */
+
+.device {
+  position: relative;
+  display: grid;
+  justify-self: center;
+  border: 1px solid var(--rule-2);
+  background: linear-gradient(155deg, var(--paper-3), var(--paper-deep));
+  box-shadow: var(--shadow-lg), inset 0 1px 0 var(--rule);
+}
+.device__screen {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 90% 55% at 85% 0%, color-mix(in srgb, var(--sky-blue) 28%, transparent), transparent 70%),
+    radial-gradient(ellipse 70% 45% at 15% 105%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+    var(--paper);
+}
+/* One orbit ring behind whatever sits in the middle. */
+.device__screen::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: 68%;
+  aspect-ratio: 1;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius-round);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.device__planet {
+  position: relative;
+  z-index: 1;
+  width: 28%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-round);
+  object-fit: cover;
+  box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--sky-blue) 55%, transparent);
+}
+.device__glyph { position: relative; z-index: 1; width: 30%; max-width: 72px; color: var(--accent); }
+
+.device--phone { width: 150px; aspect-ratio: 9 / 18; padding: 8px; border-radius: 30px; }
+.device--phone::before, .device--phone::after { content: ""; position: absolute; width: 3px; border-radius: 2px; background: var(--rule-2); }
+.device--phone::before { left: -4px; top: 22%; height: 12%; }
+.device--phone::after { right: -4px; top: 28%; height: 16%; }
+.device--phone .device__screen { grid-template-rows: auto 1fr; justify-items: center; border-radius: 22px; }
+.device--phone .device__screen::before { content: ""; width: 34%; height: 8px; margin-top: 8px; border-radius: var(--radius-pill); background: var(--paper-deep); }
+.device--phone .device__planet { width: 46%; align-self: center; }
+
+.device--window { width: min(100%, 260px); aspect-ratio: 16 / 10; padding: 6px; border-radius: 14px; grid-template-rows: 22px 1fr; margin-bottom: 24px; }
+.device--window::before { content: ""; position: absolute; left: 50%; bottom: -14px; width: 12%; height: 14px; transform: translateX(-50%); background: linear-gradient(var(--rule-2), var(--rule)); }
+.device--window::after { content: ""; position: absolute; left: 50%; bottom: -20px; width: 34%; height: 6px; transform: translateX(-50%); border-radius: 3px 3px 6px 6px; background: var(--rule-2); }
+.device__bar { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid var(--rule); border-radius: 8px 8px 0 0; background: color-mix(in srgb, var(--paper-deep) 70%, transparent); }
+.device__bar img { width: 12px; height: 12px; }
+.device__controls { display: flex; gap: 5px; margin-left: auto; }
+.device__controls b { width: 7px; height: 7px; border-radius: var(--radius-round); background: var(--rule-2); }
+.device--window .device__screen { border-radius: 0 0 8px 8px; }
+.device--window .device__planet { width: 24%; }
+
+/* The Sources page: the same window without a stand, and a plain video frame. */
+.device--flat { margin-bottom: 0; }
+.device--flat::before, .device--flat::after { display: none; }
+.device--video { width: min(100%, 260px); aspect-ratio: 16 / 9; padding: 6px; border-radius: 14px; }
+.device--video .device__screen { border-radius: 9px; }
+
+.device--lg.device--phone { width: 240px; }
+.device--lg.device--window { width: 100%; max-width: 440px; }
+
+/* --- Apps page ---------------------------------------------------------- */
+
+.hub-hero { padding: 64px 0 40px; }
+.hub-hero h1 { max-width: 14ch; }
+.platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.platform { display: grid; align-content: start; gap: 24px; padding: 40px 40px 40px 0; }
+.platform + .platform { padding-left: 40px; padding-right: 0; border-left: 1px solid var(--rule); }
+.platform__stage { display: grid; align-items: center; min-height: 300px; }
+.platform h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; }
+.platform h2 svg { flex: 0 0 auto; color: var(--accent); }
+.platform__tag { padding: 3px 10px; border: 1px solid var(--accent-line); border-radius: var(--radius-pill); color: var(--accent); font: 600 0.78rem var(--body); }
+.platform__tag[hidden] { display: none; }
+.platform__fact { margin: 0; color: var(--ink); font-weight: 600; }
+.platform__text { max-width: 44ch; margin: 0; color: var(--ink-2); }
+.platform__actions { display: grid; justify-items: start; gap: 8px; }
+.platform__hint { max-width: 44ch; margin: 0; color: var(--muted); font-size: 0.88rem; }
+
+/* --- Release facts, steps, notes and checksum --------------------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+  gap: 56px;
+  align-items: center;
+  padding: 64px 0 56px;
+}
+.hero--phone { grid-template-columns: minmax(0, 1fr) 300px; }
+
+/* Desktop visitors get the page on their phone in one scan. */
+.scan { display: flex; align-items: center; gap: 16px; margin-top: 36px; color: var(--muted); font-size: 0.9rem; }
+.scan__code { flex: 0 0 auto; width: 92px; height: 92px; padding: 8px; border-radius: 12px; background: #f4f8fc; }
+.scan__code svg { display: block; width: 100%; height: 100%; }
+.scan strong { display: block; color: var(--ink); font-weight: 600; }
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.facts div { padding: 20px 20px 20px 0; }
+.facts div + div { padding-left: 20px; border-left: 1px solid var(--rule); }
+.facts dt { color: var(--muted); font-size: 0.82rem; }
+/* Figures in the sans: Prata's old-style 1 reads as an l in "1.0.1". */
+.facts dd { margin: 6px 0 0; font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+.columns { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; margin-top: 56px; }
+
+/* Installing is a real sequence, so it is numbered. */
+.steps { display: grid; gap: 18px; margin: 0; padding: 0; list-style: none; counter-reset: step; }
+.steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; color: var(--ink-2); counter-increment: step; }
+.steps li::before { content: counter(step); color: var(--accent); font-size: 1.7rem; font-weight: 300; line-height: 1; font-variant-numeric: tabular-nums; }
+.steps strong { color: var(--ink); font-weight: 600; }
+.note { margin: 20px 0 0; padding-left: 54px; color: var(--muted); font-size: 0.9rem; }
+
+.notes { margin: 0; color: var(--ink-2); }
+ul.notes { display: grid; gap: 8px; padding-left: 1.1em; }
+.verify { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--rule); }
+.verify h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+.verify p { margin: 6px 0 0; color: var(--muted); font-size: 0.88rem; }
+.checksum-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; }
+.checksum {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-icon);
+  background: var(--paper-deep);
+  color: var(--ink-2);
+  font: 500 0.78rem/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+.copy {
+  flex: 0 0 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--radius-icon);
+  background: transparent;
+  color: var(--ink-2);
+  font: 600 0.84rem var(--body);
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+}
+.copy:hover { border-color: var(--accent); color: var(--ink); }
+.command { margin-top: 10px; color: var(--faint); font-size: 0.82rem; }
+.command code { color: var(--ink-2); font-family: var(--mono); font-size: 0.78rem; overflow-wrap: anywhere; }
+
+/* The other platform, one clear link. */
+.also { margin-top: 56px; padding-top: 28px; border-top: 1px solid var(--rule); }
+.also h2 { margin-bottom: 10px; }
+.also p { max-width: 54ch; margin: 0 0 16px; color: var(--ink-2); }
+
+/* --- Footer ------------------------------------------------------------- */
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 24px;
+  margin-top: 64px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.footer span { margin-right: auto; }
+.footer a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--muted); text-underline-offset: 3px; }
+.public-operator a { display: inline-flex; align-items: center; min-height: 44px; }
+.footer a:hover { color: var(--ink); }
+
+/* --- Motion --------------------------------------------------------------
+   Short entrances and small hover shifts, opacity and transform only. Content
+   is visible without any of it: the animation only ever starts from a faded
+   state, and nothing waits for a script. Reduced motion keeps a quick fade and
+   drops every movement. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .rise { animation: apps-rise var(--dur-short) var(--ease-out) both; animation-delay: calc(var(--i, 0) * 60ms); }
+  .device { transition: transform var(--dur-short) var(--ease-out); }
+  .platform:hover .device, .platform:focus-within .device { transform: translateY(-4px); }
+  .button:hover, .download:hover { transform: translateY(-1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise { animation: apps-fade var(--dur-micro) linear both; }
+}
+@keyframes apps-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes apps-fade { from { opacity: 0; } }
+
+/* --- Narrow screens ------------------------------------------------------ */
+
+@media (max-width: 860px) {
+  .hero, .hero--phone { grid-template-columns: minmax(0, 1fr); gap: 40px; padding: 40px 0; }
+  .hub-hero { padding: 40px 0 28px; }
+  .device--lg.device--phone { width: 220px; }
+  .device--lg.device--window { max-width: 440px; }
+  .scan { display: none; }
+  .platforms { grid-template-columns: minmax(0, 1fr); }
+  .platform, .platform + .platform { padding: 32px 0; border-left: 0; }
+  .platform + .platform { border-top: 1px solid var(--rule); }
+  .platform__stage { min-height: 0; }
+  .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .facts div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .columns { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+}
+@media (max-width: 420px) {
+  .download, .button { width: 100%; }
+  .platform__actions { justify-items: stretch; }
+  .direct { justify-content: center; }
+  .facts dd { font-size: 1.12rem; }
+  .footer span { flex-basis: 100%; }
+}

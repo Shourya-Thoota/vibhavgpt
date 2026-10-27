@@ -5,9 +5,12 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// The sidebar is a full-height column: head, New chat, nav and foot keep their
-// size, and the chat history fills the rest and scrolls on its own, so chats
-// are never cut off and never push the account foot off screen.
+// The sidebar is a full-height column: head, New chat, nav, secondary links and
+// foot keep their size, and the chat history fills the rest and scrolls on its
+// own, so chats are never cut off and never push the account foot off screen.
+// A window too short for that, and the phone drawer, scroll as one column instead.
+// These are CSS-source and rendered-markup checks. They do not prove how it scrolls;
+// that was measured separately in a real browser (see the change notes).
 const css = readFileSync(new URL("../frontend/src/styles.css", import.meta.url), "utf8");
 const rule = (selector) => {
   const start = css.indexOf(`${selector} {`);
@@ -46,18 +49,20 @@ test("the sidebar is a full-height flex column that never lets its foot fall off
   const sidebar = rule(".sidebar");
   assert.match(sidebar, /height: 100vh;\s*height: 100dvh;\s*max-height: 100dvh;/, "fits the visible screen, phone browser bars included");
   assert.match(sidebar, /display: flex;\s*flex-direction: column;/);
-  assert.match(sidebar, /overflow-x: hidden;\s*overflow-y: auto;/, "only a screen too short for everything scrolls the whole column");
+  assert.match(sidebar, /overflow-x: hidden;\s*overflow-y: auto;/, "the column can still scroll as a whole, as the short-window fallback");
   assert.match(css, /\.sidebar > :not\(\.conversation-history\) \{ flex-shrink: 0; \}/, "head, New chat, nav and foot are never squeezed");
   assert.match(css, /\.sidebar__foot \{ margin-top: auto;/, "the foot sits at the bottom");
 });
 
 test("the chat history fills the space left and scrolls independently, with room under the last chat", () => {
-  assert.match(rule(".conversation-history"), /flex: 1 1 0%;[\s\S]*min-height: 160px;/, "takes all remaining height, never collapsing to nothing");
+  const history = rule(".conversation-history");
+  assert.match(history, /flex: 1 1 0%;[\s\S]*min-height: 0;/, "takes all remaining height and may shrink");
+  assert.doesNotMatch(history, /min-height: \d+px/, "no rigid minimum height that would push the column into scrolling");
   const list = rule(".conversation-history__list");
   assert.match(list, /flex: 1 1 0%;/);
   assert.match(list, /min-height: 0;/);
   assert.match(list, /overflow-y: auto;/);
-  assert.match(list, /padding: 1px 0 24px;/, "the last chat clears the foot");
+  assert.match(list, /padding: 0 0 24px;/, "no padding above the first section, and the last chat clears the foot");
   assert.match(list, /scrollbar-width: thin;\s*scrollbar-color: var\(--line-strong\) transparent;/, "a subtle themed scrollbar");
   assert.match(css, /\.conversation-history__list::-webkit-scrollbar-thumb \{[^}]*background: var\(--line-strong\);/);
 });
@@ -74,15 +79,21 @@ test("in the rendered sidebar, the history sits in the column between the fixed 
   }
 });
 
-test("on phones the drawer is one full-height scroll column with the account pinned", () => {
+test("on phones the drawer, and on a short desktop window, are one scroll column with the account pinned", () => {
   const mobile = readFileSync(new URL("../frontend/src/mobile.css", import.meta.url), "utf8");
   assert.match(mobile, /\.sidebar \{[^}]*height: 100vh;\s*height: 100dvh;/);
-  // Head, New chat, nav and Apps fill most of a phone's height, so a nested
-  // history scroller would get a sliver; the drawer scrolls as a whole.
-  const drawer = mobile.slice(mobile.indexOf("/* --- Drawer: one scroll column"));
-  assert.match(drawer, /\.conversation-history \{ flex: 0 0 auto; min-height: auto; \}/);
-  assert.match(drawer, /\.conversation-history__list \{ flex: none; min-height: auto; overflow: visible;/, "chats flow at full height");
-  assert.match(drawer, /\.sidebar__foot \{ display: contents; \}/);
-  assert.match(drawer, /\.sidebar__foot > \.ui-menu \{\s*position: sticky;/, "the account button stays on screen");
-  assert.match(css, /\.sidebar \{[^}]*overflow-y: auto;/, "the drawer itself scrolls");
+  // A nested history scroller would get a sliver under the controls, so the column
+  // scrolls as a whole. Those rules are one shared block in styles.css.
+  const start = css.indexOf("@media (max-width: 760px), (max-height: 720px) {");
+  assert.ok(start > 0, "one block serves the phone drawer and the short window");
+  const column = css.slice(start, css.indexOf("\n}\n", start));
+  assert.match(column, /\.conversation-history \{ flex: 0 0 auto; min-height: auto; \}/);
+  assert.match(column, /\.conversation-history__list \{ flex: none; min-height: auto; overflow: visible;/, "chats flow at full height");
+  assert.match(column, /\.sidebar__foot \{ display: contents; \}/);
+  assert.match(column, /\.sidebar__foot > \.ui-menu \{\s*position: sticky;/, "the account button stays on screen");
+  assert.match(column, /\.sidebar__foot > :first-child \{ margin-top: auto; \}/, "the footer settles at the bottom of a short column");
+  assert.doesNotMatch(css, /sidebar__more/, "no group at the bottom of the sidebar");
+  assert.match(css, /\.sidebar \{[^}]*overflow-y: auto;/, "the column itself scrolls");
+  assert.doesNotMatch(mobile, /\.sidebar__foot > :first-child \{ margin-top: auto; \}/, "the drawer no longer carries its own copy of these rules");
+  assert.match(mobile, /\.sidebar \{[^}]*gap: 22px;/, "the drawer keeps its own section gap");
 });

@@ -18,7 +18,6 @@ const fixtures = {
   IMAGE_GENERATION_MODEL: "fixture/image",
   VOICE_REALTIME_MODEL: "fixture-realtime",
   VOICE_TRANSCRIPTION_MODEL: "fixture-transcribe",
-  VOICE_NAME: "fixture-voice",
   SEARCH_API_URL: "https://search.test/search",
   WEATHER_API_URL: "https://weather.test/data/2.5/weather",
   WEATHER_SOURCE_NAME: "Fixture Weather",

@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
 import {
-  BarChart3, Brain, ChevronDown, Code, CreditCard, FileText,
-  LogOut, MessageSquare, Monitor, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, PenLine, Plus,
-  Settings as SettingsIcon, Smartphone, Sun, Trash2, X,
+  BarChart3, Brain, ChevronDown, Code, CreditCard, FileText, LayoutGrid,
+  LogOut, MessageSquare, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, PenLine, Plus,
+  Settings as SettingsIcon, ShoppingBag, Sun, Trash2, X,
 } from "lucide-react";
-import { SOURCE_REPO_URL } from "../source-repo.js";
 import { Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "./ui.jsx";
 import { AccountBillingMenu } from "./AccountBillingMenu.jsx";
 import ConversationLibrary from "./ConversationLibrary.jsx";
-import { visibleAppLinks, WINDOWS_DOWNLOAD_PATH } from "../desktop-app.js";
+import { visibleAppLinks } from "../desktop-app.js";
 
-const YOUTUBE_CHANNEL_URL = "https://www.youtube.com/@vibhavthoota";
+// The one page that lists the Android and Windows apps; each links on to its
+// own download page.
+const APPS_HUB_PATH = "/apps";
+// The one page that links to the public source code and the YouTube channel.
+const SOURCES_PATH = "/sources";
+// The existing merch store, linked as it is.
+const MERCH_STORE_URL = "https://store.vibhavgpt.com";
 
 function relativeConversationTime(value) {
   if (!value) return "";
@@ -125,40 +130,31 @@ function ConversationHistory({ api, activeId, revision, onOpen, onNew, productMo
   );
 }
 
-// lucide-react 1.x dropped brand icons, so YouTube is drawn here in the same
-// 24px, round-stroked style as the lucide icons beside it.
-function YoutubeIcon({ size = 24, strokeWidth = 2 }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17" />
-      <path d="m10 15 5-3-5-3z" />
-    </svg>
-  );
-}
-
 const CHAT_LINKS = () => [
   { id: "chat", label: "Chat", icon: <MessageSquare size={17} strokeWidth={1.9} /> },
   { id: "memory", label: "Memory", icon: <Brain size={17} strokeWidth={1.9} /> },
   { id: "billing", label: "Plan", icon: <CreditCard size={17} strokeWidth={1.9} /> },
 ];
 
-// The native apps' public download pages: plain links, outside the app. The
-// public source code and the YouTube channel open in a new tab.
-// Inside the Windows app, its own download link is left out (desktop-app.js).
-const APP_LINKS = [
-  { href: "/android", label: "Android", icon: <Smartphone size={17} strokeWidth={1.9} /> },
-  { href: WINDOWS_DOWNLOAD_PATH, label: "Windows", icon: <Monitor size={17} strokeWidth={1.9} /> },
-  { href: SOURCE_REPO_URL, label: "Source code", icon: <Code size={17} strokeWidth={1.9} />, external: true },
-  { href: YOUTUBE_CHANNEL_URL, label: "YouTube", icon: <YoutubeIcon size={17} strokeWidth={1.9} />, external: true },
+// The Resources section: three plain links to public pages, outside the app. Apps
+// lists the Android and Windows downloads, Sources links to the public source code
+// and the YouTube channel, and the merch store opens in a new tab.
+// Apps and the merch store are webOnly: both are left out of the Windows app
+// (desktop-app.js), which has its own installer and loads every vibhavgpt.com
+// address inside its window. Sources stays: its two destinations are other sites,
+// which that app already sends to the system browser.
+const RESOURCE_LINKS = [
+  { href: APPS_HUB_PATH, label: "Apps", icon: <LayoutGrid size={17} strokeWidth={1.9} />, webOnly: true },
+  { href: SOURCES_PATH, label: "Sources", icon: <Code size={17} strokeWidth={1.9} /> },
+  { href: MERCH_STORE_URL, label: "Merch Store", icon: <ShoppingBag size={17} strokeWidth={1.9} />, external: true, webOnly: true, ariaLabel: "Merch Store" },
 ];
 
 /**
  * One shell, three variants (chat/study/image) driven by `variant`. The head
  * (mode switcher + collapse/close) and the foot (plan nudge + account menu)
  * never change — only the middle section does:
- *   - chat:  "New chat" + the full nav (Chat/Memory/Plan), the Apps links
- *            (Android, Windows) + history.
+ *   - chat:  "New chat" + the full nav (Chat/Memory/Plan), the Resources links
+ *            (Apps, Sources, Merch Store) + history.
  *   - study: "New study session", Writing Tools (the AI Detector and
  *            Humanizer) + history. No main-nav links: those pages live one
  *            mode-switch away in Chat, not duplicated here.
@@ -199,6 +195,19 @@ export default function Sidebar({
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); go(page);
   };
+  // In the collapsed rail every control is an icon, so each one carries an
+  // explicit accessible name and the same name as a tooltip. The tooltip is one
+  // fixed-position label shown for hover and for keyboard focus (a native
+  // `title` appears for hover only, and the rail clips anything wider than
+  // itself), and Escape dismisses it.
+  const [tip, setTip] = useState(null);
+  const railProps = (label) => (rail ? { "aria-label": label, "data-rail-label": label } : {});
+  const showTip = (event) => {
+    const target = rail ? event.target.closest?.("[data-rail-label]") : null;
+    if (!target) { setTip(null); return; }
+    const box = target.getBoundingClientRect();
+    setTip({ label: target.getAttribute("data-rail-label"), top: box.top + box.height / 2, left: event.currentTarget.getBoundingClientRect().right + 6 });
+  };
   const displayName = user.name?.trim() || user.email.split("@")[0];
   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   const newLabel = variant === "study" ? "New study session" : "New chat";
@@ -209,7 +218,16 @@ export default function Sidebar({
   }[variant];
 
   return (
-    <aside className="sidebar" data-open={sidebarOpen} data-variant={variant}>
+    <aside
+      className="sidebar"
+      data-open={sidebarOpen}
+      data-variant={variant}
+      onMouseOver={showTip}
+      onMouseLeave={() => setTip(null)}
+      onFocus={showTip}
+      onBlur={() => setTip(null)}
+      onKeyDown={(event) => { if (event.key === "Escape") setTip(null); }}
+    >
       <div className="sidebar__head">
         {brand}
         <IconButton
@@ -225,7 +243,7 @@ export default function Sidebar({
       </div>
 
       {variant !== "image" && (
-        <button className="sidebar__new" type="button" onClick={newChat} title={newLabel}>
+        <button className="sidebar__new" type="button" onClick={newChat} {...(rail ? railProps(newLabel) : { title: newLabel })}>
           <Plus size={17} strokeWidth={2.2} />
           {!rail && <span>{newLabel}</span>}
         </button>
@@ -234,7 +252,7 @@ export default function Sidebar({
       {variant === "study" && onOpenWritingTools && (
         <nav className="sidebar__nav" aria-label="Study tools">
           <button type="button" className="sidebar__link" data-active={writingToolsActive || undefined}
-            aria-current={writingToolsActive ? "page" : undefined} title={rail ? "Writing Tools" : undefined} onClick={onOpenWritingTools}>
+            aria-current={writingToolsActive ? "page" : undefined} {...railProps("Writing Tools")} onClick={onOpenWritingTools}>
             <PenLine size={17} strokeWidth={1.9} />
             {!rail && <span>Writing Tools</span>}
           </button>
@@ -249,7 +267,7 @@ export default function Sidebar({
               href={link.id === "chat" ? "/app/chat" : `/app/${link.id}`}
               className="sidebar__link"
               data-active={page === link.id || undefined}
-              title={rail ? link.label : undefined}
+              {...railProps(link.label)}
               aria-current={page === link.id ? "page" : undefined}
               onClick={(event) => {
                 if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -264,10 +282,11 @@ export default function Sidebar({
       )}
 
       {variant === "chat" && (
-        <nav className="sidebar__nav sidebar__apps" aria-label="Apps">
-          {!rail && <span className="sidebar__apps-label">Apps</span>}
-          {visibleAppLinks(APP_LINKS).map((link) => (
-            <a key={link.href} href={link.href} className="sidebar__link" title={rail ? link.label : undefined}
+        <nav className="sidebar__nav sidebar__apps" aria-label="Resources">
+          {!rail && <span className="sidebar__apps-label">Resources</span>}
+          {visibleAppLinks(RESOURCE_LINKS).map((link) => (
+            <a key={link.href} href={link.href} className="sidebar__link"
+              {...(rail ? railProps(link.ariaLabel ?? link.label) : link.ariaLabel ? { "aria-label": link.ariaLabel } : {})}
               {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
               {link.icon}
               {!rail && <span>{link.label}</span>}
@@ -301,11 +320,8 @@ export default function Sidebar({
       <div className="sidebar__foot">
         {!rail && tierKey === "free" && (
           <div className="plan-nudge">
-            <strong>You're on Free</strong>
-            <small>Get higher token allowances and included image and document generations.</small>
-            <button type="button" className="btn btn--secondary" onClick={() => go("billing")}>
-              See plans
-            </button>
+            <span className="plan-nudge__tier">Free plan</span>
+            <button type="button" className="plan-nudge__action" onClick={() => go("billing")}>See plans</button>
           </div>
         )}
         <Menu
@@ -314,7 +330,7 @@ export default function Sidebar({
           align="start"
           panelClassName="account-menu"
           trigger={({ ref, open, toggle }) => (
-            <button ref={ref} type="button" className="account" aria-expanded={open} aria-haspopup="menu" onClick={toggle}>
+            <button ref={ref} type="button" className="account" aria-expanded={open} aria-haspopup="menu" onClick={toggle} {...railProps(`Account menu, ${displayName}`)}>
               <span className="avatar" aria-hidden="true">{initials || "V"}</span>
               {!rail && (
                 <>
@@ -344,6 +360,7 @@ export default function Sidebar({
           <MenuItem icon={<LogOut size={16} />} tone="danger" onSelect={onSignOut}>Sign out</MenuItem>
         </Menu>
       </div>
+      {rail && tip && <span className="sidebar__tip" aria-hidden="true" style={{ top: tip.top, left: tip.left }}>{tip.label}</span>}
     </aside>
   );
 }

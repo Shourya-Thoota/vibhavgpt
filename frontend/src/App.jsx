@@ -3176,7 +3176,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                     <SourcesDisclosure sources={message.sources ?? []} steps={message.activitySummary ?? []} />
                     {message.attachment && (
                       <PrivateFileLink className="generated-attachment" href={message.attachment.downloadUrl} name={message.attachment.name}>
-                        {message.attachment.kind === "generated-image" ? <PrivateImage src={message.attachment.previewUrl ?? message.attachment.downloadUrl} alt={message.attachment.name} /> : <FileText size={22} />}
+                        {message.attachment.kind === "generated-image" ? <PrivateImage lazy loading="lazy" src={message.attachment.previewUrl ?? message.attachment.downloadUrl} alt={message.attachment.name} /> : <FileText size={22} />}
                         <span><strong>{message.attachment.name}</strong><small>Download file</small></span>
                       </PrivateFileLink>
                     )}

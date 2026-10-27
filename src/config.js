@@ -98,7 +98,6 @@ export const config = {
   voice: {
     realtimeModel: env("VOICE_REALTIME_MODEL"),
     transcriptionModel: env("VOICE_TRANSCRIPTION_MODEL"),
-    voiceName: env("VOICE_NAME"),
   },
   // Names that must never be stored as facts about the assistant.
   providerNameTerms: splitOrigins(process.env.PROVIDER_NAME_TERMS),

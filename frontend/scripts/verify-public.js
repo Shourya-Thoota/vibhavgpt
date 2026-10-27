@@ -10,7 +10,7 @@ export async function verifyPublicBuild(dist) {
   assert.doesNotMatch(robots, /Disallow:\s*\//);
   assert.ok(robots.includes(`${SITE_ORIGIN}/sitemap.xml`));
   for (const [path, page] of Object.entries(PUBLIC_PAGES)) {
-    const file = ["/home", "/android", "/vibhavgpt-windows"].includes(path) ? `${path.slice(1)}/index.html` : `${path.slice(1)}.html`;
+    const file = ["/home", "/apps", "/sources", "/android", "/vibhavgpt-windows"].includes(path) ? `${path.slice(1)}/index.html` : `${path.slice(1)}.html`;
     const html = await readFile(resolve(dist, file), "utf8");
     const body = html.slice(html.indexOf("<body"));
     assert.equal((html.match(/<title>/g) ?? []).length, 1, `${path}: duplicate title`);

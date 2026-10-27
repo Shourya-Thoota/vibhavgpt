@@ -30,7 +30,7 @@ const imagePrompts = [];
 mock.module(new URL("../src/generation/service.js", import.meta.url).href, {
   namedExports: {
     ...real,
-    generateImage: async ({ prompt }) => { imagePrompts.push(prompt); return { buffer: Buffer.from("png") }; },
+    generateImage: async ({ prompt, preparePrompt }) => { imagePrompts.push(preparePrompt ? await preparePrompt(prompt) : prompt); return { buffer: Buffer.from("png") }; },
     createStoredAttachment: async () => ({ id: "00000000-0000-4000-8000-000000000001" }),
   },
 });

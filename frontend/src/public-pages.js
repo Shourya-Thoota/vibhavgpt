@@ -44,6 +44,26 @@ export const PUBLIC_PAGES = {
       ["Can deleted data be recovered?", "Account deletion is permanent. Export the data you want to keep from Settings before confirming. Active account data is removed; restricted disaster-recovery backups rotate out within 12 months. Billing providers may retain transaction records under their own policies and legal obligations."],
     ],
   },
+  "/apps": {
+    label: "Apps", title: "VibhavGPT Apps: Official Android and Windows Downloads",
+    description: "Get the official VibhavGPT apps for Android and Windows from Pansophy LLC, compare requirements, then open install steps or a download. Made by Vibhav Thoota.",
+    faq: [
+      ["Which VibhavGPT apps are available?", "VibhavGPT has an Android app and a Windows app, and you can also use the workspace in any modern browser. Sign in with your existing VibhavGPT account on any of them to use the same projects and saved memory. Chat, image creation and Study are available according to your plan and allowances. Each app has its own page with installation steps, requirements and a checksum for the file."],
+      ["Where should I download the apps?", "Use the links on the official VibhavGPT pages. The direct download links here and on each app's page point to the release files that Pansophy LLC publishes. Open the Android or Windows page to check the requirements and compare the SHA-256 checksum with the file you downloaded. Avoid copies from unfamiliar download sites."],
+      ["Why does my device show a warning when I install?", "Windows shows a SmartScreen warning because the installer is not yet signed with a code-signing certificate. Android may ask you to allow your browser or file manager to install apps from this source. Follow the steps on the app's page, allow the permission only for the file you just downloaded, and check the checksum first."],
+      ["Do I have to install an app?", "No. VibhavGPT works in any modern browser with the same account, so the apps are optional. If your device cannot run an app, open the browser workspace instead. The Android app needs Android 8.0 or later, and the Windows installer is built for 64-bit editions of Windows 10 and Windows 11."],
+    ],
+  },
+  "/sources": {
+    label: "Sources", title: "VibhavGPT Sources: Public Source Code and YouTube Channel",
+    description: "Read the public VibhavGPT source code on GitHub or visit Vibhav Thoota's YouTube channel, with both links on one page from Pansophy LLC. Made by Vibhav Thoota.",
+    faq: [
+      ["What is linked from this page?", "Two places outside VibhavGPT: the public source code of VibhavGPT on GitHub, and Vibhav Thoota's YouTube channel on YouTube. Each opens in a new tab, so this page stays open for you to return to. VibhavGPT does not embed either site here and adds no tracking to these links. They are sent without a referrer, so those sites are not told you came from VibhavGPT, and you do not need a VibhavGPT account to open either one."],
+      ["Which license covers the source code?", "The public source of VibhavGPT is published under the AGPL-3.0 license, and the repository's license file has the full text. Read the license before you copy, change or run the code yourself, because it sets the conditions for sharing your changes."],
+      ["Who makes VibhavGPT?", "VibhavGPT is made by Vibhav Thoota and operated by Pansophy LLC. For help with your account or the service, email support@pansophy.com and describe what you were trying to do, so the reply can be specific."],
+      ["Where are the Android and Windows apps?", "On the Apps page, which lists the official Android and Windows apps with install steps and direct downloads. You can also use VibhavGPT in any modern browser with the same account, so installing an app is optional."],
+    ],
+  },
   "/android": {
     label: "Android", title: "VibhavGPT for Android: Official App Download and Setup",
     description: "Download the official VibhavGPT Android APK from Pansophy LLC, follow installation steps, check device requirements and verify files. Made by Vibhav Thoota.",
@@ -78,7 +98,7 @@ export function pageStructuredData(pathname) {
     { "@type": "Organization", "@id": `${SITE_ORIGIN}/#organization`, name: "Pansophy LLC", alternateName: "VibhavGPT", url: `${SITE_ORIGIN}/home`, logo: BRAND_IMAGE, email: "support@pansophy.com",
       founder: { "@type": "Person", "@id": `${SITE_ORIGIN}/#founder`, name: "Vibhav Thoota", jobTitle: "Founder" } },
     { "@type": "WebSite", "@id": `${SITE_ORIGIN}/#website`, name: "VibhavGPT", url: `${SITE_ORIGIN}/`, publisher: { "@id": `${SITE_ORIGIN}/#organization` }, creator: { "@id": `${SITE_ORIGIN}/#founder` } },
-    { "@type": "SoftwareApplication", "@id": `${SITE_ORIGIN}/#software`, name: "VibhavGPT", url: `${SITE_ORIGIN}/home`, applicationCategory: "ProductivityApplication", operatingSystem: "Web, Android", publisher: { "@id": `${SITE_ORIGIN}/#organization` }, creator: { "@id": `${SITE_ORIGIN}/#founder` } },
+    { "@type": "SoftwareApplication", "@id": `${SITE_ORIGIN}/#software`, name: "VibhavGPT", url: `${SITE_ORIGIN}/home`, applicationCategory: "ProductivityApplication", operatingSystem: "Web, Android, Windows", publisher: { "@id": `${SITE_ORIGIN}/#organization` }, creator: { "@id": `${SITE_ORIGIN}/#founder` } },
   ];
   if (page && path !== "/home") graph.push({
     "@type": "BreadcrumbList", itemListElement: [

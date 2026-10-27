@@ -35,6 +35,8 @@ export const GENERATION_LIMITS = {
 };
 // Compatibility alias for older callers; new code should use the per-kind map.
 export const IMAGE_LIMITS = GENERATION_LIMITS;
+// Voice has been retired, so nothing new is charged against these. They stay for
+// the usage report and for settling a call that was already connected.
 // Legacy transcription-request limits are retained separately from Live voice
 // minutes; Live voice's monthly minute pool is enforced in voice/live-usage.
 // This is the separate voice-dictation allowance. Live Comet has its own

@@ -32,15 +32,15 @@ function appearanceHead() {
     },
     configureServer(server) {
       // Standalone pages and their theme sources work in dev as in dist.
-      const assets = { "/theme/appearance-boot.js": "src/theme/appearance-boot.js", "/theme/vibhav.css": "src/theme/vibhav.css", "/theme/page-scroll-boot.js": "src/page-scroll-boot.js", "/theme/public-pages.css": "src/public-pages.css" };
-      const pages = { "/account-deletion": "account-deletion.html", "/account-deletion.html": "account-deletion.html", "/android": "android/index.html", "/android/": "android/index.html", "/android/index.html": "android/index.html", "/vibhavgpt-windows": "vibhavgpt-windows/index.html", "/vibhavgpt-windows/": "vibhavgpt-windows/index.html", "/vibhavgpt-windows/index.html": "vibhavgpt-windows/index.html" };
+      const assets = { "/theme/appearance-boot.js": "src/theme/appearance-boot.js", "/theme/vibhav.css": "src/theme/vibhav.css", "/theme/page-scroll-boot.js": "src/page-scroll-boot.js", "/theme/public-pages.css": "src/public-pages.css", "/theme/apps-pages.css": "src/apps-pages.css" };
+      const pages = { "/account-deletion": "account-deletion.html", "/account-deletion.html": "account-deletion.html", "/apps": "apps/index.html", "/apps/": "apps/index.html", "/apps/index.html": "apps/index.html", "/sources": "sources/index.html", "/sources/": "sources/index.html", "/sources/index.html": "sources/index.html", "/android": "android/index.html", "/android/": "android/index.html", "/android/index.html": "android/index.html", "/vibhavgpt-windows": "vibhavgpt-windows/index.html", "/vibhavgpt-windows/": "vibhavgpt-windows/index.html", "/vibhavgpt-windows/index.html": "vibhavgpt-windows/index.html" };
       server.middlewares.use((req, res, next) => {
         const path = req.url.split("?")[0];
         if (assets[path]) {
           res.setHeader("Content-Type", path.endsWith(".css") ? "text/css" : "text/javascript");
           res.end(read(assets[path]));
         } else if (pages[path]) {
-          const canonical = path.startsWith("/android") ? "/android" : path.startsWith("/vibhavgpt-windows") ? "/vibhavgpt-windows" : "/account-deletion";
+          const canonical = path.startsWith("/sources") ? "/sources" : path.startsWith("/apps") ? "/apps" : path.startsWith("/android") ? "/android" : path.startsWith("/vibhavgpt-windows") ? "/vibhavgpt-windows" : "/account-deletion";
           const details = detailsHtml(canonical);
           res.setHeader("Content-Type", "text/html; charset=utf-8");
           res.end(updateMetadata(read(`public/${pages[path]}`), canonical).replace("<!-- public-faq -->", details.faq));
@@ -51,7 +51,7 @@ function appearanceHead() {
       // Match Caddy's directory-index routes during built-site verification.
       server.middlewares.use((req, res, next) => {
         const [path, query] = req.url.split("?");
-        if (["/home", "/home/", "/android", "/android/", "/vibhavgpt-windows", "/vibhavgpt-windows/"].includes(path) || (path === "/" && !query)) {
+        if (["/home", "/home/", "/apps", "/apps/", "/sources", "/sources/", "/android", "/android/", "/vibhavgpt-windows", "/vibhavgpt-windows/"].includes(path) || (path === "/" && !query)) {
           const directory = path === "/" ? "home" : path.replaceAll("/", "");
           req.url = `/${directory}/index.html${query ? `?${query}` : ""}`;
         }

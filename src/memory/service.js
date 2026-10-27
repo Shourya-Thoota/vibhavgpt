@@ -4,6 +4,7 @@ import { db } from "../db/client.js";
 import { memoryFacts, userProfiles } from "../db/schema.js";
 import { withoutBlockedNameFacts } from "../security/display-name.js";
 import { providerNameTerms } from "../security/provider-names.js";
+import { logFailure } from "../security/error-log.js";
 import { primaryProviderApproved } from "../chat/providers.js";
 
 // Extraction runs on the primary inference stage with MEMORY_EXTRACTION_MODEL.
@@ -512,7 +513,7 @@ export async function extractAndSaveFacts(userId, userMessage, existingFacts, { 
     });
     return newFacts.map((fact) => fact.content);
   } catch (error) {
-    console.warn("Fact extraction was unavailable; chat will continue.", { reason: error.message });
+    logFailure("memory_fact_extraction_unavailable", error, {}, "warn");
     return [];
   }
 }

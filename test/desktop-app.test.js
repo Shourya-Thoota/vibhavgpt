@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { DESKTOP_APP_CLASS, isDesktopApp, markDesktopApp, visibleAppLinks, WINDOWS_DOWNLOAD_PATH } from "../frontend/src/desktop-app.js";
 
-// Inside the Windows app the sidebar drops its own "Windows" download link,
-// and <body> gets .is-desktop-app, which turns on a few playful touches
-// (desktop.css). In a browser neither happens.
+// Inside the Windows app the sidebar drops its Apps and Merch Store links (the app
+// has its own installer, and loads every vibhavgpt.com address in its window), and
+// <body> gets .is-desktop-app, which turns on a few playful touches (desktop.css).
+// In a browser neither happens.
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const LINKS = [
   { href: "/android", label: "Android" },
@@ -20,25 +21,24 @@ test("the desktop app is recognised by its preload, and a browser is not", () =>
   assert.equal(isDesktopApp({ desktop: { isDesktop: false } }), false);
 });
 
-test("the Windows link shows on the web and is hidden in the desktop app", () => {
+test("the helper still hides the Windows page in the desktop app, and the sidebar lists one Apps link instead of the platform pages", () => {
   assert.deepEqual(visibleAppLinks(LINKS, isDesktopApp({})).map((link) => link.label), ["Android", "Windows", "Source code"]);
   assert.deepEqual(visibleAppLinks(LINKS, isDesktopApp({ desktopAPI: {} })).map((link) => link.label), ["Android", "Source code"]);
   const sidebar = read("frontend/src/components/Sidebar.jsx");
-  assert.match(sidebar, /\{ href: WINDOWS_DOWNLOAD_PATH, label: "Windows"/);
-  assert.match(sidebar, /\{visibleAppLinks\(APP_LINKS\)\.map\(\(link\) =>/);
+  assert.match(sidebar, /\{visibleAppLinks\(RESOURCE_LINKS\)\.map\(\(link\) =>/);
+  assert.doesNotMatch(sidebar, /label: "Android"|label: "Windows"|WINDOWS_DOWNLOAD_PATH/, "no separate Android or Windows entry");
   assert.equal(WINDOWS_DOWNLOAD_PATH, "/vibhavgpt-windows");
 });
 
-test("the YouTube channel sits last in the Apps links and opens safely in a new tab", () => {
+test("Source code and YouTube moved to the Sources page: the sidebar has one Sources link, and external links keep their protections", () => {
   const sidebar = read("frontend/src/components/Sidebar.jsx");
-  assert.match(sidebar, /const YOUTUBE_CHANNEL_URL = "https:\/\/www\.youtube\.com\/@vibhavthoota";/);
-  const links = sidebar.slice(sidebar.indexOf("const APP_LINKS = ["), sidebar.indexOf("];", sidebar.indexOf("const APP_LINKS = [")));
-  assert.deepEqual([...links.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), ["Android", "Windows", "Source code", "YouTube"]);
-  assert.match(links, /\{ href: YOUTUBE_CHANNEL_URL, label: "YouTube", icon: <YoutubeIcon size=\{17\} strokeWidth=\{1\.9\} \/>, external: true \}/, "the same size and stroke as its neighbours");
+  const links = sidebar.slice(sidebar.indexOf("const RESOURCE_LINKS = ["), sidebar.indexOf("];", sidebar.indexOf("const RESOURCE_LINKS = [")));
+  assert.deepEqual([...links.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), ["Apps", "Sources", "Merch Store"]);
+  assert.match(links, /\{ href: SOURCES_PATH, label: "Sources", icon: <Code size=\{17\} strokeWidth=\{1\.9\} \/> \}/);
+  assert.doesNotMatch(sidebar, /YoutubeIcon|YOUTUBE_CHANNEL_URL|SOURCE_REPO_URL/, "the channel and repository addresses are no longer in the sidebar");
   assert.match(sidebar, /\{\.\.\.\(link\.external \? \{ target: "_blank", rel: "noopener noreferrer" \} : \{\}\)\}/, "external links open in a new tab without an opener");
-  assert.match(sidebar, /function YoutubeIcon\(\{ size = 24, strokeWidth = 2 \}\)[\s\S]*?stroke="currentColor"[\s\S]*?aria-hidden="true"/, "inherits the link colour and stays out of the accessible name");
-  const youtube = { href: "https://www.youtube.com/@vibhavthoota", label: "YouTube" };
-  assert.deepEqual(visibleAppLinks([...LINKS, youtube], isDesktopApp({ desktopAPI: {} })).map((link) => link.label), ["Android", "Source code", "YouTube"], "kept in the desktop app");
+  const sources = { href: "/sources", label: "Sources" };
+  assert.deepEqual(visibleAppLinks([...LINKS, sources], isDesktopApp({ desktopAPI: {} })).map((link) => link.label), ["Android", "Source code", "Sources"], "an internal page with no webOnly flag stays in the desktop app");
 });
 
 test("only the desktop app's <body> is marked, before the app renders", () => {

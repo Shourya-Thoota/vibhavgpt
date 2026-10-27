@@ -24,14 +24,30 @@ export function replyModelKey(value) {
   return REPLY_MODEL_KEYS.has(key) ? key : null;
 }
 
+// How an image reply's prompt was built (generation/image-handoff.js): its
+// context source, two lengths and a hash, never the prompt. Anything else is
+// refused rather than stored.
+const IMAGE_CONTEXT_SOURCES = new Set(["rewrite", "handoff", "none"]);
+const isCount = (value) => Number.isSafeInteger(value) && value >= 0;
+export function imageContextMetadata(value) {
+  if (value == null) return null;
+  const { source, requestChars, promptChars, promptSha256 } = value;
+  if (!IMAGE_CONTEXT_SOURCES.has(source) || !isCount(requestChars) || !isCount(promptChars) || typeof promptSha256 !== "string" || !/^[0-9a-f]{64}$/.test(promptSha256)) {
+    throw new TypeError("Invalid image context.");
+  }
+  return { source, requestChars, promptChars, promptSha256 };
+}
+
 // Only these fields are stored with a reply. The model's thinking text is
 // shown live and never saved; how long it thought is the one thing kept.
-export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null, imagePrompt = "", model = null } = {}) {
+export function assistantMessageMetadata({ sources = [], activitySummary = [], thoughtSeconds = null, imagePrompt = "", imageContext = null, model = null } = {}) {
   const prompt = String(imagePrompt ?? "").trim().slice(0, 1500);
+  const context = imageContextMetadata(imageContext);
   const replyModel = replyModelKey(model);
   return {
     ...(replyModel ? { model: replyModel } : {}),
     ...(prompt ? { imagePrompt: prompt } : {}),
+    ...(context ? { imageContext: context } : {}),
     ...(sources.length ? { sources } : {}),
     ...(activitySummary.length ? { activitySummary } : {}),
     ...(wholeSeconds(thoughtSeconds) !== null ? { thoughtSeconds } : {}),
@@ -98,6 +114,8 @@ export function presentMessages(rows, attachmentRows = []) {
       studyResults: Array.isArray(metadata?.studyResults) ? metadata.studyResults.filter((note) => typeof note === "string") : [],
       // The prompt a generated image was made from, for the model's context.
       imagePrompt: typeof metadata?.imagePrompt === "string" ? metadata.imagePrompt : "",
+      // Of how that prompt was built, only where its context came from.
+      ...(IMAGE_CONTEXT_SOURCES.has(metadata?.imageContext?.source) ? { imageContext: { source: metadata.imageContext.source } } : {}),
       // The model that wrote a reply, or null: user messages, voice lines and
       // replies saved before models were recorded carry none.
       model: message.role === "assistant" ? replyModelKey(metadata?.model) : null,
@@ -316,7 +334,7 @@ export async function markReplyMissing(messageId, replyStatus, requestId) {
 // message's missing-reply mark cleared). Without it, both are saved together.
 // The reply records replyModel, which is the conversation's model unless the
 // reply came from elsewhere (an image, or a document, which records none).
-export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "", replyModel = modelKey }) {
+export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "", imageContext = null, replyModel = modelKey }) {
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
@@ -346,7 +364,7 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
     // history, rather than relying on arbitrary order for equal timestamps.
     const userCreatedAt = new Date();
     const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
-    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds, imagePrompt, model: replyModel });
+    const assistantMetadata = assistantMessageMetadata({ sources, activitySummary, thoughtSeconds, imagePrompt, imageContext, model: replyModel });
     // Sources ride along in the assistant row's metadata so a reloaded
     // conversation can still show what an answer was grounded in. They
     // were previously returned on the live response only, which meant
