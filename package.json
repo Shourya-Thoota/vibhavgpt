@@ -60,7 +60,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "@playwright/test": "1.50.1",
+    "@playwright/test": "1.65.1",
     "drizzle-kit": "^0.31.4",
     "jsqr": "^1.4.0"
   },
