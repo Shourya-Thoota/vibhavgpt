@@ -30,7 +30,11 @@ const { config } = await import("../src/config.js");
 config.moderationApiKey = "";
 config.providerKeys.primaryFree = "";
 config.providerKeys.paid = "fixture-key";
-config.chatModels.nova = "fixture-nova";
+// Lumen on its production route type (the router's paid zero-retention route) with the fixture engine. (Nova, which this suite
+// used before, was retired on 2026-11-14.)
+config.lumenChatRoute = "paid-zdr";
+config.lumenPaidZdrProviders = ["fixture-host"];
+config.chatModels.lumenFallback1 = "fixture-lumen";
 const { default: express } = await import("express");
 const { chatRouter } = await import("../src/chat/router.js");
 
@@ -84,7 +88,7 @@ test("a streamed reply shows its thinking and real stages live, and saves only h
 
   const response = await fetch(`${base}/api/chat/stream`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "Summarize the attached notes.", model: "nova", attachmentIds: [attachment.id] }),
+    body: JSON.stringify({ message: "Summarize the attached notes.", model: "lumen", attachmentIds: [attachment.id] }),
   });
   const events = parseEvents(await response.text());
   assert.deepEqual(events.filter((item) => item.event === "error"), []);
@@ -132,7 +136,7 @@ test("a reply that streams no thinking sends no thinking and saves no thoughtSec
   const base = await serve(t);
   const response = await fetch(`${base}/api/chat/stream`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ message: "Say hello in one line.", model: "nova" }),
+    body: JSON.stringify({ message: "Say hello in one line.", model: "lumen" }),
   });
   const events = parseEvents(await response.text());
   assert.deepEqual(events.filter((item) => item.event === "error"), []);

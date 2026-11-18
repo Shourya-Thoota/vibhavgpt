@@ -1,0 +1,88 @@
+name: PostgreSQL Concurrency & Regression CI
+
+on:
+  push:
+    branches:
+      - main
+      - feat/*
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  postgres-concurrency:
+    name: Isolated PostgreSQL 16 Multi-Connection Concurrency Races
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgrespassword
+          POSTGRES_DB: vibhavgpt_isolated_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgrespassword@127.0.0.1:5432/vibhavgpt_isolated_test
+      TEST_DATABASE_URL: postgresql://postgres:postgrespassword@127.0.0.1:5432/vibhavgpt_isolated_test
+      BETTER_AUTH_SECRET: test-only-auth-secret-for-ci-concurrency-verification
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
+
+      - name: Run syntax and typecheck verification
+        run: npm run check
+
+      - name: Apply database migrations to isolated PostgreSQL service
+        run: npm run db:migrate
+
+      - name: Execute live multi-connection PostgreSQL concurrency races
+        run: node --experimental-test-module-mocks --import ./test/setup-env.js --test test/allowance-concurrency-integration.test.js test/document-credits-postgres.test.js test/drive-action-claim-postgres.test.js
+
+      - name: Execute full model-engine and allowance regression suites
+        run: |
+          node --experimental-test-module-mocks --import ./test/setup-env.js --test \
+            test/allowance-concurrency-integration.test.js \
+            test/allowance-operations.test.js \
+            test/allowance-service.test.js \
+            test/allowance-summary-api.test.js \
+            test/auto-classifier.test.js \
+            test/chat-allowance-integration.test.js \
+            test/chat-allowance-throttles.test.js \
+            test/concurrency-and-quota-enforcement.test.js \
+            test/execution-coordinator.test.js \
+            test/image-engine.test.js \
+            test/model-catalog-api.test.js \
+            test/model-registry.test.js \
+            test/model-routing-decisions.test.js \
+            test/plan-throttle-policy.test.js \
+            test/pricing-engine.test.js \
+            test/profit-protection-controls.test.js \
+            test/reservation-lifecycle-and-size.test.js \
+            test/seed-catalog.test.js \
+            test/shadow-cost-ledger.test.js \
+            test/subscription-allowance-policy.test.js \
+            test/usage-limits.test.js \
+            test/stream-stall-retry.test.js

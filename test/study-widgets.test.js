@@ -150,7 +150,7 @@ test("replies turn the blocks into widgets, with a placeholder while streaming a
   assert.match(app, /if \(!settled\) return <div className="study-widget study-widget--pending" role="status">/);
   assert.match(app, /return fallback;/);
   assert.match(app, /const settled = !streaming && \(!animate \|\| done\);/);
-  assert.match(app, /<AssistantBody text=\{streamText\} animate=\{false\} streaming \/>/, "the live stream is never settled");
+  assert.match(app, /<AssistantBody text=\{buildMode \? visibleBuildStream\(streamText\) : streamText\} animate=\{false\} streaming sources=\{liveSources\} \/>/, "the live stream is never settled");
   const css = read("frontend/src/study-widgets.css");
   assert.match(css, /var\(--color-positive\)/);
   assert.match(css, /var\(--color-danger\)/);

@@ -1,0 +1,30 @@
+/* Tailwind for the homepage logo component, and nothing else.
+
+   The component (components/ui/liquid-glass-logo-reveal.tsx) is written with Tailwind class names. The rest
+   of the site is not, so Tailwind is brought in as narrowly as it can be:
+
+   - utilities only: no reset (preflight) and no default palette, so nothing on
+     the page changes;
+   - an explicit list of classes, not a scan of the source. A scan also turns
+     ordinary words in comments and strings (hidden, grid, fixed, static,
+     filter, container) into utilities, and these are unlayered rules on a page
+     with classes of its own. Exactly the classes below are generated.
+     test/home-effects.test.js fails if a component starts using a class that
+     is not on the list, so add it here when that happens;
+   - NOT in a cascade layer. The homepage has unlayered rules such as
+     `img { max-width: 100% }`, and the grid's images need `max-w-none` to beat
+     it. Layered CSS always loses to unlayered CSS, so these utilities are
+     unlayered and win on specificity instead (one class beats one element).
+
+   This file is loaded only by the lazy homepage bundle (home-effects.tsx). */
+@import "tailwindcss/utilities.css" source(none);
+
+/* liquid-glass-logo-reveal.tsx and home-effects.tsx. */
+@source inline("{absolute,relative,isolate,block,overflow-hidden,inset-0,m-auto,h-full,w-full,cursor-pointer,select-none}");
+
+/* The one theme value those utilities read. `inline` writes the value into each utility rather than adding variables to :root,
+   so nothing here can collide with the site's own tokens. */
+@theme inline {
+  /* Without this Tailwind has no spacing scale, and silently emits nothing for every spacing utility: inset-0 here. */
+  --spacing: 0.25rem;
+}

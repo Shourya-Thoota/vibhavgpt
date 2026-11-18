@@ -117,6 +117,49 @@ test("a retry clears the shown thinking and reports the attempt", () => {
   assert.equal(relay.thoughtSeconds, 5, "measured from the retry, not the first try");
 });
 
+test("activity alone records that the model thought, without sending any text", () => {
+  const { relay, deltas, at } = relayHarness();
+  at(0); relay.startCall();
+  relay.activity();
+  relay.activity();
+  at(7_000); relay.visible();
+  relay.endCall({ answered: true });
+  assert.deepEqual(deltas, [], "no reasoning delta of any kind reaches the client");
+  assert.equal(relay.thoughtSeconds, 7, "the time is measured from the call that answered");
+});
+
+test("with no activity and no text there is no thought time", () => {
+  const { relay, deltas, at } = relayHarness();
+  at(0); relay.startCall();
+  at(3_000); relay.visible();
+  relay.endCall({ answered: true });
+  assert.deepEqual(deltas, []);
+  assert.equal(relay.thoughtSeconds, null);
+});
+
+test("activity after the first visible text does not extend the thought time", () => {
+  const { relay, at } = relayHarness();
+  at(0); relay.startCall();
+  relay.activity();
+  at(2_000); relay.visible();
+  at(30_000); relay.activity();
+  relay.endCall({ answered: true });
+  assert.equal(relay.thoughtSeconds, 2);
+});
+
+test("a call after a tool result sends no summary text, though it still reports activity", () => {
+  const { relay, deltas, at } = relayHarness();
+  at(0); relay.startCall();
+  relay.endCall({ answered: false });
+  at(5_000); relay.startCall({ afterTool: true });
+  relay.reasoning("A summary that talks about the tool outcome.");
+  relay.activity();
+  at(9_000); relay.visible();
+  relay.endCall({ answered: true });
+  assert.deepEqual(deltas, [], "nothing is relayed from the follow-up call");
+  assert.equal(relay.thoughtSeconds, 4);
+});
+
 test("live status labels name only the stage that was reported", () => {
   assert.equal(liveStatusLabel({ phase: "attachments" }), "Processing attachments...");
   assert.equal(liveStatusLabel({ phase: "searching" }), "Searching the web...");

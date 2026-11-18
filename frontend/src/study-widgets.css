@@ -55,12 +55,12 @@
 .study-widget-container *::before,
 .study-widget-container *::after { box-sizing: border-box; }
 
+/* A widget is part of the reply, set off by a fine rule rather than a box
+   around the card it already contains. */
 .study-widget {
   margin: var(--space-md) 0;
-  padding: var(--space-md) var(--space-lg) var(--space-lg);
-  border: 1px solid var(--color-rule);
-  border-radius: var(--radius-card);
-  background: var(--color-paper-2);
+  padding: var(--space-md) 0 0;
+  border-top: 1px solid var(--color-rule);
   color: var(--color-ink);
 }
 .study-widget__head { display: grid; gap: 6px; margin-bottom: var(--space-md); }
@@ -73,8 +73,8 @@
 .flashcards__controls .study-widget__actions { margin-top: 0; }
 .flashcards__controls .study-widget__actions { flex: 1; align-content: center; }
 .study-widget__tally { min-height: 1.2em; }
-.study-widget__eyebrow { color: var(--color-accent); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
-.study-widget__title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: 400; }
+.study-widget__eyebrow { color: var(--color-accent); font-size: 0.82rem; font-weight: 650; }
+.study-widget__title { margin: 0; font-family: var(--font-display); font-size: 1.25rem; font-weight: var(--display-weight); }
 .study-widget__progress { height: 4px; overflow: hidden; border-radius: 999px; background: var(--color-rule); }
 .study-widget__progress > span { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); transition: width 320ms ease; }
 .study-widget__counter { margin: 0 0 var(--space-sm); color: var(--color-muted); font-size: 0.84rem; font-variant-numeric: tabular-nums; }
@@ -114,9 +114,10 @@
   box-shadow: 0 10px 30px color-mix(in srgb, var(--color-ink) 8%, transparent);
 }
 .flashcards__face--back { transform: rotateY(180deg); background: var(--color-accent-soft); }
-.flashcards__side { color: var(--color-muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+.flashcards__side { color: var(--color-muted); font-size: 0.8rem; font-weight: 600; }
 /* Long answers scroll inside the card instead of growing it. */
-.flashcards__text { margin-block: auto; font-size: clamp(1rem, 0.94rem + 0.4vw, 1.15rem); line-height: 1.5; overflow-wrap: anywhere; }
+.flashcards__text { margin-block: auto; font-size: clamp(1.15rem, 1rem + 0.6vw, 1.45rem); font-weight: 600; letter-spacing: -0.01em; line-height: 1.4; overflow-wrap: anywhere; text-wrap: balance; }
+.flashcards__face--back .flashcards__text { font-size: clamp(1rem, 0.94rem + 0.4vw, 1.15rem); font-weight: 500; letter-spacing: 0; }
 .flashcards__marks { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-sm); margin-top: var(--space-md); }
 .flashcards__mark {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px;
@@ -141,7 +142,7 @@
 .quiz__option:disabled { cursor: default; }
 .quiz__letter {
   display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 999px;
-  background: var(--color-accent-soft); color: var(--color-accent); font-size: 0.8rem; font-weight: 650;
+  background: var(--color-accent-soft); color: var(--color-accent-text); font-size: 0.8rem; font-weight: 650;
 }
 .quiz__option-text { overflow-wrap: anywhere; }
 .quiz__option[data-result="correct"] { border-color: var(--color-positive); background: var(--color-positive-soft); }
@@ -171,7 +172,7 @@
 /* Phones: tighter padding, a shorter card, full-width stacked actions and
    touch targets of at least 44px. */
 @media (max-width: 640px) {
-  .study-widget { padding: var(--space-sm) var(--space-md) var(--space-md); border-radius: 18px; }
+  .study-widget { padding: var(--space-sm) 0 0; }
   .study-widget__title { font-size: 1.1rem; }
   .flashcards__controls { height: 156px; }
   .flashcards__face { padding: var(--space-md); }

@@ -85,12 +85,12 @@ test("Clever AI's script never runs on the page; only verified resize messages f
 
 test("the screen keeps the VibhavGPT header and tells people Clever AI handles their text", async () => {
   const { html } = await renderTools({ onBack: () => {} });
-  assert.match(html, /Back to Study<\/button>/);
+  assert.match(html, /Close<\/button>/);
   assert.doesNotMatch(html, /writing-tools__eyebrow|writing-tools__title|VIBHAVGPT WRITING TOOLS/i, "no kicker or duplicate title above the tool");
   assert.match(html, /<span>AI Detector<\/span>[\s\S]*<span>AI Humanizer<\/span>/);
   assert.match(html, /<p class="writing-tools__notice">Writing tools run via Clever AI\. Text processed through these tools is handled according to provider guidelines and does not affect your VibhavGPT chat history\.<\/p>/);
   assert.doesNotMatch(html, /VibhavGPT AI Detector|VibhavGPT Humanizer/, "Clever's tools aren't presented as VibhavGPT's own");
-  assert.match(read("frontend/src/App.jsx"), /writingToolsOpen \? <div className="writing-tools-scroll"><StudyWritingTools api=\{api\}/, "it lives in Study mode, in its own scroll area");
+  assert.match(read("frontend/src/App.jsx"), /writingToolsOpen \? <div className="writing-tools-inline"><StudyWritingTools key=\{writingToolsTab\} api=\{api\}/, "it lives in Study mode, in place on the home screen");
 });
 
 test("the Privacy Policy discloses that Clever AI processes Writing Tools text", () => {
@@ -106,12 +106,13 @@ test("each frame sits in a white card that never clips it, so the widget's foote
   assert.match(css, /@media \(max-width: 760px\)/, "it adapts to phones, at the app's phone width");
 });
 
-test("the tools scroll inside Study's fixed-height column, well past the end of the widget", () => {
+test("the tools scroll with the Study home's own column, well past the end of the widget", () => {
   const css = read("frontend/src/writing-tools.css");
-  assert.match(css, /\.writing-tools-scroll \{\s*flex: 1;\s*min-height: 0;\s*height: 100%;\s*overflow-y: auto;/, "a scroll area that fills the column");
+  assert.doesNotMatch(css, /\.writing-tools-scroll/, "no scroll area of a screen of its own: the home column scrolls");
+  assert.match(read("frontend/src/compact.css"), /\.workspace \.chat:has\(\.writing-tools-inline\) \{ padding-top: clamp\(16px, 4vh, 44px\); \}/, "with the panel open the page starts higher");
   assert.match(css, /\.writing-tools \{[^}]*padding: var\(--space-sm\) var\(--space-md\) 80px;/, "a short top, 80px of room at the bottom");
   assert.doesNotMatch(css, /max-height/, "nothing caps a frame's height");
-  assert.match(read("frontend/src/styles.css"), /\.workspace__main\[data-product-mode="study"\] > \.screen \{ display: flex; flex: 1; flex-direction: column; min-height: 0; \}/, "the column the scroll area fills");
+  assert.match(read("frontend/src/styles.css"), /\.workspace__main\[data-product-mode="study"\] > \.screen,\s*\.workspace__main\[data-product-mode="build"\] > \.screen \{ display: flex; flex: 1; flex-direction: column; min-height: 0; \}/, "the column the scroll area fills");
   const component = read("frontend/src/components/StudyWritingTools.jsx");
   assert.match(component, /\{WIDGETS\.map\(\(widget\) => <WidgetFrame key=\{widget\.tab\}/, "both frames get the resize listener");
   assert.match(component, /setHeight\(next\)/);
@@ -120,8 +121,9 @@ test("the tools scroll inside Study's fixed-height column, well past the end of 
 test("Settings rows and groups have room to breathe on wider screens", () => {
   const css = read("frontend/src/settings.css");
   const block = css.slice(css.lastIndexOf("@media (min-width: 761px) {"));
-  assert.match(block, /\.settings-row \{ gap: 10px 16px; padding: 16px 20px;/);
-  assert.match(block, /\.settings-stack \{ gap: 40px; \}/);
-  assert.match(block, /\.settings-group__head \{ margin-bottom: 12px; \}/);
-  assert.match(block, /\.settings-row__text \{ gap: 4px; \}/, "help text sits clearly under its label");
+  assert.match(block, /\.settings-row \{ gap: var\(--space-xs\) var\(--space-md\); padding: var\(--space-md\) var\(--space-lg\); \}/);
+  // Slice 6: the same room, from the spacing scale rather than raw pixels.
+  assert.match(block, /\.settings-stack \{ gap: var\(--space-xl\); \}/);
+  assert.match(block, /\.settings-group__head \{ margin-bottom: var\(--space-sm\); \}/);
+  assert.match(block, /\.settings-row__text \{ gap: var\(--space-2xs\); \}/, "help text sits clearly under its label");
 });

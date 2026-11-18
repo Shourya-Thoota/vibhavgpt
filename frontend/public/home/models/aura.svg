@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- Aura: an original orb for the home page's model showcase, in the lit-sphere style of the others: a warm amber sphere wrapped in a
+       soft glow, for VibhavGPT's second image model. -->
+  <defs>
+    <radialGradient id="au-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0.68" stop-color="#ffd27a" stop-opacity="0"/>
+      <stop offset="0.82" stop-color="#ffcf73" stop-opacity="0.24"/>
+      <stop offset="0.93" stop-color="#ffb347" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#ffd27a" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="au-body" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset="0.28" stop-color="#ffe2a8"/>
+      <stop offset="0.6" stop-color="#f5a524"/>
+      <stop offset="0.86" stop-color="#8a4a0c"/>
+      <stop offset="1" stop-color="#2b1504"/>
+    </radialGradient>
+    <radialGradient id="au-swirl" cx="62%" cy="58%" r="55%">
+      <stop offset="0" stop-color="#ffe9b8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffe9b8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="au-night" cx="78%" cy="80%" r="70%">
+      <stop offset="0.35" stop-color="#1c0d02" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1c0d02" stop-opacity="0.76"/>
+    </radialGradient>
+    <radialGradient id="au-rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0.9" stop-color="#fff3d6" stop-opacity="0"/>
+      <stop offset="0.985" stop-color="#fff3d6" stop-opacity="0.62"/>
+      <stop offset="1" stop-color="#fff3d6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="au-gloss" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="au-disc"><circle cx="400" cy="400" r="300"/></clipPath>
+    <filter id="au-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="22"/></filter>
+  </defs>
+  <circle cx="400" cy="400" r="392" fill="url(#au-halo)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#au-body)"/>
+  <g clip-path="url(#au-disc)">
+    <g filter="url(#au-soft)">
+      <ellipse cx="470" cy="450" rx="230" ry="120" fill="url(#au-swirl)" transform="rotate(24 470 450)"/>
+    </g>
+  </g>
+  <circle cx="400" cy="400" r="300" fill="url(#au-night)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#au-rim)"/>
+  <ellipse cx="318" cy="288" rx="88" ry="56" fill="url(#au-gloss)" transform="rotate(-28 318 288)"/>
+</svg>

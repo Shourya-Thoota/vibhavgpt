@@ -40,7 +40,7 @@ test("stale entitlement is a restore action, never an upgrade or service outage"
 });
 
 test("rolling limit timing and pending holds survive the API and SSE access payload", () => {
-  const error = accessError("quota", { feature: "Vesper", window: "rolling", pending: 34894, used: 51576, limit: 80000, requestTooLarge: true, resetAt: "2026-10-04T22:00:00Z" });
+  const error = accessError("quota", { feature: "Vulcan", window: "rolling", pending: 34894, used: 51576, limit: 80000, requestTooLarge: true, resetAt: "2026-10-04T22:00:00Z" });
   const { access } = responseError(JSON.parse(JSON.stringify(accessPayload(error))), 429);
   assert.equal(access.window, "rolling");
   assert.equal(access.pending, 34894);

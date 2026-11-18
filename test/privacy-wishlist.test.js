@@ -20,9 +20,11 @@ test("memory can be switched off and cleared, and chat honours the switch", () =
   const chat = read("../src/chat/router.js");
   assert.match(chat, /memoryEnabled: userProfiles\.memoryEnabled/);
   assert.match(chat, /const recapFacts = memoryEnabled && recapIds\.length/);
-  assert.match(chat, /const facts = memoryEnabled \? await getFacts\(userId\) : \[\];/);
+  // Use off reads nothing at all: personal memories (and a project's) are only read when use is on.
+  assert.match(chat, /const facts = memoryEnabled\s*\?\s*\[\.\.\.await getFacts\(userId\), \.\.\.\(projectMemoryUse \? await getFacts\(userId, \{ scope: "project", projectId: project\.id \}\) : \[\]\)\]\s*:\s*\[\];/);
   assert.match(chat, /memoryEnabled \|\| tool\.function\.name !== "save_memory"/);
-  assert.match(chat, /if \(memoryEnabled\) \{\s*void \(async \(\) => extractAndSaveFacts/);
+  // Extraction runs only where saving may go, and never for a protected (Vulcan) conversation.
+  assert.match(chat, /if \(memoryTarget && shouldUpdateMemory && !protectedChat\) \{\s*void \(async \(\) => extractAndSaveFacts/);
 });
 
 test("the admin dashboard is gone: route, page, link and endpoint", () => {

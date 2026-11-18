@@ -190,7 +190,7 @@ test("credit Checkout shows the one-time purchase notes and changes nothing else
     mode: "payment",
     customer: "cus_1",
     client_reference_id: "user-1",
-    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: 750, product_data: { name: "VibhavGPT Flex Credits (750)" } } }],
+    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: 750, product_data: { name: "VibhavGPT image & document credits (750)" } } }],
     metadata: { kind: "credit_purchase", userId: "user-1", credits: "750", amountCents: "750" },
     payment_intent_data: { metadata: { kind: "credit_purchase", userId: "user-1", credits: "750" } },
     success_url: redirects.successUrl,

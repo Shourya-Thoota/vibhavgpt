@@ -26,7 +26,11 @@ const { config } = await import("../src/config.js");
 config.moderationApiKey = "";
 config.providerKeys.primaryFree = "";
 config.providerKeys.paid = "fixture-key";
-config.chatModels.nova = "fixture-nova";
+// Lumen on its production route type (the router's paid zero-retention route) with the fixture engine. (Nova, which this suite
+// used before, was retired on 2026-11-14.)
+config.lumenChatRoute = "paid-zdr";
+config.lumenPaidZdrProviders = ["fixture-host"];
+config.chatModels.lumenFallback1 = "fixture-lumen";
 const { createThoughtFilter, stripThoughts } = await import("../src/chat/thought-filter.js");
 const { callModelStreaming } = await import("../src/chat/providers.js");
 const { visibleReply } = await import("../src/chat/router.js");
@@ -54,6 +58,11 @@ const assertAllSplits = (input, expected) => {
 
 test("normal text passes through unchanged, with no character dropped", () => {
   const text = "Hello, world. a < b and x<y>z, <3, 5 > 3, <div>ok</div>, <thinker> and <th alone, `code` and <|not a marker.";
+  assertAllSplits(text, text);
+});
+
+test("a normal reply that contains the word 'think' passes through unchanged", () => {
+  const text = "I think that this solution is thoughtful and worth thinking through.";
   assertAllSplits(text, text);
 });
 
@@ -118,7 +127,7 @@ const sse = (chunks) => new Response(chunks.map(frame).join(""), { headers: { "C
 test("provider reasoning fields never reach the visible text", async () => {
   const seen = [];
   const reasoning = [];
-  const { data } = await callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
+  const { data } = await callModelStreaming("lumen", [{ role: "user", content: "hi" }], undefined, {
     onDelta: (text) => { seen.push(text); return true; },
     onReasoning: (text) => reasoning.push(text),
     fetchImpl: async (url) => url.includes("/generation") ? new Response("{}", { status: 404 }) : sse([
@@ -156,7 +165,7 @@ async function serve(t, userId, modelChunks) {
   const server = await new Promise((resolve) => { const s = app.listen(0, "127.0.0.1", () => resolve(s)); });
   t.after(() => { globalThis.fetch = realFetch; return new Promise((resolve) => server.close(resolve)); });
   const response = await fetch(`http://127.0.0.1:${server.address().port}/api/chat/stream`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", message: "Explain photosynthesis briefly." }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen", message: "Explain photosynthesis briefly." }),
   });
   return (await response.text()).split("\n\n").map((block) => ({ event: block.match(/^event:\s*(.+)$/m)?.[1], data: block.match(/^data:\s*(.+)$/m)?.[1] }))
     .filter((item) => item.event && item.data).map((item) => ({ event: item.event, data: JSON.parse(item.data) }));

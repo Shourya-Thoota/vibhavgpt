@@ -1,15 +1,33 @@
 import express, { Router } from "express";
 import { requireSession } from "../middleware/require-session.js";
-import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, DOWNGRADE_PAUSED, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, tierForPriceLookupKey, verifyWebhookSignature } from "./service.js";
+import { applySubscriptionEvent, cancelSubscriptionForUser, changeSubscriptionPlan, createCheckoutSession, DOWNGRADE_PAUSED, createCreditCheckoutSession, createCustomerPortalSession, getCreditPurchaseHistory, getSubscriptionDetailsForUser, getSubscriptionForUser, isMaxCheckoutConfigured, tierForPriceLookupKey, verifyWebhookSignature, assertCreditPurchaseAllowed } from "./service.js";
 import { getCurrentUsage } from "../usage/service.js";
+import { COMPLIMENTARY_SUBSCRIPTION, isCompPlanAccount } from "./comp-accounts.js";
+import { planSourceFor } from "./plan-source.js";
+import { db } from "../db/client.js";
 import { logFailure } from "../security/error-log.js";
 
 export const billingRouter = Router();
 
 billingRouter.get("/subscription", requireSession, async (req, res, next) => {
   try {
-    const subscription = await getSubscriptionDetailsForUser(req.authSession.user.id);
-    return res.json({ subscription: subscription ? { tier: subscription.tier, status: subscription.status, billingSource: subscription.billingSource ?? "stripe", currentPeriodEndsAt: subscription.currentPeriodEndsAt, cancelAtPeriodEnd: subscription.cancelAtPeriodEnd } : null });
+    const userId = req.authSession.user.id;
+    const record = await getSubscriptionDetailsForUser(userId);
+    // A complimentary account (COMP_PLAN_ACCOUNTS) is shown Max, complimentary, with nothing to cancel or manage, unless it has a
+    // real, current web subscription (which billing then shows). A store row is shown only while it verifies; a leftover row, of any
+    // source, is never shown as a current plan (src/billing/plan-source.js).
+    const comp = await isCompPlanAccount(userId, db);
+    const source = planSourceFor(record, { complimentary: comp });
+    const subscription = source === "complimentary" ? COMPLIMENTARY_SUBSCRIPTION : source === "none" ? null : record;
+    // The plan itself comes from the one resolver the sidebar and every gate read, so the two surfaces can never disagree.
+    const usage = await getCurrentUsage(userId);
+    const planTier = usage?.tier === "paid" ? "pro" : usage?.tier ?? "free";
+    return res.json({
+      subscription: subscription ? { tier: subscription.tier, status: subscription.status, billingSource: subscription.billingSource ?? "stripe", currentPeriodEndsAt: subscription.currentPeriodEndsAt, cancelAtPeriodEnd: subscription.cancelAtPeriodEnd } : null,
+      plan: { tier: planTier, source },
+      maxAvailable: isMaxCheckoutConfigured(),
+      complimentary: source === "complimentary",
+    });
   } catch (error) { return next(error); }
 });
 
@@ -63,13 +81,14 @@ billingRouter.post("/checkout", requireSession, async (req, res, next) => {
       getSubscriptionForUser(userId),
     ]);
     const requestedTier = tierForPriceLookupKey(req.body?.priceLookupKey ?? "");
-    if (usage.tier === "pro" || usage.tier === requestedTier) {
-      return res.status(409).json({ error: `Your account already has an active ${usage.tier === "plus" ? "Plus" : "Pro"} subscription.`, code: "already-subscribed" });
+    const tierDisplayName = (t) => t === "max" ? "Max" : t === "pro" ? "Pro" : "Plus";
+    if (usage.tier === "max" || usage.tier === requestedTier) {
+      return res.status(409).json({ error: `Your account already has an active ${tierDisplayName(usage.tier)} subscription.`, code: "already-subscribed" });
     }
     if (currentSubscription && ["active", "trialing"].includes(currentSubscription.status)
       && currentSubscription.tier !== "free"
       && (!currentSubscription.currentPeriodEndsAt || currentSubscription.currentPeriodEndsAt > new Date())) {
-      return res.status(409).json({ error: `Your ${currentSubscription.tier === "plus" ? "Plus" : "Pro"} plan is active until ${currentSubscription.currentPeriodEndsAt ? new Date(currentSubscription.currentPeriodEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "its period ends"}. You can choose a plan here after that.`, code: "already-subscribed" });
+      return res.status(409).json({ error: `Your ${tierDisplayName(currentSubscription.tier)} plan is active until ${currentSubscription.currentPeriodEndsAt ? new Date(currentSubscription.currentPeriodEndsAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : "its period ends"}. You can choose a plan here after that.`, code: "already-subscribed" });
     }
     const url = await createCheckoutSession({
       userId: req.authSession.user.id,
@@ -80,13 +99,16 @@ billingRouter.post("/checkout", requireSession, async (req, res, next) => {
     });
     return res.json({ url });
   } catch (error) {
-    if (error.message === "Invalid price selection.") return res.status(400).json({ error: error.message });
+    if (["Invalid price selection.", "The selected plan is unavailable."].includes(error.message)) return res.status(400).json({ error: error.message });
     return next(error);
   }
 });
 
 billingRouter.post("/credits/checkout", requireSession, async (req, res, next) => {
   try {
+    // Not a way to buy a balance the account cannot spend: Free has no documents and Pro and Max have unlimited ones, so there is nothing
+    // to pay for. A balance already held is untouched, and the plan it can be used on is Plus.
+    assertCreditPurchaseAllowed((await getCurrentUsage(req.authSession.user.id)).tier);
     const result = await createCreditCheckoutSession({
       userId: req.authSession.user.id,
       email: req.authSession.user.email,
@@ -97,6 +119,7 @@ billingRouter.post("/credits/checkout", requireSession, async (req, res, next) =
     return res.json(result);
   } catch (error) {
     if (error.message.startsWith("Enter an amount")) return res.status(400).json({ error: error.message });
+    if (error.code === "credits_not_usable_on_plan") return res.status(403).json({ error: error.message, code: error.code });
     return next(error);
   }
 });

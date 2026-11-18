@@ -77,7 +77,7 @@ test("the reader stays put when a page goes in above, and keys never use positio
   assert.match(app, /if \(skipBottomScrollRef\.current\) \{\s*skipBottomScrollRef\.current = false;\s*return;\s*\}\s*endRef\.current\?\.scrollIntoView/, "the follow-to-bottom effect skips once after a prepend");
   assert.match(app, /<Fragment key=\{messageKey\(message\)\}>/);
   assert.doesNotMatch(app, /key=\{index\}/, "no message is keyed by its position");
-  for (const added of [/clientKey: nextClientKey\(\), role: "user", content: autoPrompt\.text/, /\{ \.\.\.partial, clientKey: nextClientKey\(\) \}/, /\{\s*clientKey: nextClientKey\(\),\s*role: "user",\s*content: content \|\| "Attached file\(s\)"/, /\{ id: reply\.messageId \?\? null, clientKey: nextClientKey\(\),/]) {
+  for (const added of [/clientKey: nextClientKey\(\), role: "user", content: autoPrompt\.text/, /\{ \.\.\.partial, clientKey: nextClientKey\(\) \}/, /const userKey = nextClientKey\(\);[\s\S]{0,120}\{\s*clientKey: userKey,\s*role: "user",\s*content: content \|\| "Attached file\(s\)"/, /\{ id: reply\.messageId \?\? null, clientKey: nextClientKey\(\),/]) {
     assert.match(app, added, "every message added on this screen has a stable key");
   }
   assert.match(app, /const replySwitches = useMemo\(\(\) => modelSwitches\(messages\), \[messages\]\);/, "dividers are worked out over the merged list");

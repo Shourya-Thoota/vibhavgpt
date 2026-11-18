@@ -1,6 +1,17 @@
 import { createHash } from "node:crypto";
 import { callImagePromptModel } from "../chat/providers.js";
 import { stripThoughts } from "../chat/thought-filter.js";
+import { normalizeModelKey } from "../chat/model-keys.js";
+import { logFailure } from "../security/error-log.js";
+
+function isVesperTier(modelKey) {
+  if (!modelKey) return false;
+  if (typeof modelKey === "object") {
+    if (modelKey.hasHistoricalVesper === true) return true;
+    return normalizeModelKey(modelKey.modelKey) === "vesper";
+  }
+  return normalizeModelKey(modelKey) === "vesper";
+}
 
 // An image asked for in a chat or Study conversation often points back at
 // what the assistant just wrote: "make an image of that analogy", "draw the
@@ -39,10 +50,12 @@ export function plainContext(markdown) {
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/^\s{0,3}#{1,6}\s+/gm, "")
     .replace(/^\s*>\s?/gm, "")
+    // Lists: keep term-definition pairs attached with " - " instead of joining cells with semicolons
+    .replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:(?:\*\*|__)?([^\n:;\-–—|]+?)(?:\*\*|__)?\s*[;–—|]\s+([^\n]+))$/gm, "; $1 - $2")
     .replace(/^\s*(?:[-*+]|\d+[.)])\s+/gm, "; ")
     // A table: its divider row goes, and each row reads as its cells.
     .replace(/^\s*\|?\s*:?-{3,}[\s|:-]*$/gm, "")
-    .replace(/^\s*\|(.*)\|\s*$/gm, (_row, cells) => `; ${cells.split("|").map((cell) => cell.trim()).filter(Boolean).join(", ")}`)
+    .replace(/^\s*\|(.*)\|\s*$/gm, (_row, cells) => `; ${cells.split("|").map((cell) => cell.trim()).filter(Boolean).join(" - ")}`)
     .replace(/(\*\*|__|\*|_|`)/g, "")
     .replace(/\s*\n\s*/g, " ")
     .replace(/(?:^|\s);\s*/g, (match, offset) => (offset === 0 ? "" : "; "))
@@ -58,7 +71,8 @@ function shorten(text, limit = MAX_CONTEXT_CHARS) {
 }
 
 // The context to send with an image request, or "" when it needs none.
-export function imageHandoffContext(request, history = []) {
+export function imageHandoffContext(request, history = [], options = {}) {
+  if (isVesperTier(options)) return "";
   if (!refersToConversation(request)) return "";
   for (let index = history.length - 1; index >= 0; index -= 1) {
     const message = history[index];
@@ -83,7 +97,8 @@ const MAX_TURNS = 8;
 const MAX_REWRITE = 1500;
 
 // Worth a rewrite: there is earlier text in the conversation to draw on.
-export function shouldExpandImagePrompt(request, history = []) {
+export function shouldExpandImagePrompt(request, history = [], options = {}) {
+  if (isVesperTier(options)) return false;
   return Boolean(String(request ?? "").trim()) && history.some((message) => message?.role === "assistant" && typeof message.content === "string" && !IMAGE_REPLY.test(message.content.trim()) && message.content.trim());
 }
 
@@ -114,16 +129,17 @@ export function cleanRewrite(text) {
 
 // { prompt, context, expanded }: the rewritten standalone prompt when the
 // model gave one, else the request with the plain handoff context.
-export async function expandImagePrompt(request, history = [], { callModel = callImagePromptModel, signal, requestId } = {}) {
-  const fallback = { prompt: request, context: imageHandoffContext(request, history), expanded: false };
-  if (!shouldExpandImagePrompt(request, history)) return fallback;
+export async function expandImagePrompt(request, history = [], { callModel = callImagePromptModel, signal, requestId, modelKey, hasHistoricalVesper = false } = {}) {
+  if (hasHistoricalVesper || isVesperTier(modelKey)) return { prompt: request, context: "", expanded: false };
+  const fallback = { prompt: request, context: imageHandoffContext(request, history, { modelKey, hasHistoricalVesper }), expanded: false };
+  if (!shouldExpandImagePrompt(request, history, { modelKey, hasHistoricalVesper })) return fallback;
   try {
     const { data } = await callModel(imageRewriteMessages(request, history), { signal, requestId });
     const rewritten = cleanRewrite(data?.choices?.[0]?.message?.content);
     return rewritten.length >= 12 ? { prompt: rewritten, context: "", expanded: true } : fallback;
   } catch (error) {
     if (error?.code !== "route-not-configured") {
-      console.warn(JSON.stringify({ event: "image_prompt_rewrite_unavailable", errorType: error?.name ?? "Error", code: error?.code ?? "unknown" }));
+      logFailure("image_prompt_rewrite_unavailable", error, {}, "warn");
     }
     return fallback;
   }

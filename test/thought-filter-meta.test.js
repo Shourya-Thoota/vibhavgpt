@@ -97,7 +97,7 @@ test("the thinking tiers are told to answer simple questions without deliberatin
     "For simple identity queries, greetings, or casual conversation that do not require multi-step reasoning, immediately provide your answer without deliberating on rules.",
   ]) {
     assert.ok(REASONING_GUIDELINES.includes(sentence), sentence);
-    for (const tier of ["nova", "nebula", "vesper"]) assert.ok(buildIdentitySystemPrompt(tier, { query: "What model are you?" }).includes(sentence), tier);
+    for (const tier of ["vesper", "zenith"]) assert.ok(buildIdentitySystemPrompt(tier, { query: "What model are you?" }).includes(sentence), tier);
     for (const tier of ["lumen", "study"]) assert.ok(!buildIdentitySystemPrompt(tier, { query: "hi" }).includes(sentence), tier);
   }
   assert.ok(!REASONING_GUIDELINES.includes("—"), "no em dash");

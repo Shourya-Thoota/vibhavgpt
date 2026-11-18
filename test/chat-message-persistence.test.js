@@ -29,7 +29,11 @@ const { config } = await import("../src/config.js");
 config.moderationApiKey = "";
 config.providerKeys.primaryFree = "";
 config.providerKeys.paid = "fixture-key";
-config.chatModels.nova = "fixture-nova";
+// These requests run on Lumen's production route type (the router's paid zero-retention route) with the fixture engine. (Nova, which
+// this suite used before, was retired on 2026-11-14.)
+config.lumenChatRoute = "paid-zdr";
+config.lumenPaidZdrProviders = ["fixture-host"];
+config.chatModels.lumenFallback1 = "fixture-nova"; // lumenPaidZdrModel derives from it
 const { default: express } = await import("express");
 const { chatRouter } = await import("../src/chat/router.js");
 
@@ -82,7 +86,7 @@ const parseEvents = (text) => text.split("\n\n").map((block) => ({
 })).filter((item) => item.event && item.data).map((item) => ({ event: item.event, data: JSON.parse(item.data) }));
 
 async function stream(base, body, signal) {
-  const response = await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", ...body }), signal });
+  const response = await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen", ...body }), signal });
   return parseEvents(await response.text());
 }
 const eventOf = (events, name) => events.find((item) => item.event === name)?.data;
@@ -138,7 +142,7 @@ test("a reply the user leaves mid-stream keeps the message, marked interrupted",
   const controller = new AbortController();
   const response = await fetch(`${base}/api/chat/stream`, {
     method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal,
-    body: JSON.stringify({ model: "nova", message: "Write me a long story." }),
+    body: JSON.stringify({ model: "lumen", message: "Write me a long story." }),
   });
   const reader = response.body.getReader();
   let text = "";
@@ -189,7 +193,7 @@ test("the JSON route keeps the message too and returns its conversation with the
   const userId = "persist-json";
   const base = await serve(t, userId);
   model = "fail";
-  const response = await fetch(`${base}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", message: "Plain request" }) });
+  const response = await fetch(`${base}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen", message: "Plain request" }) });
   const body = await response.json();
   assert.equal(response.status, 503);
   const rows = await thread(userId);
@@ -210,7 +214,7 @@ test("a request refused before it is accepted saves nothing", async (t) => {
 
 test("a message that was answered after all is never marked as missing its reply", async () => {
   const { markReplyMissing } = await import("../src/chat/repository.js");
-  const { rows: [conversation] } = await client.query("INSERT INTO conversations (user_id, title, model) VALUES ('persist-guard', 'Chat', 'nova') RETURNING id");
+  const { rows: [conversation] } = await client.query("INSERT INTO conversations (user_id, title, model) VALUES ('persist-guard', 'Chat', 'lumen') RETURNING id");
   const { rows: [answered] } = await client.query("INSERT INTO messages (conversation_id, role, content, created_at) VALUES ($1, 'user', 'q1', now() - interval '2 seconds') RETURNING id", [conversation.id]);
   await client.query("INSERT INTO messages (conversation_id, role, content, created_at) VALUES ($1, 'assistant', 'a1', now() - interval '1 second')", [conversation.id]);
   const { rows: [unanswered] } = await client.query("INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', 'q2') RETURNING id", [conversation.id]);
@@ -236,9 +240,9 @@ test("a reply keeps its model through a failed first try and a retry; user messa
   const saved = eventOf(await stream(base, { message: "Which model answers this?" }), "conversation");
   model = "answer";
   const done = eventOf(await stream(base, { message: "Which model answers this?", conversationId: saved.conversationId }), "complete");
-  assert.deepEqual([done.modelKey, done.model], ["nova", "VibhavGPT Nova"]);
+  assert.deepEqual([done.modelKey, done.model], ["lumen", "VibhavGPT Lumen"]);
   let rows = await thread(userId);
-  assert.deepEqual(rows.map((row) => [row.role, row.metadata.model ?? null]), [["user", null], ["assistant", "nova"]], "the retry's reply records its model");
+  assert.deepEqual(rows.map((row) => [row.role, row.metadata.model ?? null]), [["user", null], ["assistant", "lumen"]], "the retry's reply records its model");
   assert.deepEqual(rows[0].metadata, {}, "the user message stays model-free, its missing-reply mark cleared");
 
   // A later message that fails is marked on its own row; earlier replies keep their model.
@@ -247,7 +251,7 @@ test("a reply keeps its model through a failed first try and a retry; user messa
   model = "answer";
   rows = await thread(userId);
   assert.deepEqual(rows.map((row) => [row.role, row.metadata.model ?? null, row.metadata.replyStatus ?? null]), [
-    ["user", null, null], ["assistant", "nova", null], ["user", null, "failed"],
+    ["user", null, null], ["assistant", "lumen", null], ["user", null, "failed"],
   ]);
 });
 

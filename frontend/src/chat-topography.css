@@ -1,0 +1,86 @@
+/* Chat's decorative background. It is a layer behind the conversation, never in front of it and never in the way:
+   - the workspace becomes its own stacking context only while the layer is on, so the layer (z-index -1) paints above the workspace's
+     own background and below everything inside it (messages, message box, menus, dialogs);
+   - it takes no pointer events at all, so clicks, touch, scrolling and text selection go straight through;
+   - it is fixed to the viewport, takes no space in the layout, and so cannot move the message box. */
+.workspace[data-topography="on"] { isolation: isolate; }
+
+.chat-topography {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  contain: strict;
+}
+.chat-topography *,
+.chat-topography canvas { pointer-events: none; }
+
+/* The conversation's own surfaces are translucent over it only while it is on, so the lines show through the empty parts of the screen
+   and the text keeps its own solid panels. Nothing else changes. */
+.workspace[data-topography="on"] { --ref-main: transparent; }
+
+/* The empty new-chat screen paints its own glow across the conversation area. In the light sky that glow is built from opaque colour stops, so
+   it painted over the lines: they showed inside a conversation but not on the first screen a person sees. (The dark sky's glow is translucent
+   and already lets them through.) In the light sky the screen keeps the same glow, from the same token, but draws it as a softened layer above
+   the lines and below everything else, and the area's own opaque background is dropped. Nothing else about the screen changes. */
+:root[data-theme="light"] .workspace[data-topography="on"] .workspace__main:has(.chat__scroll[data-empty]) { background: transparent; }
+:root[data-theme="light"] .workspace[data-topography="on"] .workspace__main:has(.chat__scroll[data-empty])::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ref-glow);
+  opacity: 0.4;
+}
+
+/* Readability over the moving lines: one liquid-glass backdrop over the whole chat viewport, edge to edge and top to bottom. The sky's
+   paper colour at part strength with a soft blur, so the lines show through evenly everywhere and the text stays crisp on it. It used to be
+   a scrim sized to the conversation column, which ended where the last message did: a hard horizontal line partway down a short chat. This
+   one belongs to the whole chat column (.workspace__main: from the very top of the screen, behind the Chat/Image tabs or the phone's top
+   bar, to the very bottom, sidebar excluded), not to the content, so it has no edge to cut off at, on a long chat, a short one, or the empty
+   new-chat screen. It is behind every message and control (the column's own stacking context, z-index -1), takes no pointer events,
+   exists only while the background is on, and does not move, so reduced motion is unaffected. It is ::after because the light sky's
+   new-chat glow already uses ::before; the glow stays, softened under the glass.
+   Strength: --ref-reading-scrim / --ref-reading-blur (chat-reference.css). */
+/* Only in an active conversation: on the empty landing screen (before the first message) there is no glass at all, so the contour
+   background shows crisp and unobstructed. It appears as soon as the conversation view has a message. */
+.workspace[data-topography="on"] .workspace__main:has(.chat__scroll:not([data-empty])) { isolation: isolate; }
+.workspace[data-topography="on"] .workspace__main:has(.chat__scroll:not([data-empty]))::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--ref-reading-scrim);
+  -webkit-backdrop-filter: blur(var(--ref-reading-blur)) saturate(1.05);
+  backdrop-filter: blur(var(--ref-reading-blur)) saturate(1.05);
+}
+
+/* The soft top edge of a scrolled chat is a gradient in the page's wash colour, painted over the scroll pane (styles.css). Over the contour
+   background that opaque colour is a flat band across the lines, right under the Chat/Image control. With the background on, the edge is
+   softened the other way: the messages fade out at the top by a mask, and nothing is painted, so the lines show all the way up. */
+.workspace[data-topography="on"] .chat[data-scrolled="true"] .chat__scroll::before { opacity: 0; }
+.workspace[data-topography="on"] .chat[data-scrolled="true"] .chat__scroll {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--space-xl));
+  mask-image: linear-gradient(to bottom, transparent 0, #000 var(--space-xl));
+}
+
+/* The phone's top bar sits on the column's glass, not on its own (its own tint and blur made a seam under it). */
+.workspace[data-topography="on"][data-page="chat"]:has(.chat__scroll:not([data-empty])) .topbar-mobile { background: transparent; -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+/* The landing screen has no glass: the contour background is crisp everywhere. Only the greeting's own words sit on a soft tinted pool
+   (the sky's paper colour, no blur, no frosting) that fades to nothing at its edges, so the greeting keeps 4.5:1 over the brightest
+   frame of the lines in both skies. */
+.workspace[data-topography="on"] .chat__scroll[data-empty] .opening { position: relative; isolation: isolate; }
+.workspace[data-topography="on"] .chat__scroll[data-empty] .opening__title { position: relative; }
+.workspace[data-topography="on"] .chat__scroll[data-empty] .opening__title::before {
+  content: "";
+  position: absolute;
+  inset: -0.9em -1.6em;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--color-paper) 82%, transparent) 0%, color-mix(in srgb, var(--color-paper) 70%, transparent) 55%, transparent 100%);
+}

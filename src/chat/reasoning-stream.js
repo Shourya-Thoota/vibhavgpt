@@ -1,6 +1,8 @@
-// Streams the model's thinking to the client while a reply is prepared.
-// Thinking text is shown live and never stored; only how long the model
-// thought (thoughtSeconds) is kept with the saved reply.
+// Relays the model's thinking state to the client while a reply is prepared.
+// The model's own reasoning text is never relayed: only a verified summary
+// (reasoning) can be shown, and a bare activity signal records that the model
+// thought. Nothing is stored except how long the model thought
+// (thoughtSeconds), which is kept with the saved reply.
 import { createMetaThoughtFilter } from "./thought-filter.js";
 
 const NAME_REPLACEMENT = "the model";
@@ -49,8 +51,12 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
   let thoughtThisCall = false;
   let firstVisibleAt = null;
   let thoughtSeconds = null;
+  // A call that follows a tool result is the model talking itself through the
+  // tool's outcome (what it picked, why it failed). That is not shown; the
+  // client shows activity labels grounded in the executed step instead.
+  let hidden = false;
   const show = (text) => {
-    if (!text) return;
+    if (!text || hidden) return;
     // Only thinking that is shown counts: a block that was all rule-checking
     // gets no "Thought for X s" (thoughtSeconds stays null).
     if (firstVisibleAt === null) thoughtThisCall = true;
@@ -69,18 +75,27 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
     separate = false;
   };
   return {
-    startCall() {
+    // afterTool: this call follows an executed tool step; its thinking is not shown.
+    startCall({ afterTool = false } = {}) {
       show(meta.flush());
       forwarder.flush();
       meta.reset();
+      hidden = afterTool;
       separate = shown;
       callStartedAt = now();
       thoughtThisCall = false;
       firstVisibleAt = null;
     },
+    // Verified summary text only (see reasoningDisplay in providers.js). Raw
+    // reasoning never reaches this method.
     reasoning(text) {
       if (typeof text !== "string" || !text) return;
       show(meta.push(text));
+    },
+    // The model is thinking and none of it is shown. No text is involved: this
+    // only lets the answering call report how long it thought.
+    activity() {
+      if (firstVisibleAt === null) thoughtThisCall = true;
     },
     visible() {
       if (firstVisibleAt !== null) return;
@@ -89,13 +104,14 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
       firstVisibleAt = now();
       forwarder.flush();
     },
-    retry({ attempt, maxAttempts }) {
+    retry({ attempt, maxAttempts, rateLimited = false }) {
       // The next try starts over, so its thinking replaces this try's.
       reset();
       callStartedAt = now();
       thoughtThisCall = false;
       firstVisibleAt = null;
-      onStatus("retrying", { attempt, maxAttempts });
+      // A host that refused for load is named as high demand, not as a slow reply.
+      onStatus(rateLimited ? "busy" : "retrying", { attempt, maxAttempts });
     },
     // `answered` is true when the call returned the reply's text rather than
     // a tool request.
@@ -103,7 +119,8 @@ export function createThinkingRelay({ onDelta, onStatus, pattern = null, maxTerm
       show(meta.flush());
       forwarder.flush();
       if (answered && thoughtThisCall && callStartedAt !== null) {
-        thoughtSeconds = Math.max(0, Math.round(((firstVisibleAt ?? now()) - callStartedAt) / 1000));
+        const elapsed = Math.max(0, Math.round(((firstVisibleAt ?? now()) - callStartedAt) / 1000));
+        thoughtSeconds = elapsed >= 1 ? elapsed : null;
       }
     },
     get thoughtSeconds() { return thoughtSeconds; },

@@ -61,9 +61,14 @@ function captureLogs(t) {
 }
 
 const fast = { idleTimeoutMs: 400, firstOutputTimeoutMs: 60, overallTimeoutMs: 20_000, startRetryDelaysMs: [5, 10] };
+// Explicit three-attempt budget for tests that assert calls===3 / maxAttempts:3.
+// Product default remains maxRetries=1 (two attempts).
+const fastThree = { ...fast, maxRetries: 2 };
 
 beforeEach(() => {
   config.providerKeys.paid = "fixture-key";
+  config.providerKeys.direct = "fixture-key";
+  config.vesperDataPolicyVerified = true;
   config.chatModels.nova = "fixture-nova";
   config.chatModels.vesper = "fixture-vesper";
   config.routeProviders.nova = ["fixture-route"];
@@ -99,7 +104,7 @@ test("stalls on every try end with a retryable error, release usage and log exha
   const logs = captureLogs(t);
   let calls = 0;
   await assert.rejects(callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, requestId: "req-stalled", usageTracker: createUsageTracker("user-b", "nova", "normal", db),
+    ...fastThree, requestId: "req-stalled", usageTracker: createUsageTracker("user-b", "nova", "normal", db),
     fetchImpl: async (_url, init) => { calls += 1; return quiet(init); },
   }), (error) => error instanceof InferenceUnavailableError && error.exhausted === true
     && error.code === "inference-unavailable" && error.status === 503 && error.stageCode === "provider-stalled");
@@ -120,7 +125,7 @@ test("a transient 5xx before any output is retried the same way", async (t) => {
   const logs = captureLogs(t);
   let calls = 0;
   const { data } = await callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, usageTracker: createUsageTracker("user-c", "nova", "normal", db),
+    ...fastThree, usageTracker: createUsageTracker("user-c", "nova", "normal", db),
     fetchImpl: async (_url, init) => (++calls < 3 ? new Response("", { status: 502 }) : sse(reply(), init.signal)),
   });
   assert.equal(calls, 3);
@@ -130,7 +135,7 @@ test("a transient 5xx before any output is retried the same way", async (t) => {
 
   calls = 0;
   await assert.rejects(callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, fetchImpl: async () => { calls += 1; return new Response("", { status: 503 }); },
+    ...fastThree, fetchImpl: async () => { calls += 1; return new Response("", { status: 503 }); },
   }), (error) => error.exhausted === true && error.stageCode === "provider-http-error");
   assert.equal(calls, 3);
 });
@@ -141,7 +146,7 @@ test("only the last try waits the full idle time for its first output", async (t
   // Every try would answer after 150 ms: past the 60 ms first-output wait,
   // inside the 400 ms idle wait the last try gets.
   const { data } = await callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, fetchImpl: async (_url, init) => { calls += 1; return sse(reply("Slow start", 150), init.signal); },
+    ...fastThree, fetchImpl: async (_url, init) => { calls += 1; return sse(reply("Slow start", 150), init.signal); },
   });
   assert.equal(calls, 3);
   assert.equal(data.choices[0].message.content, "Slow start");
@@ -154,7 +159,11 @@ test("a route with a configured fallback moves to it after its retry", async (t)
   const route = (stage) => `${config.providerBaseUrls[stage]}/chat/completions`;
   const { data, internalStage } = await callModelStreaming("lumen", [{ role: "user", content: "hi" }], undefined, {
     ...fast, usageTracker: createUsageTracker("user-d", "lumen", "normal", db),
-    fetchImpl: async (url, init) => { requests.push(url); return url === route("primaryFree") ? quiet(init) : sse(reply("From the fallback"), init.signal); },
+    fetchImpl: async (url, init) => {
+      requests.push(url);
+      const model = JSON.parse(init.body).model;
+      return model === config.chatModels.lumen ? quiet(init) : sse(reply("From the fallback"), init.signal);
+    },
   });
   assert.deepEqual(requests, [route("primaryFree"), route("primaryFree"), route("gatewayFree")]);
   assert.equal(internalStage, "gatewayFree");
@@ -276,19 +285,23 @@ test("the 120 s per-message cap still ends a reply that only thinks", async (t) 
   assert.deepEqual(logs("inference_retry"), []);
 });
 
-test("readable thinking goes to onReasoning; encrypted thinking and the reply never mix with it", async (t) => {
+test("readable thinking is reported as activity only; encrypted thinking and the reply never mix with it", async (t) => {
   captureLogs(t);
   const thought = [], seen = [];
+  let signals = 0;
   const chunks = [
     { chunk: { choices: [{ delta: { reasoning_details: [{ type: "reasoning.text", text: "Looking at the question. " }] } }] } },
     { chunk: { choices: [{ delta: { reasoning_details: [{ type: "reasoning.encrypted", data: "OPAQUE-BLOB" }, { type: "reasoning.summary", summary: "Plan: answer briefly." }] } }] } },
     ...answerChunks("Short answer"),
   ];
   const { data } = await callModelStreaming("vesper", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, onReasoning: (text) => thought.push(text), onDelta: (text) => { seen.push(text); return true; },
+    ...fast, onReasoning: (text) => thought.push(text), onThinking: () => { signals += 1; }, onDelta: (text) => { seen.push(text); return true; },
     fetchImpl: async (_url, init) => sse(chunks, init.signal),
   });
-  assert.deepEqual(thought, ["Looking at the question. ", "Plan: answer briefly."]);
+  // Neither a raw `reasoning.text` detail nor a `reasoning.summary` on a route
+  // that is not verified for display is relayed: one activity signal per chunk.
+  assert.deepEqual(thought, []);
+  assert.equal(signals, 2);
   assert.deepEqual(seen, ["Short answer"]);
   assert.equal(data.choices[0].message.content, "Short answer");
   assert.doesNotMatch(JSON.stringify({ thought, data }), /OPAQUE-BLOB/);
@@ -299,7 +312,7 @@ test("a retry before any output is reported to onRetry with the attempt and the 
   const retries = [];
   let calls = 0;
   await callModelStreaming("nova", [{ role: "user", content: "hi" }], undefined, {
-    ...fast, onRetry: (retry) => retries.push(retry),
+    ...fastThree, onRetry: (retry) => retries.push(retry),
     fetchImpl: async (_url, init) => (++calls < 3 ? quiet(init) : sse(reply(), init.signal)),
   });
   assert.deepEqual(retries, [
@@ -363,18 +376,21 @@ test("tries with no tokens never surface as usage-unavailable, and leave no hold
 });
 
 // Why a provider refused a request: the start of its 4xx body, scrubbed.
-const lumenRoute = (stage) => `${config.providerBaseUrls[stage]}/chat/completions`;
 const PRIVATE_PROMPT = "please summarise my private medical history notes";
-const refusals = {
-  // An OpenAI-style body that quotes the request back.
-  [lumenRoute("primaryFree")]: () => Response.json({ error: {
-    code: "context_length_exceeded",
-    message: `Please reduce the length of the messages for someone@example.com (key sk-abcdef1234567890) near "${PRIVATE_PROMPT}"`,
-  } }, { status: 400 }),
-  // Plain text.
-  [lumenRoute("gatewayFree")]: () => new Response("Forbidden: this key may not use the requested model", { status: 403 }),
-  // A list of errors, as some providers send.
-  [lumenRoute("secondaryFree")]: () => Response.json([{ error: { code: 401, message: "API key not valid. Please pass a valid API key.", status: "UNAUTHENTICATED" } }], { status: 401 }),
+const getRefusal = (model) => {
+  if (model === config.chatModels.lumen) {
+    return Response.json({ error: {
+      code: "context_length_exceeded",
+      message: `Please reduce the length of the messages for someone@example.com (key sk-abcdef1234567890) near "${PRIVATE_PROMPT}"`,
+    } }, { status: 400 });
+  }
+  if (model === config.chatModels.lumenFallback1) {
+    return new Response("Forbidden: this key may not use the requested model", { status: 403 });
+  }
+  if (model === config.chatModels.lumenFallback2) {
+    return Response.json([{ error: { code: 401, message: "API key not valid. Please pass a valid API key.", status: "UNAUTHENTICATED" } }], { status: 401 });
+  }
+  return null;
 };
 const expectedRefusals = [
   ["primaryFree", 400, "context_length_exceeded", "Please reduce the length of the messages for [email] (key [redacted]) near [quoted]"],
@@ -390,7 +406,10 @@ for (const [name, call, event, success] of [
     const logs = captureLogs(t);
     const result = await call("lumen", [{ role: "user", content: PRIVATE_PROMPT }], undefined, {
       ...fast, maxRetries: 0, requestId: "req-refused",
-      fetchImpl: async (url, init) => refusals[url]?.() ?? success(init),
+      fetchImpl: async (url, init) => {
+        const model = JSON.parse(init.body).model;
+        return getRefusal(model) ?? success(init);
+      },
     });
     assert.equal(result.internalStage, "reserveFree");
     const failures = logs(event).map((entry) => [entry.stage, entry.providerStatus, entry.providerCode, entry.providerMessage]);
@@ -403,7 +422,7 @@ test("a 5xx body is not read; its status alone is logged", async (t) => {
   const logs = captureLogs(t);
   await callModelStreaming("lumen", [{ role: "user", content: "hi" }], undefined, {
     ...fast, maxRetries: 0,
-    fetchImpl: async (url, init) => url === lumenRoute("primaryFree")
+    fetchImpl: async (url, init) => JSON.parse(init.body).model === config.chatModels.lumen
       ? Response.json({ error: { code: "upstream", message: "Upstream detail" } }, { status: 503 })
       : sse(reply(), init.signal),
   });

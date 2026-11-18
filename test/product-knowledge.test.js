@@ -9,11 +9,17 @@ test("product facts include current pricing, limits, credit costs, refund policy
   const prompt = buildProductKnowledgeSystemPrompt();
   assert.match(prompt, /\$4\.99 per month or \$49\.99 per year/);
   assert.match(prompt, /\$12\.99 per month or \$129\.99 per year/);
-  assert.match(prompt, /Lumen and Nova: 1M tokens per calendar month/);
-  assert.match(prompt, /Lumen and Nova each 8M \/ 800K; Study 4M \/ 400K/);
-  assert.match(prompt, /Lumen and Nova each 12M \/ 1.2M/);
-  assert.match(prompt, /25 image generations and 20 document generations per subscription billing month/);
-  assert.match(prompt, /60 image generations per UTC calendar month and unlimited document generations/);
+  assert.match(prompt, /up to 15 AI requests in any 24-hour period/i);
+  assert.match(prompt, /shared \$0\.25 (included )?allowance each UTC calendar month/i);
+  assert.match(prompt, /one message or action can use more than one AI request/i);
+  assert.doesNotMatch(prompt, /15 prompts in any 24-hour period/);
+  assert.doesNotMatch(prompt, /1M tokens per calendar month and 100K per rolling 5 hours/);
+  assert.match(prompt, /Lumen 8M \/ 800K; Study 4M \/ 400K/);
+  assert.match(prompt, /Lumen 12M \/ 1.2M/);
+  // Nova and Nebula were retired on 2026-11-14 and are not described as plan features.
+  assert.doesNotMatch(prompt, /Lumen and Nova|Nebula (requires|is on|\d)/);
+  assert.match(prompt, /100 image generations and 20 document generations per subscription billing month/);
+  assert.match(prompt, /400 image generations per UTC calendar month and unlimited document generations/);
   assert.match(prompt, /Refund eligibility and processing follow applicable law/);
   assert.doesNotMatch(prompt, /Google ?Play/i);
   const publicPrivacy = PRODUCT_KNOWLEDGE.privacy.map(([, body]) => body).join(" ");
@@ -27,11 +33,17 @@ test("product facts include current pricing, limits, credit costs, refund policy
   assert.doesNotMatch(prompt, /Pansophy's official domain is pansophy\.tech/);
   const sellable = [...PRODUCT_KNOWLEDGE.plans.flatMap((plan) => [...plan.features, ...plan.details]), PRODUCT_KNOWLEDGE.credits].join(" ");
   assert.doesNotMatch(sellable, /voice|dictation|Comet/i);
-  assert.match(prompt, /Chat and Study token caps apply even when you have Flex Credits/i);
-  assert.match(prompt, /image generations beyond the included allowance cost 3 credits each/i);
-  assert.match(prompt, /Free cannot use Flex Credits to unlock image or document generation/i);
+  assert.match(prompt, /They do not add Chat or Study usage/i);
+  assert.match(prompt, /images cannot be bought beyond a plan's image allowance/i);
+  assert.doesNotMatch(prompt, /cost 3 (Flex )?credits|3 Flex Credits each/i, "images never use credits, so no price in credits is promised");
+  assert.match(prompt, /image & document credits do not add images or unlock documents on Free/i);
+  assert.match(prompt, /previously called Flex Credits/i);
+  assert.match(prompt, /Free includes 2 image generations per week/i);
+  // The image watermark policy (owner decision, 2026-11-16, superseding #70): the assistant is told it as it is enforced.
+  assert.match(prompt, /Images made on Free carry a small black-and-white VibhavGPT watermark[^.]*cannot be turned off on Free/);
+  assert.match(prompt, /watermark is optional on Plus and off by default/);
   assert.match(prompt, /Higher effort may consume more output tokens/);
-  assert.match(prompt, /Credits do not expire/);
+  assert.match(prompt, /\$1 buys 100 credits, and they do not expire/);
   assert.doesNotMatch(prompt, /weekly allowances|voice exchanges per week|unlimited voice|30 Nebula usage units and 5 Nebula usage units/);
   assert.equal(PRODUCT_KNOWLEDGE.refunds.includes("does not issue refunds"), false);
 });
@@ -47,8 +59,9 @@ test("every model receives the same authoritative product knowledge", () => {
 test("pricing questions receive the exact maintained plan facts as a correctness backstop", () => {
   const addendum = buildProductKnowledgeAddendum("What does VibhavGPT Plus cost compared with Pro?");
   assert.match(addendum, /Free: \$0/);
-  assert.match(addendum, /Lumen and Nova each 8M \/ 800K; Study 4M \/ 400K/);
-  assert.match(addendum, /Lumen and Nova: 1M tokens per calendar month/);
+  assert.match(addendum, /Lumen 8M \/ 800K; Study 4M \/ 400K/);
+  assert.match(addendum, /up to 15 AI requests in any 24-hour period/i);
+  assert.match(addendum, /one message or action can use more than one AI request/i);
   assert.match(addendum, /25 MB per file and image uploads to 10 MB/);
   assert.match(addendum, /80 MB per file and image uploads to 20 MB/);
   assert.equal(buildProductKnowledgeAddendum("Help me plan a trip to Boston"), "");
@@ -146,4 +159,16 @@ test("the Privacy Policy no longer says deleting an account cancels a subscripti
   assert.ok(retention.endsWith("Account deletion is blocked while a web subscription is active; cancel it in Plan and billing first."));
   const privacy = PRODUCT_KNOWLEDGE.privacy.map(([, body]) => body).join(" ");
   assert.doesNotMatch(privacy, /subscription is canceled as part of the account-deletion process/i);
+});
+
+// The sub-processor list (legal audit, 2026-11-16) names vendors, so it lives apart from the policy sections that also brief the assistant.
+test("the Privacy page publishes the sub-processor list; the assistant is never given it", async () => {
+  const { SUBPROCESSORS_SECTION } = await import("../frontend/src/subprocessors.js");
+  const [title, body] = SUBPROCESSORS_SECTION;
+  assert.equal(title, "Sub-processors");
+  for (const name of ["Railway", "Stripe", "Resend", "Cloudflare", "Sentry", "OpenRouter", "OpenAI", "Groq", "Tavily", "OpenWeather", "Composio"]) assert.match(body, new RegExp(name), name);
+  const legal = (await import("node:fs")).readFileSync(new URL("../frontend/src/Legal.jsx", import.meta.url), "utf8");
+  assert.match(legal, /title === "AI, hosting, and service providers" \? \[section, \[\.\.\.SUBPROCESSORS_SECTION\]\]/);
+  const prompt = buildProductKnowledgeSystemPrompt();
+  assert.doesNotMatch(prompt, /Sub-processors|OpenRouter|Tavily|Composio/);
 });

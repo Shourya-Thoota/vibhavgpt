@@ -1,4 +1,5 @@
 import { PUBLIC_PAGES, SITE_ORIGIN, BRAND_IMAGE, pageStructuredData } from "../src/public-pages.js";
+import { PUBLIC_CREDITS_MODE } from "../src/credits-copy.js";
 
 export const escapeHtml = (text) => text.replaceAll("&", "&amp;").replaceAll('"', "&quot;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
@@ -10,6 +11,7 @@ export function metadataHtml(path) {
   return `<title>${title}</title>
     <meta name="description" content="${description}">
     <meta name="robots" content="index, follow, max-image-preview:large">
+    <meta name="vibhavgpt-credits-copy" content="${PUBLIC_CREDITS_MODE ?? "off"}">
     <link rel="canonical" href="${url}">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="VibhavGPT">
@@ -29,7 +31,7 @@ export function updateMetadata(html, path) {
   const headEnd = html.indexOf("</head>");
   let head = html.slice(0, headEnd);
   head = head.replace(/<title>[\s\S]*?<\/title>/gi, "")
-    .replace(/<meta\b[^>]*(?:name=["'](?:description|robots|twitter:[^"']*)["']|property=["']og:[^"']*["'])[^>]*>/gi, "")
+    .replace(/<meta\b[^>]*(?:name=["'](?:description|robots|vibhavgpt-credits-copy|twitter:[^"']*)["']|property=["']og:[^"']*["'])[^>]*>/gi, "")
     .replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi, "")
     .replace(/<script\b[^>]*type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, "");
   // Removing old tags must not leave whitespace-only lines. Keep every

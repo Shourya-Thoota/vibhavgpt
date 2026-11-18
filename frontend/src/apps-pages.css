@@ -1,4 +1,4 @@
-/* Shared by the three public app pages: /apps, /android and /vibhavgpt-windows.
+/* Shared by the public app pages: /apps, /android and /vibhavgpt-windows, and by /sources.
    Colours, type and motion come from the tokens in /theme/vibhav.css, so both
    themes work. The only raw colour is the QR code's fixed dark-on-light panel,
    which a phone camera has to read in either theme. */
@@ -19,15 +19,10 @@ body {
   margin: 0;
   min-height: 100vh;
   overflow-x: clip;
-  background-color: var(--paper);
-  background-image:
-    radial-gradient(1px 1px at 37px 61px, var(--star), transparent 100%),
-    radial-gradient(1px 1px at 173px 211px, var(--star), transparent 100%),
-    radial-gradient(1px 1px at 89px 263px, var(--star), transparent 100%),
-    radial-gradient(ellipse 70% 55% at 88% -12%, color-mix(in srgb, var(--sky-blue) 20%, transparent), transparent 62%),
-    radial-gradient(ellipse 55% 45% at 6% 112%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 66%);
-  background-size: 293px 293px, 347px 347px, 331px 331px, auto, auto;
-  background-attachment: fixed;
+  background-color: transparent;
+  background-image: none;
+  background-size: auto;
+  background-attachment: scroll;
   color: var(--ink);
   font-family: var(--body);
   line-height: 1.55;
@@ -35,13 +30,13 @@ body {
 a { color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
 
-.shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 20px 0 64px; }
+.shell { width: min(1080px, calc(100% - 32px)); margin: 0 auto; padding: 76px 0 64px; }
 
 /* --- Navigation --------------------------------------------------------- */
 
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
 .nav__links { display: flex; align-items: center; flex-wrap: wrap; gap: 0 20px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-family: var(--display); font-size: 1.15rem; text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-family: var(--display); font-size: 1.1rem; font-weight: 650; letter-spacing: -0.02em; text-decoration: none; }
 .brand img { width: 30px; height: 30px; border-radius: var(--radius-icon); }
 .nav-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 0.94rem; text-decoration: none; white-space: nowrap; }
 .nav-link:hover { color: var(--ink); }
@@ -53,12 +48,12 @@ h1 {
   max-width: 11ch;
   margin: 0;
   font-family: var(--display);
-  font-size: clamp(2.8rem, 5.4vw + 0.6rem, 5rem);
-  font-weight: 400;
-  letter-spacing: -0.025em;
+  font-size: clamp(2.6rem, 4.6vw + 0.6rem, 4.4rem);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
   line-height: 1;
 }
-h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weight: 400; }
+h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weight: var(--display-weight); letter-spacing: var(--display-tracking); }
 .lede { max-width: 46ch; margin: 20px 0 0; color: var(--ink-2); font-size: 1.12rem; }
 
 /* --- Buttons and links -------------------------------------------------- */
@@ -99,10 +94,12 @@ h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weig
 .web-link { margin: 18px 0 0; color: var(--muted); font-size: 0.92rem; }
 .web-link a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink-2); text-underline-offset: 3px; }
 
-/* --- Device frames: drawn shapes around the brand planet, no interface ----
+/* --- Device frames: drawn shapes around a sketch of the workspace ------
    A phone with its side buttons, a monitor on a stand with a window title bar,
-   and two plain frames for the Sources page. Only tokens are used, so both
-   themes work; nothing in them is text, a screenshot or a claim. */
+   and two plain frames for the Sources page. Inside, the workspace is drawn
+   as plain shapes (a question, an answer, the floating message box): nothing
+   in them is text, a screenshot or a claim. Only tokens are used, so both
+   themes work. */
 
 .device {
   position: relative;
@@ -118,42 +115,22 @@ h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weig
   place-items: center;
   height: 100%;
   overflow: hidden;
-  background:
-    radial-gradient(ellipse 90% 55% at 85% 0%, color-mix(in srgb, var(--sky-blue) 28%, transparent), transparent 70%),
-    radial-gradient(ellipse 70% 45% at 15% 105%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
-    var(--paper);
+  background: var(--paper);
 }
-/* One orbit ring behind whatever sits in the middle. */
-.device__screen::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 54%;
-  width: 68%;
-  aspect-ratio: 1;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--radius-round);
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-}
-.device__planet {
-  position: relative;
-  z-index: 1;
-  width: 28%;
-  aspect-ratio: 1;
-  border-radius: var(--radius-round);
-  object-fit: cover;
-  box-shadow: 0 14px 34px -10px color-mix(in srgb, var(--sky-blue) 55%, transparent);
-}
+.device__ui { position: absolute; inset: 14% 12% 8%; display: flex; flex-direction: column; gap: 7%; }
+.device__ui i { display: block; height: 6px; border-radius: 3px; background: var(--rule-2); }
+.device__ui .device__q { width: 58%; height: 16px; margin-left: auto; margin-bottom: 4%; border-radius: 8px; background: var(--paper-3); }
+.device__ui .device__short { width: 62%; }
+.device__ui .device__composer { margin-top: auto; height: 20px; border-radius: 10px; border: 1px solid var(--rule-2); background: var(--paper-2); box-shadow: var(--shadow-sm); }
 .device__glyph { position: relative; z-index: 1; width: 30%; max-width: 72px; color: var(--accent); }
 
 .device--phone { width: 150px; aspect-ratio: 9 / 18; padding: 8px; border-radius: 30px; }
 .device--phone::before, .device--phone::after { content: ""; position: absolute; width: 3px; border-radius: 2px; background: var(--rule-2); }
 .device--phone::before { left: -4px; top: 22%; height: 12%; }
 .device--phone::after { right: -4px; top: 28%; height: 16%; }
-.device--phone .device__screen { grid-template-rows: auto 1fr; justify-items: center; border-radius: 22px; }
-.device--phone .device__screen::before { content: ""; width: 34%; height: 8px; margin-top: 8px; border-radius: var(--radius-pill); background: var(--paper-deep); }
-.device--phone .device__planet { width: 46%; align-self: center; }
+.device--phone .device__screen { border-radius: 22px; }
+.device--phone .device__screen::before { content: ""; position: absolute; top: 8px; left: 33%; width: 34%; height: 8px; border-radius: var(--radius-pill); background: var(--paper-deep); }
+.device--phone .device__ui { inset: 16% 10% 6%; gap: 5%; }
 
 .device--window { width: min(100%, 260px); aspect-ratio: 16 / 10; padding: 6px; border-radius: 14px; grid-template-rows: 22px 1fr; margin-bottom: 24px; }
 .device--window::before { content: ""; position: absolute; left: 50%; bottom: -14px; width: 12%; height: 14px; transform: translateX(-50%); background: linear-gradient(var(--rule-2), var(--rule)); }
@@ -163,7 +140,6 @@ h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weig
 .device__controls { display: flex; gap: 5px; margin-left: auto; }
 .device__controls b { width: 7px; height: 7px; border-radius: var(--radius-round); background: var(--rule-2); }
 .device--window .device__screen { border-radius: 0 0 8px 8px; }
-.device--window .device__planet { width: 24%; }
 
 /* The Sources page: the same window without a stand, and a plain video frame. */
 .device--flat { margin-bottom: 0; }
@@ -174,22 +150,127 @@ h2 { margin: 0 0 18px; font-family: var(--display); font-size: 1.6rem; font-weig
 .device--lg.device--phone { width: 240px; }
 .device--lg.device--window { width: 100%; max-width: 440px; }
 
-/* --- Apps page ---------------------------------------------------------- */
-
-.hub-hero { padding: 64px 0 40px; }
+/* --- Hub pages: Apps and Sources ------------------------------------------
+   White elevated cards on the warm ground in light mode, the raised paper
+   surface in dark mode (never a white patch). One card system serves both
+   pages. Only /apps and /sources use these classes. */
+.hub-hero { padding: 56px 0 32px; }
 .hub-hero h1 { max-width: 14ch; }
-.platforms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
-.platform { display: grid; align-content: start; gap: 24px; padding: 40px 40px 40px 0; }
-.platform + .platform { padding-left: 40px; padding-right: 0; border-left: 1px solid var(--rule); }
-.platform__stage { display: grid; align-items: center; min-height: 300px; }
-.platform h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; }
-.platform h2 svg { flex: 0 0 auto; color: var(--accent); }
-.platform__tag { padding: 3px 10px; border: 1px solid var(--accent-line); border-radius: var(--radius-pill); color: var(--accent); font: 600 0.78rem var(--body); }
+
+.app-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+.src-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+
+.app-card {
+  --card-surface: var(--color-paper-2);
+  --card-line: color-mix(in srgb, var(--ink) 12%, transparent);
+  --card-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 8%, transparent), 0 8px 24px -12px color-mix(in srgb, var(--ink) 20%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--card-line);
+  border-radius: var(--radius-card, 20px);
+  background: var(--card-surface);
+  box-shadow: var(--card-shadow);
+}
+:root:not([data-theme="light"]) .app-card {
+  --card-surface: var(--color-paper-raised);
+  --card-line: color-mix(in srgb, white 10%, transparent);
+  --card-shadow: var(--shadow-md);
+}
+.app-card[data-recommended] { border-color: var(--accent-line, var(--accent)); box-shadow: 0 0 0 1px var(--accent-line, var(--accent)), var(--card-shadow); }
+.app-card--wide { max-width: 560px; }
+.app-card__head { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 10px 14px; }
+.app-card__head > .platform__tag { grid-column: 1 / -1; justify-self: start; }
+.app-card__title { min-width: 0; }
+.app-card h2, .app-card h3 { margin: 0; font-family: var(--display); font-size: 1.3rem; font-weight: var(--display-weight); letter-spacing: var(--display-tracking); line-height: 1.2; }
+.app-card__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.app-card__icon--windows { background: color-mix(in srgb, var(--sky-blue) 14%, transparent); color: var(--sky-blue); }
+.app-card__icon--android { background: color-mix(in srgb, var(--color-accent-pine) 16%, transparent); color: var(--color-accent-pine); }
+.app-card__icon--web { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink-2); }
+.app-card__fact { margin: 2px 0 0; color: var(--muted); font-size: 0.9rem; font-weight: 500; }
+.app-card__text { margin: 0; color: var(--ink-2); }
+.app-card__actions { display: grid; justify-items: start; gap: 6px; padding-top: 4px; }
+.app-card .platform__hint { margin: 0; }
+.app-card .qr { margin: 4px 0 0; }
+.app-card .qr svg { width: 112px; height: 112px; }
+
+.platform__tag { padding: 3px 10px; border: 1px solid var(--accent-line); border-radius: var(--radius-pill); color: var(--accent); font: 600 0.78rem var(--body); white-space: nowrap; }
 .platform__tag[hidden] { display: none; }
-.platform__fact { margin: 0; color: var(--ink); font-weight: 600; }
-.platform__text { max-width: 44ch; margin: 0; color: var(--ink-2); }
-.platform__actions { display: grid; justify-items: start; gap: 8px; }
 .platform__hint { max-width: 44ch; margin: 0; color: var(--muted); font-size: 0.88rem; }
+
+/* Sources: sections, repository paths and documentation rows */
+.src-section { margin-top: 36px; }
+.src-section__title { margin: 0 0 14px; font-size: 1.05rem; color: var(--ink-2); font-family: var(--body); font-weight: 650; letter-spacing: 0; }
+.src-path { margin: 0; }
+.src-path code, .src-row code {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+.src-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.src-row {
+  --card-surface: var(--color-paper-2);
+  --card-line: color-mix(in srgb, var(--ink) 12%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 12px 18px;
+  border: 1px solid var(--card-line);
+  border-radius: 16px;
+  background: var(--card-surface);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 6%, transparent);
+  transition: border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+:root:not([data-theme="light"]) .src-row { --card-surface: var(--color-paper-raised); --card-line: color-mix(in srgb, white 10%, transparent); }
+.src-row:hover { border-color: var(--accent); }
+.src-row__main { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; }
+.src-row__main > span { color: var(--ink-2); font-size: 0.94rem; }
+.src-row svg { flex: 0 0 auto; color: var(--muted); }
+/* Social rows: the platform mark, then its name and handle, then the arrow. Same row as the documentation links, so the page reads as one system. */
+.src-row--social { justify-content: flex-start; }
+.src-row--social .src-row__icon { display: inline-grid; flex: 0 0 auto; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.src-row--social .src-row__icon svg { color: var(--ink); }
+.src-row--social .src-row__main { flex: 1 1 auto; flex-direction: column; align-items: flex-start; gap: 1px; }
+.src-row--social .src-row__main strong { color: var(--ink); font-weight: 600; font-size: 1rem; }
+.src-row--social .src-row__main > span { color: var(--ink-2); font-size: 0.92rem; overflow-wrap: anywhere; }
+.src-row--social .src-row__main small { color: var(--muted); font-size: 0.84rem; }
+.src-row--social:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.src-list--social { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 720px) { .src-list--social { grid-template-columns: minmax(0, 1fr); } }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+@media (max-width: 1020px) {
+  .app-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Three cards in two columns would leave a hole: the last one takes the row. */
+  .app-grid > .app-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 720px) {
+  .hub-hero { padding: 32px 0 22px; }
+  .app-grid, .src-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .app-card { padding: 20px; }
+  .app-card--wide { max-width: none; }
+}
 
 /* --- Release facts, steps, notes and checksum --------------------------- */
 
@@ -268,23 +349,7 @@ ul.notes { display: grid; gap: 8px; padding-left: 1.1em; }
 .also h2 { margin-bottom: 10px; }
 .also p { max-width: 54ch; margin: 0 0 16px; color: var(--ink-2); }
 
-/* --- Footer ------------------------------------------------------------- */
-
-.footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 24px;
-  margin-top: 64px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
-  color: var(--muted);
-  font-size: 0.86rem;
-}
-.footer span { margin-right: auto; }
-.footer a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; color: var(--muted); text-underline-offset: 3px; }
-.public-operator a { display: inline-flex; align-items: center; min-height: 44px; }
-.footer a:hover { color: var(--ink); }
+/* --- Footer: the shared site footer (site-footer.css). ------------------- */
 
 /* --- Motion --------------------------------------------------------------
    Short entrances and small hover shifts, opacity and transform only. Content
@@ -312,10 +377,6 @@ ul.notes { display: grid; gap: 8px; padding-left: 1.1em; }
   .device--lg.device--phone { width: 220px; }
   .device--lg.device--window { max-width: 440px; }
   .scan { display: none; }
-  .platforms { grid-template-columns: minmax(0, 1fr); }
-  .platform, .platform + .platform { padding: 32px 0; border-left: 0; }
-  .platform + .platform { border-top: 1px solid var(--rule); }
-  .platform__stage { min-height: 0; }
   .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .facts div:nth-child(3) { padding-left: 0; border-left: 0; }
   .facts div:nth-child(n + 3) { border-top: 1px solid var(--rule); }
@@ -323,8 +384,13 @@ ul.notes { display: grid; gap: 8px; padding-left: 1.1em; }
 }
 @media (max-width: 420px) {
   .download, .button { width: 100%; }
-  .platform__actions { justify-items: stretch; }
   .direct { justify-content: center; }
   .facts dd { font-size: 1.12rem; }
-  .footer span { flex-basis: 100%; }
 }
+
+/* A QR code: dark on white, whatever the page's theme, because scanners read it that way. It is a picture of an address, so the
+   caption says where it goes. On a small screen the person is probably holding the phone already, so it is not shown. */
+.qr { display: grid; gap: 10px; justify-items: start; margin: 18px 0 0; }
+.qr svg { display: block; width: 152px; height: 152px; border-radius: 12px; }
+.qr figcaption { max-width: 22rem; color: var(--color-muted, var(--muted)); font-size: 0.86rem; line-height: 1.5; }
+@media (max-width: 720px) { .qr--desktop { display: none; } }

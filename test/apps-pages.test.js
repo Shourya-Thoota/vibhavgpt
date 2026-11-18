@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { PUBLIC_PAGES, pageStructuredData, SITE_ORIGIN } from "../frontend/src/public-pages.js";
 import { SOURCE_REPO_URL } from "../frontend/src/source-repo.js";
+import { SOCIAL_LINKS, sourcesSocialHtml } from "../frontend/src/social-links.js";
 import { detailsHtml, updateMetadata } from "../frontend/scripts/public-html.js";
 
 // The Apps hub (/apps) and the refreshed Android and Windows pages.
@@ -70,27 +71,47 @@ test("the structured data names Web, Android and Windows on every public page", 
 
 // --- The hub's content ---------------------------------------------------------
 
-test("the hub offers both platforms, each with install steps first and the exact existing direct download second", () => {
+test("the hub offers Windows and Android with a direct download first and the install steps beside it, and the browser for other phones", () => {
   const links = anchors(body(hub));
+  const downloads = Object.fromEntries(links.filter((link) => link.download).map((link) => [link.text, link]));
+  assert.equal(downloads["Download for Android"].href, APK);
+  assert.equal(downloads["Download for Android"].download, "vibhavgpt-android.apk");
+  assert.equal(downloads["Download for Windows"].href, EXE);
+  assert.equal(downloads["Download for Windows"].download, "VibhavGPT-Setup-x64.exe");
+  const steps = links.filter((link) => link.text === "Install steps and file checksum").map((link) => link.href);
+  assert.deepEqual(steps.sort(), ["/android", "/vibhavgpt-windows"], "each platform's steps page, which carries the checksum");
   const byText = Object.fromEntries(links.map((link) => [link.text, link]));
-  assert.equal(byText["See Android install steps"].href, "/android");
-  assert.equal(byText["See Windows install steps"].href, "/vibhavgpt-windows");
-  assert.equal(byText["Download the APK directly"].href, APK);
-  assert.equal(byText["Download the APK directly"].download, "vibhavgpt-android.apk");
-  assert.equal(byText["Download the installer directly"].href, EXE);
-  assert.equal(byText["Download the installer directly"].download, "VibhavGPT-Setup-x64.exe");
   assert.equal(byText["Open workspace"].href, "/app");
-  assert.equal(byText["Use VibhavGPT in your browser"].href, "/app");
+  assert.equal(byText["Open VibhavGPT in the browser"].href, "/app", "other phones are offered the website, not an app");
   // The same two addresses the platform pages download from.
   assert.equal(anchors(android).find((link) => link.className === "download").href, APK);
   assert.equal(anchors(windows).find((link) => link.className === "download").href, EXE);
-  // The destination of each button is explained, in words.
-  assert.match(hub, /The steps page has the requirements and the file checksum\. The direct link starts the download at once\./);
-  assert.match(hub, /The steps page explains the Windows security prompt and has the file checksum\./);
+  assert.match(hub, /Windows shows a security prompt when you run it, because the installer is not signed yet\. The steps page explains it\./);
+  assert.match(hub, /There is no app for other phones yet/, "it says plainly that there is no store app");
+  assert.doesNotMatch(body(hub), /app ?store|google play|testflight|apps\.apple/i, "no store link or badge is invented");
+});
+
+test("the QR codes are drawn locally, decode to the real pages, and say where they go", async () => {
+  const { default: sharp } = await import("sharp");
+  const { default: jsQR } = await import("jsqr");
+  const figures = [...body(hub).matchAll(/<figure class="qr qr--desktop">\s*(<svg[\s\S]*?<\/svg>)\s*<figcaption>([^<]+)<\/figcaption>\s*<\/figure>/g)].map((m) => ({ svg: m[1], caption: m[2] }));
+  assert.equal(figures.length, 2, "one for Android, one for the website");
+  const wanted = ["https://vibhavgpt.com/android", "https://vibhavgpt.com/app"];
+  for (const [index, figure] of figures.entries()) {
+    assert.doesNotMatch(figure.svg.replace(' xmlns="http://www.w3.org/2000/svg"', ""), /<image|href=|xlink|<script|https?:\/\//i, "a plain drawing: nothing is fetched to draw it");
+    const { data, info } = await sharp(Buffer.from(figure.svg), { density: 300 }).flatten({ background: "#ffffff" }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const decoded = jsQR(new Uint8ClampedArray(data), info.width, info.height);
+    assert.equal(decoded?.data, wanted[index], "scanning it opens the intended page");
+    assert.ok(figure.caption.includes(wanted[index].replace("https://", "")), "the caption names the address it opens");
+  }
+  assert.match(figures[0].caption, /Android install page/);
+  assert.match(figures[1].caption, /website/, "it does not pretend to install an app");
+  const css = read("frontend/src/apps-pages.css");
+  assert.match(css, /@media \(max-width: 720px\) \{ \.qr--desktop \{ display: none; \} \}/, "not shown on a phone, which is already in hand");
 });
 
 test("both platform cards are always in the page, and no script can hide or add one", () => {
-  for (const platform of ["android", "windows"]) assert.match(hub, new RegExp(`<article class="platform rise" data-platform="${platform}"`));
+  for (const platform of ["android", "windows"]) assert.match(hub, new RegExp(`<article class="app-card rise" data-platform="${platform}"`));
   assert.equal(/<article[^>]*\bhidden\b/.test(hub), false, "neither card is hidden in the markup");
   const script = /<script>([\s\S]*?)<\/script>/.exec(body(hub))[1];
   assert.match(script, /setAttribute\("data-recommended", ""\)/, "the script only marks a card");
@@ -106,7 +127,7 @@ test("the hub states no version, size, checksum, count or rating, and its requir
   assert.equal(/id="android-requirements">([^<]*)</.exec(hub)[1], release.androidRequirements, "the source default equals the release file; the build bakes it again");
   assert.match(windows, /<dt>Requires<\/dt><dd>Windows 10 or 11, x64<\/dd>/);
   assert.match(hub, /64-bit Windows 10 or 11/);
-  assert.doesNotMatch(text, /\bios\b|iphone|macos|\bmac\b|linux|chromeos/i, "no unsupported platforms");
+  assert.doesNotMatch(text, /\bios\b|iphone|macos|\bmac\b|linux|chromeos/i, "no unsupported platforms named");
 });
 
 // --- The refreshed platform pages ----------------------------------------------
@@ -204,11 +225,11 @@ test("css: motion is opacity and transform only, gated by reduced motion, with n
 test("css: visible focus, 44px controls, tokens only, and no horizontal-scroll trap", () => {
   const plain = css.replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(plain, /:focus-visible \{ outline: 2px solid var\(--accent\); outline-offset: 3px;/);
-  for (const selector of [".download, .button", ".direct", ".copy", ".nav-link", ".brand", ".footer a", ".web-link a"]) {
+  for (const selector of [".download, .button", ".direct", ".copy", ".nav-link", ".brand", ".web-link a"]) {
     const match = new RegExp(`(?:^|\\n)${selector.replaceAll(".", "\\.")} \\{[^}]*min-height: (\\d+)px`).exec(plain);
     assert.ok(match && Number(match[1]) >= 44, `${selector} is at least 44px tall`);
   }
-  assert.match(plain, /\.footer a \{[^}]*min-width: 44px;/);
+  // The footer is the shared site footer now (site-footer.css; test/social-links.test.js checks its 44px targets).
   assert.match(plain, /body \{[^}]*overflow-x: clip;/);
   assert.doesNotMatch(plain, /overflow-x:\s*hidden/);
   const hexes = [...plain.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((match) => match[0].toLowerCase());
@@ -226,7 +247,7 @@ const YOUTUBE = "https://www.youtube.com/@vibhavthoota";
 test("/sources is a registered public page with accurate, length-checked metadata and real FAQs", () => {
   const page = PUBLIC_PAGES["/sources"];
   assert.ok(page);
-  assert.equal(page.title, "VibhavGPT Sources: Public Source Code and YouTube Channel");
+  assert.equal(page.title, "VibhavGPT Sources: Public Source Code and Social Links");
   assert.ok(page.description.length >= 150 && page.description.length <= 160, `description is ${page.description.length} characters`);
   assert.ok(page.description.endsWith("Made by Vibhav Thoota."));
   assert.ok(page.faq.length >= 3);
@@ -253,15 +274,21 @@ test("the Sources page composes like the prerender step: one title, canonical, h
   assert.doesNotMatch(html, /(?:src|href)\s*=\s*["']http:\/\//i);
 });
 
-test("the Sources page has exactly two destinations: the existing repository and the existing channel, in safe new tabs", () => {
+test("the Sources page lists the public repository, the public releases, three public documents, the channel, the four social profiles, Threads and GitHub, each in a safe new tab", () => {
   const links = [...sources.matchAll(/<a ([^>]*)>([\s\S]*?)<\/a>/g)].map(([, attributes, inner]) => ({
     href: attr(attributes, "href"), target: attr(attributes, "target"), rel: attr(attributes, "rel"), cls: attr(attributes, "class"),
     text: inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim(),
   }));
   const main = body(sources).slice(0, body(sources).indexOf("<footer"));
-  const mainLinks = [...main.matchAll(/<a ([^>]*)>([\s\S]*?)<\/a>/g)].map(([, attributes, inner]) => ({ href: attr(attributes, "href"), target: attr(attributes, "target"), rel: attr(attributes, "rel"), text: inner.replace(/\s+/g, " ").trim() }));
+  const mainLinks = [...main.matchAll(/<a ([^>]*)>([\s\S]*?)<\/a>/g)].map(([, attributes, inner]) => ({ href: attr(attributes, "href"), target: attr(attributes, "target"), rel: attr(attributes, "rel"), text: inner.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim() }));
   const external = mainLinks.filter((link) => /^https?:/.test(link.href));
-  assert.deepEqual(external.map((link) => [link.text, link.href]), [["View the source code", SOURCE_REPO_URL], ["Watch on YouTube", YOUTUBE]]);
+  const RELEASES = "https://github.com/Shourya-Thoota/vibhavgpt-releases/releases";
+  const DOCS = ["LICENSE", "README.md", "SECURITY.md"].map((name) => `${SOURCE_REPO_URL}/blob/main/${name}`);
+  // The Social section: the existing YouTube channel first, then the four profiles, then Threads and GitHub (Slice 6.1), each exactly as
+  // the owner gave it, the same seven the footer shows.
+  assert.deepEqual(external.map((link) => link.href), [SOURCE_REPO_URL, RELEASES, ...DOCS, YOUTUBE, ...SOCIAL_LINKS.map((link) => link.href), "https://www.threads.net/@vibhavgpt.ai", "https://github.com/Shourya-Thoota"]);
+  assert.deepEqual(external.slice(0, 2).map((link) => link.text), ["View the source code", "See the releases"]);
+  for (const [link, platform] of external.slice(5).map((entry, index) => [entry, ["YouTube", "Instagram", "X", "Bluesky", "Reddit", "Threads", "GitHub"][index]])) assert.ok(link.text.startsWith(platform), `${link.href} is named ${platform}`);
   for (const link of external) { assert.equal(link.target, "_blank", link.href); assert.equal(link.rel, "noopener noreferrer", link.href); }
   assert.equal(SOURCE_REPO_URL, "https://github.com/Shourya-Thoota/vibhavgpt", "the repository address is the one the app already uses");
   assert.ok(links.some((link) => link.href === "/app" && link.text === "Open workspace"), "workspace navigation");
@@ -270,7 +297,11 @@ test("the Sources page has exactly two destinations: the existing repository and
   assert.equal(footerSource.length, 1);
   assert.equal(footerSource[0].href, SOURCE_REPO_URL, "the footer link is the same existing destination, not a second one");
   assert.equal(footerSource[0].rel, "noopener noreferrer");
-  assert.equal(new Set(links.filter((link) => /github\.com/.test(link.href)).map((link) => link.href)).size, 1, "one GitHub address on the whole page");
+  // Every GitHub address is the public repository, the public releases repository or a file in the public repository.
+  for (const link of links.filter((entry) => /github\.com/.test(entry.href))) {
+    // The owner's GitHub profile is one of the seven social destinations (Social section and footer).
+    assert.ok(link.href === SOURCE_REPO_URL || link.href === RELEASES || DOCS.includes(link.href) || link.href === "https://github.com/Shourya-Thoota", `an unexpected GitHub address: ${link.href}`);
+  }
 });
 
 test("the Sources page embeds nothing, tracks nothing, runs no script of its own, and does not name the private repository", () => {

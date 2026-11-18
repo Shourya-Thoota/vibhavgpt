@@ -2,33 +2,51 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { currentThirdPartyKey, isRetiredHouseKey } from "../frontend/src/model-marketplace.js";
 
 // Exercise the functions used by the frontend without loading React/JSX.
 const source = readFileSync(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
 const helpers = source.slice(source.indexOf("function modelAllowedForTier("), source.indexOf("function relativeConversationTime("));
 const { choose, allowed } = runInNewContext(`${helpers}; ({ choose: preferredModelForProfile, allowed: modelAllowedForTier })`, {
-  MODELS: ["lumen", "nova", "nebula", "vesper"].map((value) => ({ value })),
+  MODELS: ["lumen", "vesper", "zenith"].map((value) => ({ value })),
+  // A retired third-party id in a saved preference reads as its replacement (model-marketplace.js); a retired house tier (Nova, Nebula,
+  // retired 2026-11-14) is named, never replaced.
+  currentThirdPartyKey,
+  isRetiredHouseKey,
 });
 
-test("last-used Nebula survives a null fixed preference on Plus and Pro", () => {
-  for (const tier of ["plus", "pro"]) {
-    assert.equal(choose({ preferredModel: null, lastUsedModel: "nebula" }, tier), "nebula");
-    assert.equal(choose({ lastUsedModel: "nova" }, tier), "nova");
+test("last-used Vulcan survives a null fixed preference on Pro and Max", () => {
+  for (const tier of ["pro", "max"]) {
+    assert.equal(choose({ preferredModel: null, lastUsedModel: "vesper" }, tier), "vesper");
+    assert.equal(choose({ lastUsedModel: "vesper" }, tier), "vesper");
     assert.equal(allowed(null, tier), false);
     assert.equal(allowed("invalid", tier), false);
   }
 });
 
+test("a saved retired tier is named, so the chat asks for a model; it is never swapped for another tier", () => {
+  for (const tier of ["free", "plus", "pro", "max"]) {
+    assert.equal(choose({ preferredModel: null, lastUsedModel: "nebula" }, tier), "retired:nebula");
+    assert.equal(choose({ lastUsedModel: "nova" }, tier), "retired:nova");
+    assert.equal(choose({ retiredModel: "nova", preferredModel: null, lastUsedModel: null }, tier), "retired:nova", "the preferences API names it");
+    assert.equal(allowed("nova", tier), false);
+    assert.equal(allowed("nebula", tier), false);
+  }
+});
+
 test("fixed preference wins, with tier eligibility enforced", () => {
-  assert.equal(choose({ preferredModel: "nebula", lastUsedModel: "nebula" }, "pro"), "nebula");
-  assert.equal(choose({ preferredModel: "ultra", lastUsedModel: "nova" }, "pro"), "nebula");
-  assert.equal(choose({ preferredModel: null, lastUsedModel: "nebula" }, "free", 2), "lumen");
-  assert.equal(choose({ preferredModel: null, lastUsedModel: "nebula" }, "free", 3), "lumen");
+  assert.equal(choose({ preferredModel: "vesper", lastUsedModel: "lumen" }, "pro"), "vesper");
+  assert.equal(choose({ preferredModel: "zenith", lastUsedModel: "vesper" }, "max"), "zenith");
+  assert.equal(choose({ preferredModel: "zenith", lastUsedModel: "vesper" }, "pro"), "vesper", "Zenith is Max only, so the eligible last-used model is used");
+  assert.equal(choose({ preferredModel: null, lastUsedModel: "vesper" }, "free", 2), "lumen");
+  assert.equal(choose({ preferredModel: null, lastUsedModel: "vesper" }, "plus", 3), "lumen");
   assert.equal(choose({}, "pro"), "lumen");
+  // Nebula's legacy alias is retired with it.
+  assert.equal(choose({ preferredModel: "ultra", lastUsedModel: "lumen" }, "pro"), "retired:ultra");
 });
 
 test("legacy Spark preferences retain their Lumen selection", () => {
-  assert.equal(choose({ preferredModel: "spark", lastUsedModel: "nova" }, "free"), "lumen");
+  assert.equal(choose({ preferredModel: "spark", lastUsedModel: "vesper" }, "free"), "lumen");
   assert.equal(choose({ lastUsedModel: "spark" }, "plus"), "lumen");
 });
 
@@ -41,29 +59,41 @@ test("a stale saved qwen preference falls back to Lumen like any unknown key", (
     assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "not-a-model" }, tier), "lumen");
   }
   // As with any unknown fixed preference, a valid last-used model is kept.
-  assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "nova" }, "free"), "nova");
+  assert.equal(choose({ preferredModel: "qwen", lastUsedModel: "vesper" }, "pro"), "vesper");
 });
 
 test("a conversation saved with an unknown model reopens on Lumen", () => {
-  assert.match(source, /const restoredModel = result\.conversation\.model === "spark" \? "lumen" : result\.conversation\.model;/);
+  // A retired third-party id reads as its replacement; anything unknown or not on the plan reopens on Lumen.
+  assert.match(source, /const restoredModel = result\.conversation\.model === "spark" \? "lumen" : result\.conversation\.model \? currentThirdPartyKey\(result\.conversation\.model\) : result\.conversation\.model;/);
   assert.match(source, /const conversationModel = modelAllowedForTier\(restoredModel, tier, creditBalance\) \? restoredModel : "lumen";/);
+  // A model picked while the conversation was loading is never replaced when the load finishes; a conversation last on a retired tier
+  // opens with no model chosen and names the retired tier.
+  assert.match(source, /if \(!userPickedModelRef\.current\) \{\n\s+if \(isRetiredHouseKey\(result\.conversation\.model\)\) \{\n\s+setModel\(null\);\n\s+setRetiredSelection\(String\(result\.conversation\.model\)\.toLowerCase\(\)\);/);
 });
 
-test("Vesper requires a paid plan even with credits", () => {
+test("Vulcan requires Pro, even with credits", () => {
   assert.equal(allowed("vesper", "free", 1000), false);
-  for (const tier of ["plus", "pro"]) assert.equal(allowed("vesper", tier), true);
+  assert.equal(allowed("vesper", "plus"), false);
+  assert.equal(allowed("vesper", "pro"), true);
 });
 
-test("Nova and Vesper are vision tiers and Nova and Vesper expose thinking controls", () => {
-  assert.match(source, /const VISION_MODELS = \["nova", "nebula", "vesper"\];/);
-  assert.match(source, /value: "nova"[\s\S]*?description: "Balanced speed and depth\. Reads images\./);
-  assert.match(source, /const THINKING_MODELS = \["nova", "nebula", "vesper"\];/);
-  assert.match(source, /value: "nebula"[\s\S]*?description: "Strong reasoning for demanding, high-complexity work\. Reads images\./);
-  assert.match(source, /value: "vesper"[\s\S]*?description: "Flagship\. Highest reasoning capacity for the most difficult problems\. Reads images\./);
+// Slice 7: the picker reads its house lineup from model-marketplace.js, so the facts are checked there and the picker is checked to use it.
+const { HOUSE_MODELS, HOUSE_INTELLIGENCE, INTELLIGENCE_LABELS, INTELLIGENCE_TONES } = await import("../frontend/src/model-marketplace.js");
+const house = Object.fromEntries(HOUSE_MODELS.map((model) => [model.id, model]));
+
+test("Vulcan and Zenith are vision tiers and expose thinking controls; Lumen does neither", () => {
+  assert.match(source, /const VISION_MODELS = \[\.\.\.HOUSE_MODELS\.filter\(\(entry\) => entry\.vision\)/, "the picker's vision list is the lineup's");
+  assert.match(source, /const THINKING_MODELS = \["vesper", "zenith"\];/);
+  assert.deepEqual(HOUSE_MODELS.filter((model) => model.vision).map((model) => model.id), ["vesper", "zenith"]);
+  assert.equal(house.lumen.description, "Fastest. Good for everyday questions.");
+  assert.equal(house.vesper.description, "Top-tier reasoning for difficult problems. Reads images.");
+  assert.match(house.zenith.description, /^Flagship\./, "Zenith is the flagship now");
 });
 
-test("every picker tier has its capability-rank badge", () => {
-  for (const [model, label] of [["lumen", "Entry"], ["nova", "Balanced"], ["nebula", "Premium"], ["vesper", "Top Tier"]]) {
-    assert.match(source, new RegExp(`value: "${model}"[\\s\\S]*?label: "${label}"`));
+test("every picker model carries its label on the one intelligence scale, in the existing badge tones", () => {
+  assert.match(source, /badges: \[intelligenceBadge\(HOUSE_INTELLIGENCE\[entry\.id\]\)\]/, "the picker's badge is the lineup's label");
+  for (const [model, label, tone] of [["lumen", "Fast", "entry"], ["vesper", "Advanced", "premium"], ["zenith", "Best", "top-tier"]]) {
+    assert.equal(INTELLIGENCE_LABELS[HOUSE_INTELLIGENCE[model]], label, model);
+    assert.equal(INTELLIGENCE_TONES[HOUSE_INTELLIGENCE[model]], tone, model);
   }
 });

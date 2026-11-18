@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
-import { conversationGroups, conversations } from "../db/schema.js";
+import { conversationGroups, conversations, memoryFacts } from "../db/schema.js";
 
 // Projects and folders for Chat and Study. A project carries optional
 // instructions that reach the model for every chat filed under it (or under
@@ -41,13 +41,18 @@ function cleanInstructions(value) {
 }
 
 export function groupView(group) {
+  const mode = group.mode === "study" ? "study" : "chat";
+  const notebookType = mode === "study" ? "learning" : "work";
   return {
     id: group.id,
     kind: group.kind,
-    mode: group.mode,
+    mode,
+    notebookType,
     parentId: group.parentId ?? null,
     name: group.name,
     instructions: group.instructions ?? "",
+    // Projects only: use this project's memories in its chats, and save new ones to it.
+    ...(group.kind === "project" ? { memoryUseEnabled: group.memoryUseEnabled !== false, memorySaveEnabled: group.memorySaveEnabled !== false } : {}),
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
   };
@@ -76,21 +81,28 @@ export function createConversationGroups(db) {
 
     async listGroups(userId, mode) {
       const conditions = [eq(conversationGroups.userId, userId)];
-      if (MODES.includes(mode)) conditions.push(eq(conversationGroups.mode, mode));
+      if (mode && mode !== "all" && MODES.includes(mode)) conditions.push(eq(conversationGroups.mode, mode));
       const rows = await db.select().from(conversationGroups).where(and(...conditions))
         .orderBy(asc(conversationGroups.name), asc(conversationGroups.id));
       return rows.map(groupView);
     },
 
     async createGroup(userId, body = {}) {
-      const kind = KINDS.includes(body.kind) ? body.kind : "folder";
-      const mode = MODES.includes(body.mode) ? body.mode : "chat";
+      const kind = KINDS.includes(body.kind) ? body.kind : "project";
+      let mode = "chat";
+      if (body.notebookType === "learning" || body.mode === "learning" || body.mode === "study") {
+        mode = "study";
+      } else if (body.notebookType === "work" || body.mode === "work" || body.mode === "chat") {
+        mode = "chat";
+      } else if (body.mode && !MODES.includes(body.mode)) {
+        throw failure(400, "Invalid notebook type. Choose Learning or Work.");
+      }
       const name = cleanName(body.name, kind);
       const instructions = kind === "project" ? cleanInstructions(body.instructions) : "";
       const parentId = kind === "folder" ? await validParent(userId, body.parentId ?? null, mode) : null;
       const existing = await db.select({ id: conversationGroups.id }).from(conversationGroups)
         .where(eq(conversationGroups.userId, userId)).limit(GROUP_LIMIT);
-      if (existing.length >= GROUP_LIMIT) throw failure(409, `You can have up to ${GROUP_LIMIT} projects and folders.`);
+      if (existing.length >= GROUP_LIMIT) throw failure(409, `You can have up to ${GROUP_LIMIT} projects.`);
       const [group] = await db.insert(conversationGroups).values({ userId, kind, mode, name, instructions, parentId }).returning();
       return groupView(group);
     },
@@ -104,9 +116,20 @@ export function createConversationGroups(db) {
         if (group.kind !== "project") throw failure(400, "Only projects have instructions.");
         change.instructions = cleanInstructions(body.instructions);
       }
+      for (const key of ["memoryUseEnabled", "memorySaveEnabled"]) {
+        if (!Object.hasOwn(body, key)) continue;
+        if (group.kind !== "project") throw failure(400, "Only projects have memory settings.");
+        if (typeof body[key] !== "boolean") throw failure(400, "Choose on or off.");
+        change[key] = body[key];
+      }
       if (Object.hasOwn(body, "parentId")) {
         if (group.kind !== "folder") throw failure(400, "Projects can't go inside another project.");
         change.parentId = await validParent(userId, body.parentId, group.mode);
+      }
+      if (Object.hasOwn(body, "notebookType") || Object.hasOwn(body, "mode")) {
+        const reqType = body.notebookType || body.mode;
+        if (reqType === "learning" || reqType === "study") change.mode = "study";
+        else if (reqType === "work" || reqType === "chat") change.mode = "chat";
       }
       if (!Object.keys(change).length) throw failure(400, "Choose something to change.");
       const [updated] = await db.update(conversationGroups).set({ ...change, updatedAt: new Date() })
@@ -132,11 +155,15 @@ export function createConversationGroups(db) {
         }
         await tx.delete(conversationGroups)
           .where(and(eq(conversationGroups.userId, userId), eq(conversationGroups.id, group.id)));
+        // A project's memories were only ever for it; they go with it. Chats are kept (above), memories saved to it are not.
+        if (group.kind === "project") {
+          await tx.delete(memoryFacts).where(and(eq(memoryFacts.userId, userId), eq(memoryFacts.scope, "project"), eq(memoryFacts.projectId, group.id)));
+        }
       });
       return { deleted: ids };
     },
 
-    // File a conversation under a group of its own workspace, or back in the
+    // File a conversation under a project, or back in the
     // main list with null.
     async moveConversation(userId, conversationId, groupId) {
       requireId(conversationId, "Invalid conversation.");
@@ -144,8 +171,7 @@ export function createConversationGroups(db) {
         .where(and(eq(conversations.userId, userId), eq(conversations.id, conversationId))).limit(1);
       if (!conversation) throw failure(404, "Conversation not found.");
       if (groupId != null) {
-        const group = await getGroup(userId, groupId);
-        if (group.mode !== (conversation.mode ?? "chat")) throw failure(400, "That project or folder belongs to a different workspace.");
+        await getGroup(userId, groupId);
       }
       const [updated] = await db.update(conversations).set({ groupId: groupId ?? null })
         .where(and(eq(conversations.userId, userId), eq(conversations.id, conversationId)))

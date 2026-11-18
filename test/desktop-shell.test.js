@@ -23,6 +23,8 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
   const opened = [];
   const shortcuts = {};
   let trayMenu = null;
+  let appMenu = null;
+  let userTasks = null;
   let quit = 0;
   const ipc = Object.assign(new Emitter(), { handlers: {}, handle(channel, handler) { this.handlers[channel] = handler; } });
   const appEvents = new Emitter();
@@ -56,6 +58,7 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
     focus() {}
     isMinimized() { return false; }
     setTitleBarOverlay(overlay) { this.overlay = overlay; }
+    setMenuBarVisibility(visible) { this.menuBarVisible = visible; }
   }
   const electron = {
     app: Object.assign(appEvents, {
@@ -65,11 +68,12 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
       setAsDefaultProtocolClient() {},
       whenReady: () => ({ then: (run) => run() }),
       quit: () => { quit += 1; appEvents.emit("before-quit"); },
+      setUserTasks: (tasks) => { userTasks = tasks; return true; },
     }),
     BrowserWindow,
     globalShortcut: { register: (accelerator, handler) => { shortcuts[accelerator] = handler; return true; }, unregisterAll() {} },
     ipcMain: ipc,
-    Menu: { setApplicationMenu() {}, buildFromTemplate: (template) => ({ template, popup() {} }) },
+    Menu: { setApplicationMenu: (menu) => { appMenu = menu?.template ?? null; }, buildFromTemplate: (template) => ({ template, popup() {} }) },
     shell: { openExternal: (url) => { opened.push(url); return Promise.resolve(); } },
     Tray: class extends Emitter { setToolTip() {} setContextMenu(menu) { trayMenu = menu.template; } },
   };
@@ -81,7 +85,7 @@ function loadMain({ packaged = true, argv = ["electron.exe"] } = {}) {
     setTimeout: (run, ms) => { timers.push({ run, ms }); return timers.length; },
   };
   vm.runInNewContext(read("desktop/main.js"), sandbox, { filename: "desktop/main.js" });
-  return { windows, opened, shortcuts, ipc, appEvents, updater, timers, trayMenu: () => trayMenu, quits: () => quit, windowState };
+  return { windows, opened, shortcuts, ipc, appEvents, updater, timers, trayMenu: () => trayMenu, appMenu: () => appMenu, userTasks: () => userTasks, quits: () => quit, windowState };
 }
 const require = (await import("node:module")).createRequire(import.meta.url);
 
@@ -122,15 +126,17 @@ test("closing hides to the tray; the tray opens, starts a new chat and quits", (
   assert.equal(prevented, true);
   assert.equal(win.visible, false, "hidden, not closed");
   const menu = shell.trayMenu();
-  assert.deepEqual(plain(menu.map((item) => item.label ?? item.type)), ["Open VibhavGPT", "New Chat", "separator", "Quit"]);
-  menu[0].click();
+  // The tray also lists the workspace shortcuts (2026-11-17); Open, New Chat and Quit behave as before.
+  assert.deepEqual(plain(menu.map((item) => item.label ?? item.type)), ["Open VibhavGPT", "separator", "New Chat", "New Image", "New Build", "separator", "Search Chats", "Show or Hide Sidebar", "Settings", "Keyboard Shortcuts", "separator", "Quit"]);
+  const item = (label) => menu.find((entry) => entry.label === label);
+  item("Open VibhavGPT").click();
   assert.equal(win.visible, true);
-  menu[1].click();
+  item("New Chat").click();
   assert.deepEqual(plain(win.sent), ["desktop:new-chat"], "the open app starts its own new chat");
   win.webContents.url = "https://vibhavgpt.com/pricing";
-  menu[1].click();
+  item("New Chat").click();
   assert.equal(win.loaded.at(-1), "https://vibhavgpt.com/app", "elsewhere, the app opens on a new chat");
-  menu[3].click();
+  item("Quit").click();
   assert.equal(shell.quits(), 1);
   prevented = false;
   win.emit("close", { preventDefault: () => { prevented = true; } });
@@ -279,6 +285,65 @@ test("the Windows download page describes the version the desktop package builds
   assert.match(page, new RegExp(`<dt>Download size</dt><dd>${hero[2].replace(".", "\.")}</dd>`), "the facts agree with the button");
   assert.match(page, /<span class="checksum" id="checksum">[0-9a-f]{64}<\/span>/);
   assert.match(page, /href="https:\/\/github\.com\/Shourya-Thoota\/vibhavgpt-releases\/releases\/latest\/download\/VibhavGPT-Setup-x64\.exe"/);
+});
+
+// Launch shortcuts and the shortcuts menu (2026-11-17).
+test("the jump list offers New Chat, New Image and New Build, each a vibhavgpt://open link to this app", () => {
+  const shell = loadMain();
+  const tasks = plain(shell.userTasks());
+  assert.deepEqual(tasks.map((task) => [task.title, task.arguments]), [
+    ["New Chat", "vibhavgpt://open/app/chat"], ["New Image", "vibhavgpt://open/app/image"], ["New Build", "vibhavgpt://open/app/build"],
+  ]);
+  for (const task of tasks) {
+    assert.equal(task.program, process.execPath);
+    assert.equal(task.iconPath, process.execPath, "the app icon");
+    assert.ok(task.description);
+  }
+});
+
+test("a launch link reaches the open app as its action, opens its page from elsewhere, and anything else is ignored", () => {
+  const shell = loadMain();
+  const [win] = shell.windows;
+  win.hide();
+  shell.appEvents.emit("second-instance", {}, ["VibhavGPT.exe", "vibhavgpt://open/app/image"]);
+  assert.equal(win.visible, true, "the window comes forward");
+  assert.deepEqual(plain(win.messages.at(-1)), ["desktop:shortcut", "new-image"]);
+  win.webContents.url = "https://vibhavgpt.com/pricing";
+  const loads = win.loaded.length;
+  shell.appEvents.emit("second-instance", {}, ["VibhavGPT.exe", "vibhavgpt://open/app/build"]);
+  assert.equal(win.loaded.at(-1), "https://vibhavgpt.com/app/build");
+  for (const link of ["vibhavgpt://open/app/settings", "vibhavgpt://open/app/chat?x=1", "vibhavgpt://elsewhere/app/chat"]) {
+    shell.appEvents.emit("second-instance", {}, ["VibhavGPT.exe", link]);
+  }
+  assert.equal(win.loaded.length, loads + 1, "no other link navigates");
+});
+
+test("started from the jump list, the window opens on that page once", () => {
+  const shell = loadMain({ argv: ["VibhavGPT.exe", "vibhavgpt://open/app/image"] });
+  const [win] = shell.windows;
+  assert.deepEqual(plain(win.loaded), ["https://vibhavgpt.com/app/image"]);
+  win.webContents.emit("did-finish-load");
+  assert.deepEqual(plain(win.loaded), ["https://vibhavgpt.com/app/image"], "not loaded again");
+  assert.deepEqual(plain(win.sent), [], "and not started twice");
+});
+
+test("the app menu names the keyboard shortcuts without taking the keys, and its items run in the page", () => {
+  const shell = loadMain();
+  const [win] = shell.windows;
+  const [group, ...rest] = shell.appMenu();
+  assert.deepEqual(rest, [], "no reload or developer tools in the installed app");
+  const items = group.submenu.filter((item) => item.label);
+  assert.deepEqual(plain(items.map((item) => [item.label, item.accelerator ?? null])), [
+    ["New Chat", "CommandOrControl+N"], ["New Image", null], ["New Build", null], ["Search Chats", "CommandOrControl+K"],
+    ["Show or Hide Sidebar", "CommandOrControl+B"], ["Settings", "CommandOrControl+,"], ["Keyboard Shortcuts", "CommandOrControl+/"], ["Quit", null],
+  ]);
+  for (const item of items.filter((entry) => entry.accelerator)) assert.equal(item.registerAccelerator, false, item.label);
+  items.find((item) => item.label === "Settings").click();
+  assert.deepEqual(plain(win.messages.at(-1)), ["desktop:shortcut", "settings"]);
+  assert.equal(win.menuBarVisible, false, "the window draws no menu bar");
+  assert.equal(win.options.autoHideMenuBar, false, "and Alt does not reveal one over the title bar");
+  const dev = loadMain({ packaged: false });
+  assert.deepEqual(plain(dev.appMenu().slice(1)), [{ role: "viewMenu" }], "development runs keep reload and developer tools");
 });
 
 test("the updater downloads in the background, installs on quit, and checks 10 s after an installed app starts", async () => {

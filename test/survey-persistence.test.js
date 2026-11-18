@@ -87,7 +87,7 @@ test("the route only records completion, and only for a signed-in account", asyn
 test("/api/me carries the survey fields on the user", () => {
   const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
   assert.match(server, /const survey = await surveyStatus\(session\.user\.id\);/);
-  assert.match(server, /user: \{ \.\.\.session\.user, \.\.\.names, hasPassword: [^}]*, \.\.\.survey \}/);
+  assert.match(server, /user: \{ \.\.\.session\.user, \.\.\.names, hasPassword: [^}]*, \.\.\.survey, image: googlePhotoUrl\(session\.user\.image\), pictureVersion: [^}]*\}/);
 });
 
 /* --- The client ---------------------------------------------------------- */

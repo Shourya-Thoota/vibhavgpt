@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { sendStoredFile } from "../library/delivery.js";
 import path from "node:path";
-import { createReadStream } from "node:fs";
 import { rm } from "node:fs/promises";
 import { Router } from "express";
 import { accessPayload } from "../../frontend/src/access-status.js";
@@ -24,7 +24,8 @@ import {
 } from "./service.js";
 
 const absoluteMaxFileBytes = 80 * 1024 * 1024;
-export const UPLOAD_REQUEST_LIMITS = { free: 8, plus: 25, pro: 60 };
+// Max had no row, so its uploads were rate limited as Free's; it uses Pro's.
+export const UPLOAD_REQUEST_LIMITS = { free: 8, plus: 25, pro: 60, paid: 60, max: 60 };
 export const UNAUTHENTICATED_UPLOAD_REQUEST_LIMIT = 30;
 
 const unauthenticatedUploadLimiter = rateLimit({
@@ -121,9 +122,7 @@ uploadRouter.get("/:id/download", async (req, res, next) => {
   try {
     const [record] = await db.select().from(attachments).where(and(eq(attachments.id, req.params.id), eq(attachments.userId, req.authSession.user.id))).limit(1);
     if (!record) return res.status(404).json({ error: "File not found." });
-    res.attachment(record.originalName);
-    res.type(record.mimeType || "application/octet-stream");
-    return createReadStream(path.join(uploadRoot, record.storedName)).on("error", next).pipe(res);
+    return sendStoredFile(res, next, record, req.authSession.user.id, { disposition: "attachment" });
   } catch (error) { return next(error); }
 });
 
@@ -134,8 +133,7 @@ uploadRouter.get("/:id/preview", async (req, res, next) => {
   try {
     const [record] = await db.select().from(attachments).where(and(eq(attachments.id, req.params.id), eq(attachments.userId, req.authSession.user.id))).limit(1);
     if (!record || record.kind !== "generated-image" || !record.mimeType.startsWith("image/")) return res.status(404).json({ error: "Image preview not found." });
-    res.type(record.mimeType);
-    return createReadStream(path.join(uploadRoot, record.storedName)).on("error", next).pipe(res);
+    return sendStoredFile(res, next, record, req.authSession.user.id, { disposition: "inline" });
   } catch (error) {
     return next(error);
   }

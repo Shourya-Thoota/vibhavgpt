@@ -68,26 +68,33 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
   test(`${name}: unapproved fallback stages are skipped and receive zero requests`, async () => {
     approve("primaryFree");
     const requests = [];
-    await assert.rejects(call("lumen", messages, undefined, { maxRetries: 0, fetchImpl: async (url) => { requests.push(url); return new Response("", { status: 503 }); } }),
+    await assert.rejects(call("lumen", messages, undefined, { maxRetries: 0, fetchImpl: async (url, init) => { requests.push({ url, model: JSON.parse(init.body).model }); return new Response("", { status: 503 }); } }),
       (error) => error instanceof InferenceUnavailableError && error.status === 503);
-    assert.deepEqual([...new Set(requests)], [route("primaryFree")], "only the approved primary is asked");
+    assert.deepEqual([...new Set(requests.map((r) => r.url))], [route("primaryFree")], "only the approved primary is asked");
+    assert.deepEqual([...new Set(requests.map((r) => r.model))], [config.chatModels.lumen], "only the approved primary is asked");
   });
 
   test(`${name}: an approved, pinned fallback is used; changing its model revokes it`, async () => {
     approve("primaryFree");
     approve("secondaryFree");
-    const failPrimary = (requests) => async (url) => { requests.push(url); return url === route("primaryFree") ? new Response("", { status: 503 }) : success(); };
+    const failPrimary = (requests) => async (url, init) => {
+      const model = JSON.parse(init.body).model;
+      requests.push({ url, model });
+      return model === config.chatModels.lumen ? new Response("", { status: 503 }) : success();
+    };
 
     let requests = [];
     const served = await call("lumen", messages, undefined, { maxRetries: 0, fetchImpl: failPrimary(requests) });
     assert.equal(served.internalStage, "secondaryFree");
-    assert.deepEqual([...new Set(requests)], [route("primaryFree"), route("secondaryFree")], "the unapproved gateway is skipped");
+    assert.deepEqual(requests.map((r) => r.url), [route("primaryFree"), route("secondaryFree")]);
+    assert.deepEqual(requests.map((r) => r.model), [config.chatModels.lumen, config.chatModels.lumenFallback2], "the unapproved gateway is skipped");
 
     // The configured model changes; the approval still names the old one.
     config.chatModels.lumenFallback2 = "fixture-a-different-model";
     requests = [];
     await assert.rejects(call("lumen", messages, undefined, { maxRetries: 0, fetchImpl: failPrimary(requests) }), InferenceUnavailableError);
-    assert.deepEqual([...new Set(requests)], [route("primaryFree")], "the changed stage gets nothing");
+    assert.deepEqual(requests.map((r) => r.url), [route("primaryFree")]);
+    assert.deepEqual(requests.map((r) => r.model), [config.chatModels.lumen], "the changed stage gets nothing");
     assert.deepEqual(lumenStageApproval("secondaryFree"), { approved: false, reason: "pinned-model-mismatch" });
 
     // Approving the new model restores it.

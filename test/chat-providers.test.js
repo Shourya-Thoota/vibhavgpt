@@ -12,18 +12,22 @@ const endpoint = (stage) => `${config.providerBaseUrls[stage]}/chat/completions`
 
 beforeEach(() => {
   for (const key of Object.keys(MODEL_CONFIGS)) config.chatModels[key] = `fixture-${key}`;
-  config.providerKeys.paid = "fixture-key";
-  config.providerKeys.study = "fixture-key";
+  for (const key of ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree", "paid", "study", "direct"]) {
+    config.providerKeys[key] = `fixture-${key}-key`;
+  }
   config.lumenPrimaryApproved = true;
-  for (const key of ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"]) config.providerKeys[key] = "fixture-key";
   for (const key of ["lumenFallback1", "lumenFallback2", "lumenFallback3"]) config.chatModels[key] = `fixture-${key}`;
   approveLumenStages(config);
   config.nebulaDataPolicyVerified = true;
+  config.vesperDataPolicyVerified = true;
+  config.vesperTransport = "router";
+  config.routeProviders.nebula = [...NEBULA_PROVIDERS];
 });
 const messages = [{ role: "user", content: "Reply with OK" }];
 const answer = (usage = { prompt_tokens: 10, completion_tokens: 2 }) => Response.json({ choices: [{ message: { content: "OK" } }], usage });
 
 const lumenEndpoints = ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"].map(endpoint);
+const lumenStages = ["primaryFree", "gatewayFree", "secondaryFree", "reserveFree"];
 const lumenModels = ["lumen", "lumenFallback1", "lumenFallback2", "lumenFallback3"];
 function streamResponse(chunks) {
   return new Response(chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join(""), { headers: { "Content-Type": "text/event-stream" } });
@@ -61,26 +65,99 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
 }
 
 test("Lumen preserves Google's signed streaming tool calls only on Google replay", async () => {
-  const signedCall = { index: 0, id: "call-google", type: "function", function: { name: "weather", arguments: '{ "location": "London" }' }, extra_content: { google: { thought_signature: "opaque-signature" } } };
-  const result = await callModelStreaming("lumen", messages, undefined, {
-    fetchImpl: async (url) => url === lumenEndpoints[3]
-      ? streamResponse([{ choices: [{ delta: { tool_calls: [signedCall] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 2 } }])
-      : new Response("", { status: 429 }),
-  });
-  const replayCall = result.data.choices[0].message.tool_calls[0];
-  assert.deepEqual(replayCall.extra_content, signedCall.extra_content);
-  const history = [...messages, { role: "assistant", content: null, tool_calls: [replayCall] }, { role: "tool", tool_call_id: replayCall.id, content: "Weather is sunny" }];
-  for (const [call, success] of [[callModelWithFallback, answer], [callModelStreaming, streamAnswer]]) {
-    await call("lumen", history, undefined, { fetchImpl: async (url, init) => {
-      const body = JSON.parse(init.body);
-      if (url === lumenEndpoints[0]) {
-        assert.equal(body.messages[1].tool_calls, undefined);
-        assert.equal(body.messages[2].role, "system");
-      } else {
-        assert.deepEqual(body.messages[1].tool_calls[0].extra_content, url === lumenEndpoints[3] ? signedCall.extra_content : undefined);
-      }
-      return url === lumenEndpoints[3] ? success() : new Response("", { status: 429 });
-    } });
+  const previousReserveModel = config.chatModels.lumenFallback3;
+  const previousReserveApproval = config.lumenApprovals.reserve;
+  config.chatModels.lumenFallback3 = "google/gemini-2.5-flash";
+  config.lumenApprovals.reserve = { approved: true, model: "google/gemini-2.5-flash" };
+  try {
+    const signedCall = { index: 0, id: "call-google", type: "function", function: { name: "weather", arguments: '{ "location": "London" }' }, extra_content: { google: { thought_signature: "opaque-signature" } } };
+    const result = await callModelStreaming("lumen", messages, undefined, {
+      fetchImpl: async (url, init) => {
+        const body = JSON.parse(init?.body || "{}");
+        return body.model === config.chatModels.lumenFallback3
+          ? streamResponse([{ choices: [{ delta: { tool_calls: [signedCall] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 10, completion_tokens: 2 } }])
+          : new Response("", { status: 429 });
+      },
+    });
+    const replayCall = result.data.choices[0].message.tool_calls[0];
+    assert.deepEqual(replayCall.extra_content, signedCall.extra_content);
+    const history = [...messages, { role: "assistant", content: null, tool_calls: [replayCall] }, { role: "tool", tool_call_id: replayCall.id, content: "Weather is sunny" }];
+    for (const [call, success] of [[callModelWithFallback, answer], [callModelStreaming, streamAnswer]]) {
+      await call("lumen", history, undefined, { fetchImpl: async (url, init) => {
+        const body = JSON.parse(init.body);
+        if (body.model === config.chatModels.lumen) {
+          assert.equal(body.messages[1].tool_calls, undefined);
+          assert.equal(body.messages[2].role, "system");
+        } else {
+          assert.deepEqual(body.messages[1].tool_calls[0].extra_content, body.model === config.chatModels.lumenFallback3 ? signedCall.extra_content : undefined);
+        }
+        return body.model === config.chatModels.lumenFallback3 ? success() : new Response("", { status: 429 });
+      } });
+    }
+  } finally {
+    config.chatModels.lumenFallback3 = previousReserveModel;
+    config.lumenApprovals.reserve = previousReserveApproval;
+  }
+});
+
+test("a non-Google model on the reserve stage does NOT receive extra_content", async () => {
+  const previousReserveModel = config.chatModels.lumenFallback3;
+  const previousReserveApproval = config.lumenApprovals.reserve;
+  config.chatModels.lumenFallback3 = "meta-llama/llama-3.3-70b-instruct";
+  config.lumenApprovals.reserve = { approved: true, model: "meta-llama/llama-3.3-70b-instruct" };
+  try {
+    const signedCall = { index: 0, id: "call-google", type: "function", function: { name: "weather", arguments: '{ "location": "Paris" }' }, extra_content: { google: { thought_signature: "opaque-signature" } } };
+    const history = [...messages, { role: "assistant", content: null, tool_calls: [signedCall] }, { role: "tool", tool_call_id: signedCall.id, content: "Weather is cloudy" }];
+    let reserveBody;
+    await callModelWithFallback("lumen", history, undefined, {
+      maxRetries: 0,
+      fetchImpl: async (url, init) => {
+        const body = JSON.parse(init.body);
+        if (body.model === config.chatModels.lumenFallback3) {
+          reserveBody = body;
+          return answer();
+        }
+        return new Response("", { status: 429 });
+      },
+    });
+    assert.ok(reserveBody, "Reserve stage request must be sent");
+    assert.equal(reserveBody.model, "meta-llama/llama-3.3-70b-instruct");
+    assert.equal(reserveBody.messages[1].tool_calls[0].extra_content, undefined);
+  } finally {
+    config.chatModels.lumenFallback3 = previousReserveModel;
+    config.lumenApprovals.reserve = previousReserveApproval;
+  }
+});
+
+test("direct Google AI Studio model-ID formats (gemini-2.5-flash, models/gemini-2.5-flash) preserve extra_content", async () => {
+  const previousReserveModel = config.chatModels.lumenFallback3;
+  const previousReserveApproval = config.lumenApprovals.reserve;
+  const signedCall = { index: 0, id: "call-google", type: "function", function: { name: "weather", arguments: '{ "location": "Tokyo" }' }, extra_content: { google: { thought_signature: "direct-gemini-sig" } } };
+  const history = [...messages, { role: "assistant", content: null, tool_calls: [signedCall] }, { role: "tool", tool_call_id: signedCall.id, content: "Weather is clear" }];
+
+  for (const directModelId of ["gemini-2.5-flash", "models/gemini-2.5-flash"]) {
+    config.chatModels.lumenFallback3 = directModelId;
+    config.lumenApprovals.reserve = { approved: true, model: directModelId };
+    try {
+      let reserveBody;
+      await callModelWithFallback("lumen", history, undefined, {
+        maxRetries: 0,
+        fetchImpl: async (_url, init) => {
+          const body = JSON.parse(init.body);
+          if (body.model === directModelId) {
+            reserveBody = body;
+            return answer();
+          }
+          return new Response("", { status: 429 });
+        },
+      });
+      assert.ok(reserveBody, `Reserve request must be sent for ${directModelId}`);
+      assert.equal(reserveBody.model, directModelId);
+      assert.deepEqual(reserveBody.messages[1].tool_calls[0].extra_content, signedCall.extra_content, `extra_content preserved for ${directModelId}`);
+    } finally {
+      config.chatModels.lumenFallback3 = previousReserveModel;
+      config.lumenApprovals.reserve = previousReserveApproval;
+    }
   }
 });
 
@@ -95,7 +172,14 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
       assert.equal(result.data.choices[0].message.content, "OK");
       assert.deepEqual(requests.map((r) => r.url), lumenEndpoints.slice(0, successIndex + 1));
       assert.deepEqual(requests.map((r) => r.body.model), lumenModels.slice(0, successIndex + 1).map((key) => config.chatModels[key]));
-      for (const r of requests) { assert.equal(r.body.provider, undefined); assert.equal(r.headers.Authorization, "Bearer fixture-key"); }
+      for (let i = 0; i < requests.length; i++) {
+        const r = requests[i];
+        assert.equal(r.body.provider, undefined, "Lumen sends no router provider routing");
+        assert.equal(r.headers.Authorization, `Bearer ${config.providerKeys[lumenStages[i]]}`);
+        assert.notEqual(r.headers.Authorization, `Bearer ${config.providerKeys.paid}`, "Lumen never sends router key");
+        assert.notEqual(r.headers.Authorization, `Bearer ${config.providerKeys.study}`, "Lumen never sends Study key");
+        assert.notEqual(r.headers.Authorization, `Bearer ${config.providerKeys.direct}`, "Lumen never sends Direct key");
+      }
       if (successIndex > 0) assert.equal(requests[1].headers["X-Free-Fallback"], "false");
       assert.deepEqual(actions, [...Array.from({ length: successIndex }, () => ["reserve", "release"]).flat(), "reserve", { prompt_tokens: 10, completion_tokens: 2 }]);
     });
@@ -142,19 +226,26 @@ test("Lumen rejects an unapproved primary and skips missing routes without reque
   config.lumenPrimaryApproved = false;
   config.chatModels.lumenFallback1 = undefined;
   const requests = [];
-  await callModelWithFallback("lumen", messages, undefined, { fetchImpl: async (url) => { requests.push(url); return answer(); } });
-  assert.deepEqual(requests, [lumenEndpoints[2]]);
+  await callModelWithFallback("lumen", messages, undefined, { fetchImpl: async (url, init) => { requests.push({ url, body: JSON.parse(init.body) }); return answer(); } });
+  assert.deepEqual(requests.map((r) => r.url), [lumenEndpoints[2]]);
+  assert.deepEqual(requests.map((r) => r.body.model), [config.chatModels.lumenFallback2]);
 });
 
 test("a failed try without confirmed usage is released, never settled, and the Lumen fallback continues in both paths", async () => {
   for (const call of [callModelWithFallback, callModelStreaming]) {
     const urls = [];
+    const models = [];
     let reserves = 0, releases = 0;
-    await assert.rejects(call("lumen", messages, undefined, { fetchImpl: async (url) => { urls.push(url); throw new Error("transport interrupted"); },
+    await assert.rejects(call("lumen", messages, undefined, { fetchImpl: async (url, init) => {
+      urls.push(url);
+      models.push(JSON.parse(init.body).model);
+      throw new Error("transport interrupted");
+    },
       usageTracker: { beforeCall: async () => { reserves++; }, record: async () => assert.fail("no usage was confirmed, so nothing is settled"), release: async () => releases++ },
     }), /temporarily unavailable/);
     // Every route is tried (a retry each), instead of stopping at the first.
     assert.deepEqual([...new Set(urls)], lumenEndpoints);
+    assert.deepEqual([...new Set(models)], lumenModels.map((key) => config.chatModels[key]));
     assert.equal(releases, reserves, "every reservation is released");
   }
 });
@@ -203,12 +294,43 @@ test("streaming Nova keeps its price-sorted no-training shortlist through retrie
   }
 });
 
-test("Lumen's small primary omits unsupported tools and router-only parameters", async () => {
+test("Lumen's small primary omits unsupported tools when no connector route is required", async () => {
   let body;
   await callModelWithFallback("lumen", messages, [{ type: "function", function: { name: "fixture" } }], { reasoning: "high",
     fetchImpl: async (_url, init) => { body = JSON.parse(init.body); return answer(); },
   });
-  assert.equal(body.tools, undefined); assert.equal(body.reasoning, undefined); assert.equal(body.provider, undefined);
+  assert.equal(body.tools, undefined);
+  assert.equal(body.reasoning, undefined);
+  assert.equal(body.provider, undefined);
+});
+
+test("a selected connector skips Lumen's no-tool primary and sends tools to an approved fallback", async () => {
+  for (const call of [callModelWithFallback, callModelStreaming]) {
+    const requests = [];
+    await call("lumen", messages, [{ type: "function", function: { name: "google_drive_upload_file" } }], { reasoning: "high", requireToolRoute: true,
+      fetchImpl: async (url, init) => {
+        requests.push({ url, body: JSON.parse(init.body) });
+        return call === callModelStreaming ? streamAnswer() : answer();
+      },
+    });
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].url, endpoint("gatewayFree"));
+    assert.equal(requests[0].body.tools[0].function.name, "google_drive_upload_file");
+    assert.equal(requests[0].body.tool_choice, "auto");
+  }
+});
+
+test("Lumen refuses a selected connector when every usable stage cannot call tools", async () => {
+  for (const stage of ["gateway", "secondary", "reserve"]) config.lumenApprovals[stage] = { approved: false, model: "unapproved" };
+  let calls = 0;
+  await assert.rejects(
+    callModelWithFallback("lumen", messages, [{ type: "function", function: { name: "google_drive_upload_file" } }], {
+      requireToolRoute: true,
+      fetchImpl: async () => { calls += 1; return answer(); },
+    }),
+    (error) => error.code === "tools-unsupported" && /Choose another model/.test(error.message) && !/Nova|Nebula/.test(error.message),
+  );
+  assert.equal(calls, 0);
 });
 
 for (const key of ["nova"]) {
@@ -292,14 +414,94 @@ test("a chosen thinking effort is requested with its thinking returned on every 
   }
 });
 
-test("Nebula and Vesper use configured models with the no-collection filter", async () => {
-  for (const key of ["nebula", "vesper"]) {
-    let body;
-    await callModelWithFallback(key, messages, undefined, { reasoning: false, fetchImpl: async (_url, init) => { body = JSON.parse(init.body); return answer(); } });
-    assert.equal(body.model, config.chatModels[key]);
-    assert.equal(body.provider.allow_fallbacks, key === "nebula");
-    assert.equal(body.provider.data_collection, "deny");
-    assert.deepEqual(body.reasoning, { enabled: false, exclude: true });
+test("Nebula uses no-collection filter on OpenRouter; Vulcan supports router privacy filter and direct store:false", async () => {
+  config.chatModels.nebula = "google/gemini-3.8-flash";
+  let nebulaBody;
+  await callModelWithFallback("nebula", messages, undefined, { reasoning: false, fetchImpl: async (_url, init) => { nebulaBody = JSON.parse(init.body); return answer(); } });
+  assert.equal(nebulaBody.model, "google/gemini-3.8-flash");
+  assert.equal(nebulaBody.provider.allow_fallbacks, true);
+  assert.equal(nebulaBody.provider.data_collection, "deny");
+  assert.deepEqual(nebulaBody.reasoning, { effort: "low", exclude: true });
+
+  // Default router transport preserves no-collection filter
+  config.vesperTransport = "router";
+  config.chatModels.vesper = "x-ai/grok-4.7";
+  let routerBody;
+  await callModelWithFallback("vesper", messages, undefined, { reasoning: false, fetchImpl: async (_url, init) => { routerBody = JSON.parse(init.body); return answer(); } });
+  assert.equal(routerBody.model, "x-ai/grok-4.7");
+  assert.equal(routerBody.provider.allow_fallbacks, false);
+  assert.equal(routerBody.provider.data_collection, "deny");
+
+  // Direct transport uses direct Responses API with store: false
+  config.vesperTransport = "direct";
+  config.chatModels.vesperDirect = "gpt-6.1-terra";
+  let vesperBody;
+  await callModelWithFallback("vesper", messages, undefined, { reasoning: false, fetchImpl: async (_url, init) => { vesperBody = JSON.parse(init.body); return answer(); } });
+  assert.equal(vesperBody.model, "gpt-6.1-terra");
+  assert.equal(vesperBody.store, false);
+  assert.equal(vesperBody.provider, undefined);
+  assert.deepEqual(vesperBody.reasoning, { effort: "none" });
+});
+
+test("Nebula supports vision inputs, uses router credentials, and enforces provider allowlist", async () => {
+  config.chatModels.nebula = "google/gemini-3.8-flash";
+  config.providerKeys.paid = "test-router-key";
+  config.providerKeys.direct = "should-not-be-used";
+  config.providerKeys.primaryFree = "should-not-be-used";
+  const vision = [{ role: "user", content: [{ type: "text", text: "Inspect diagram" }, { type: "image_url", image_url: { url: "data:image/png;base64,mock" } }] }];
+  let requestUrl, requestInit;
+  await callModelWithFallback("nebula", vision, undefined, { fetchImpl: async (url, init) => {
+    requestUrl = url;
+    requestInit = init;
+    return answer();
+  } });
+  assert.equal(requestUrl, endpoint("paid"));
+  assert.equal(requestInit.headers.Authorization, "Bearer test-router-key");
+  const body = JSON.parse(requestInit.body);
+  assert.equal(body.model, "google/gemini-3.8-flash");
+  assert.deepEqual(body.messages, vision);
+  assert.deepEqual(body.provider, { only: NEBULA_PROVIDERS, sort: "price", allow_fallbacks: true, data_collection: "deny" });
+});
+
+test("Nebula preserves Google signed streaming tool calls across the tool loop", async () => {
+  config.chatModels.nebula = "google/gemini-3.8-flash";
+  const signedCall = { index: 0, id: "call-gemini", type: "function", function: { name: "weather", arguments: '{"location":"Tokyo"}' }, extra_content: { google: { thought_signature: "gemini-sig-456" } } };
+  const result = await callModelStreaming("nebula", messages, undefined, {
+    fetchImpl: async () => streamResponse([{ choices: [{ delta: { tool_calls: [signedCall] }, finish_reason: "tool_calls" }], usage: { prompt_tokens: 15, completion_tokens: 3 } }]),
+  });
+  const replayCall = result.data.choices[0].message.tool_calls[0];
+  assert.deepEqual(replayCall.extra_content, signedCall.extra_content);
+  const history = [...messages, { role: "assistant", content: null, tool_calls: [replayCall] }, { role: "tool", tool_call_id: replayCall.id, content: "Rainy, 18C" }];
+  let replayedBody;
+  await callModelWithFallback("nebula", history, undefined, { fetchImpl: async (_url, init) => {
+    replayedBody = JSON.parse(init.body);
+    return answer();
+  } });
+  assert.equal(replayedBody.model, "google/gemini-3.8-flash");
+  assert.deepEqual(replayedBody.messages[1].tool_calls[0].extra_content, signedCall.extra_content);
+});
+
+test("Nebula privacy gate fails closed when route providers are unconfigured or unverified", async () => {
+  config.chatModels.nebula = "google/gemini-3.8-flash";
+  try {
+    // Unverified data policy blocks
+    config.nebulaDataPolicyVerified = false;
+    config.routeProviders.nebula = ["google-vertex"];
+    await assert.rejects(callModelWithFallback("nebula", messages, undefined, { fetchImpl: async () => answer() }), /temporarily unavailable/);
+
+    // Empty provider allowlist blocks even if verified
+    config.nebulaDataPolicyVerified = true;
+    config.routeProviders.nebula = [];
+    await assert.rejects(callModelWithFallback("nebula", messages, undefined, { fetchImpl: async () => answer() }), /temporarily unavailable/);
+
+    // Verified + configured succeeds
+    config.routeProviders.nebula = ["google-vertex"];
+    let called = false;
+    await callModelWithFallback("nebula", messages, undefined, { fetchImpl: async () => { called = true; return answer(); } });
+    assert.ok(called);
+  } finally {
+    config.routeProviders.nebula = [...NEBULA_PROVIDERS];
+    config.nebulaDataPolicyVerified = true;
   }
 });
 
@@ -315,10 +517,11 @@ test("permanent errors and exhausted deadlines do not retry or expose upstream e
 });
 
 test("all public identities and product facts contain only branded model names and token allowances", () => {
-  assert.deepEqual(Object.keys(MODEL_CONFIGS), ["lumen", "nova", "study", "nebula", "vesper"]);
-  for (const [key, model] of Object.entries(MODEL_CONFIGS)) {
+  // Slice 7: Zenith is a house tier; its prompt is held to the same checks (its engine's names are in providerTermsPattern's terms).
+  assert.deepEqual(Object.keys(MODEL_CONFIGS), ["lumen", "nova", "study", "nebula", "vesper", "zenith", "tecton"]);
+  for (const [key, model] of Object.entries(MODEL_CONFIGS).filter(([key]) => !["nova", "nebula"].includes(key))) {
     const prompt = buildIdentitySystemPrompt(key);
-    assert.ok(prompt.includes(model.displayName));
+    assert.ok(prompt.includes(model.displayName), key);
     assert.match(prompt, /rolling 5-hour token caps/);
     assert.doesNotMatch(prompt, /Halo|\u2014/);
     assert.doesNotMatch(prompt, providerTermsPattern);
@@ -347,6 +550,7 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
     const large = [{ role: "system", content: "x".repeat(18_000) }, ...messages];
     const requests = await send(large, 2_048);
     assert.deepEqual(requests.map((r) => r.url), [lumenEndpoints[1]]);
+    assert.equal(requests[0].body.model, config.chatModels.lumenFallback1);
     assert.equal(requests[0].body.max_tokens, 2_048);
     // Other models keep whatever budget they are given.
     config.chatModels.lumen = "fixture-lumen";
@@ -357,7 +561,7 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
 
 test("the generated-image byline follows the model naming and is never a model key", async () => {
   const { IMAGE_DISPLAY_NAME, getModelConfig } = await import("../src/chat/providers.js");
-  assert.equal(IMAGE_DISPLAY_NAME, "VibhavGPT Image");
+  assert.equal(IMAGE_DISPLAY_NAME, "VibhavGPT Prism");
   for (const model of Object.values(MODEL_CONFIGS)) assert.match(model.displayName, /^VibhavGPT [A-Z][a-z]+$/);
   assert.match(IMAGE_DISPLAY_NAME, /^VibhavGPT [A-Z][a-z]+$/);
   assert.doesNotMatch(IMAGE_DISPLAY_NAME, providerTermsPattern);
@@ -367,7 +571,7 @@ test("the generated-image byline follows the model naming and is never a model k
   const { readFile } = await import("node:fs/promises");
   const router = await readFile(new URL("../src/chat/router.js", import.meta.url), "utf8");
   assert.match(router, /model: IMAGE_DISPLAY_NAME,/);
-  assert.doesNotMatch(router, /"VibhavGPT Image"/, "the label is defined once, beside the model names");
+  assert.doesNotMatch(router, /"VibhavGPT Prism"/, "the label is defined once, beside the model names");
 });
 
 test("every actual attempt reserves and settles its own API usage, including empty-response retries", async () => {
@@ -444,13 +648,13 @@ for (const [name, call, success] of [["non-streaming", callModelWithFallback, an
   });
 }
 
-test("Vesper recovers finalized usage when the last SSE frame omits it", async () => {
+test("OpenRouter recovers finalized usage when the last SSE frame omits it", async () => {
   const recorded = [];
-  const result = await callModelStreaming("vesper", messages, undefined, {
+  const result = await callModelStreaming("nebula", messages, undefined, {
     usageTracker: { beforeCall: async () => {}, record: async (usage) => recorded.push(usage) },
     fetchImpl: async (url, init) => {
       if (url.includes("/generation?")) {
-        assert.equal(init.headers.Authorization, "Bearer fixture-key");
+        assert.equal(init.headers.Authorization, `Bearer ${config.providerKeys.paid}`);
         return Response.json({ data: { finish_reason: "stop", native_tokens_prompt: 123, native_tokens_completion: 12 } });
       }
       // The final frame is valid even without a trailing newline.
@@ -461,9 +665,9 @@ test("Vesper recovers finalized usage when the last SSE frame omits it", async (
   assert.deepEqual(recorded, [{ prompt_tokens: 123, completion_tokens: 12 }]);
 });
 
-test("Vesper premature EOF is a failure, but confirmed consumed tokens are settled", async () => {
+test("OpenRouter premature EOF is a failure, but confirmed consumed tokens are settled", async () => {
   const recorded = [], visible = [];
-  await assert.rejects(callModelStreaming("vesper", messages, undefined, {
+  await assert.rejects(callModelStreaming("nebula", messages, undefined, {
     onDelta: (text) => { visible.push(text); return true; },
     usageTracker: { beforeCall: async () => {}, record: async (usage) => recorded.push(usage), release: async () => {} },
     fetchImpl: async (url) => url.includes("/generation?")
@@ -474,10 +678,10 @@ test("Vesper premature EOF is a failure, but confirmed consumed tokens are settl
   assert.deepEqual(recorded, [{ prompt_tokens: 30, completion_tokens: 8 }]);
 });
 
-test("completed Vesper code survives a 404 followed by delayed finalized usage", async () => {
+test("completed OpenRouter code survives a 404 followed by delayed finalized usage", async () => {
   let inferenceCalls = 0, lookups = 0;
   const recorded = [];
-  const result = await callModelStreaming("vesper", messages, undefined, {
+  const result = await callModelStreaming("nebula", messages, undefined, {
     usageTracker: { beforeCall: async () => {}, record: async (usage) => recorded.push(usage) },
     fetchImpl: async (url) => {
       if (url.includes("/generation?")) {
@@ -500,7 +704,7 @@ test("metadata recovery stops on cancellation and does not retry authentication 
   for (const cancel of [false, true]) {
     const controller = new AbortController();
     let lookups = 0;
-    const result = await callModelStreaming("vesper", messages, undefined, {
+    const result = await callModelStreaming("nebula", messages, undefined, {
       signal: controller.signal,
       fetchImpl: async (url) => {
         if (url.includes("/generation?")) {
@@ -518,7 +722,7 @@ test("metadata recovery stops on cancellation and does not retry authentication 
 
 test("metadata recovery shares the inference deadline and never estimates missing usage", async () => {
   let lookups = 0;
-  const result = await callModelStreaming("vesper", messages, undefined, {
+  const result = await callModelStreaming("nebula", messages, undefined, {
     deadlineAt: Date.now() + 80,
     fetchImpl: async (url) => {
       if (url.includes("/generation?")) { lookups++; return Response.json({}, { status: 404 }); }
@@ -533,7 +737,7 @@ test("running or unavailable metadata never turns unconfirmed consumption into f
   const { replyTokenEstimate, requestTokenEstimate } = await import("../src/chat/context-window.js");
   for (const data of [{ native_tokens_prompt: 30, native_tokens_completion: 8 }, { finish_reason: "stop", native_tokens_prompt: null, native_tokens_completion: null }]) {
     const settled = [];
-    const result = await callModelStreaming("vesper", messages, undefined, {
+    const result = await callModelStreaming("nebula", messages, undefined, {
       usageTracker: { beforeCall: async () => {}, record: async (usage) => { settled.push(usage); }, release: async () => assert.fail("a delivered reply is settled, not released") },
       fetchImpl: async (url) => url.includes("/generation?") ? Response.json({ data }) : streamResponse([{ id: "gen-pending", choices: [{ delta: { content: "partial" }, finish_reason: "stop" }] }]),
     });

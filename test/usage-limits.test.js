@@ -10,12 +10,18 @@ const { VISION_IMAGE_TOKEN_ESTIMATE } = await import("../src/chat/context-window
 
 const blank = (tier = "free") => ({ tier, tokenBreakdown: {}, rollingTokenBreakdown: {}, reservedTokenBreakdown: {}, creditBalance: 99999, periodEndsAt: new Date("2026-11-01T00:00:00Z") });
 test("every plan has the exact monthly and 5-hour caps", () => {
-  assert.deepEqual(Object.values(LIMITS.free).map(({monthly, rolling}) => [monthly, rolling]), [[1e6,1e5],[1e6,1e5],[5e5,5e4],[0,0],[0,0]]);
-  assert.deepEqual(Object.values(LIMITS.plus).map(({monthly, rolling}) => [monthly, rolling]), [[8e6,8e5],[8e6,8e5],[4e6,4e5],[1.5e6,1.5e5],[3e5,3e4]]);
-  assert.deepEqual(Object.values(LIMITS.pro).map(({monthly, rolling}) => [monthly, rolling]), [[12e6,1.2e6],[12e6,1.2e6],[6e6,6e5],[3e6,3e5],[8e5,8e4]]);
-  assert.equal(GENERATION_LIMITS.plus.images, 25);
-  assert.equal(GENERATION_LIMITS.pro.images, 60);
-  assert.deepEqual(VOICE_LIMITS, { free: 0, plus: 10, pro: 30, paid: 30 });
+  assert.deepEqual(Object.values(LIMITS.free).map(({monthly, rolling}) => [monthly, rolling]), [[1e6,1e5],[1e6,1e5],[5e5,5e4],[0,0],[0,0],[0,0],[0,0]]);
+  assert.deepEqual(Object.values(LIMITS.plus).map(({monthly, rolling}) => [monthly, rolling]), [[8e6,8e5],[8e6,8e5],[4e6,4e5],[1.5e6,1.5e5],[0,0],[0,0],[0,0]]);
+  assert.deepEqual(Object.values(LIMITS.pro).map(({monthly, rolling}) => [monthly, rolling]), [[12e6,1.2e6],[12e6,1.2e6],[6e6,6e5],[3e6,3e5],[8e5,8e4],[0,0],[2e6,2e5]]);
+  // Tecton (Build, 2026-11-14): Pro and Max only.
+  assert.deepEqual([LIMITS.max.tecton.monthly, LIMITS.pro.tecton.monthly, LIMITS.plus.tecton.monthly, LIMITS.free.tecton.monthly], [5e6, 2e6, 0, 0]);
+  // Zenith (Slice 7): Max only. Free, Plus and Pro have no Zenith allowance; Max has one.
+  assert.deepEqual([LIMITS.max.zenith.monthly > 0, LIMITS.pro.zenith.monthly, LIMITS.plus.zenith.monthly, LIMITS.free.zenith.monthly], [true, 0, 0, 0]);
+  assert.equal(GENERATION_LIMITS.plus.images, 100);
+  assert.equal(GENERATION_LIMITS.pro.images, 400);
+  assert.equal(GENERATION_LIMITS.free.images, 2);
+  assert.equal(GENERATION_LIMITS.max.images, 1500);
+  assert.deepEqual(VOICE_LIMITS, { free: 0, plus: 10, pro: 30, paid: 30, max: 30 });
   assert.equal(creditsForImage(), 3);
   assert.equal(creditsForVoiceSeconds(60), 15);
 });
@@ -40,9 +46,11 @@ test("models and users have independent allowances and pending budgets prevent o
 });
 test("cached and reasoning details are subsets of provider token totals", () => {
   const usage = { prompt_tokens: 1000, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 400 }, completion_tokens_details: { reasoning_tokens: 100 } };
-  assert.deepEqual(normalizedProviderUsage(usage), { inputTokens: 1000, outputTokens: 200, cachedInputTokens: 400, reasoningTokens: 100 });
+  assert.deepEqual(normalizedProviderUsage(usage), { inputTokens: 1000, outputTokens: 200, cachedInputTokens: 400, cacheWriteInputTokens: 0, reasoningTokens: 100 });
+  // Prompt-cache writes (Responses usage, input_tokens_details.cache_write_tokens) are carried for billing at the write rate.
+  assert.equal(normalizedProviderUsage({ input_tokens: 1000, output_tokens: 10, input_tokens_details: { cached_tokens: 100, cache_write_tokens: 600 } }).cacheWriteInputTokens, 600);
   assert.equal(actualApiCostUsd("study", usage), (600 * 0.1 + 400 * 0.01 + 200 * 0.5) / 1e6);
-  assert.deepEqual(normalizedProviderUsage({ input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 40 } }), { inputTokens: 100, outputTokens: 20, cachedInputTokens: 40, reasoningTokens: 0 });
+  assert.deepEqual(normalizedProviderUsage({ input_tokens: 100, output_tokens: 20, input_tokens_details: { cached_tokens: 40 } }), { inputTokens: 100, outputTokens: 20, cachedInputTokens: 40, cacheWriteInputTokens: 0, reasoningTokens: 0 });
 });
 test("token windows handle month, year, leap-day, and exact rolling boundaries", () => {
   for (const [time, start, end] of [["2026-12-31T23:59:59Z", "2026-12-01T00:00:00Z", "2027-01-01T00:00:00Z"], ["2028-02-29T12:00:00Z", "2028-02-01T00:00:00Z", "2028-03-01T00:00:00Z"]]) {
@@ -54,7 +62,7 @@ test("token windows handle month, year, leap-day, and exact rolling boundaries",
 test("Lumen cost estimates use paid fallback rates without assuming cached-input discounts", () => {
   assert.equal(actualApiCostUsd("lumen", { prompt_tokens: 1000, completion_tokens: 200 }), (1000 * 0.30 + 200 * 2.50) / 1e6);
   assert.equal(actualApiCostUsd("lumen", { prompt_tokens: 1000, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 400 } }), (1000 * 0.30 + 200 * 2.50) / 1e6);
-  assert.equal(actualApiCostUsd("nova", { prompt_tokens: 1000, completion_tokens: 200 }), (1000 * 0.14 + 200 * 0.42) / 1e6);
+  assert.equal(actualApiCostUsd("nova", { prompt_tokens: 1000, completion_tokens: 200 }), (1000 * 0.10 + 200 * 0.50) / 1e6);
 });
 
 async function fixture() {
@@ -97,7 +105,20 @@ test("historical Spark tokens and holds share the Lumen pool and new alias reser
     assert.equal(usage.reservedTokenBreakdown.lumen, 17000);
     assert.equal(usage.rollingReservedTokenBreakdown.lumen, 17000);
     assert.equal(usage.tokenBreakdown.spark, undefined);
-    await assert.rejects(reserveUsage("a", "lumen", "normal", 1001, f.db, now), /Lumen limit/);
+    // Seed customer models (lumen) skip legacy token-pool checkUsageLimit and use MTAB.
+    // Exhaust free MTAB so the shared Spark/Lumen financial path still rejects.
+    await f.db.insert(usageEvents).values({
+      userId: "a",
+      model: "lumen",
+      costMicros: 250_000,
+      inputTokens: 1,
+      outputTokens: 1,
+      createdAt: now,
+    });
+    await assert.rejects(
+      () => reserveUsage("a", "lumen", "normal", 1001, f.db, now),
+      (err) => err.code === "allowance_exceeded" || /allowance|used up|Lumen limit/i.test(String(err.message || err)),
+    );
     for (const key of ["spark", "lumen"]) {
       const event = await reserveUsage("b", key, "normal", 100, f.db, now);
       const stored = (await f.db.select().from(usageEvents)).find((row) => row.id === event.id);
@@ -155,22 +176,29 @@ test("each image holds the context window's fixed estimate, whatever its encoded
   assert.ok(small - none >= 4_096 && small - none < 4_096 + 20, `one image adds ${small - none}`);
   assert.ok(two - none >= 8_192 && two - none < 8_192 + 40, `two images add ${two - none}`);
 });
-test("a standard Vesper image request is held well below the Plus 5-hour cap", async () => {
+test("a standard Vulcan image request is held well below the Pro 5-hour cap", async () => {
   const { buildIdentitySystemPrompt } = await import("../src/chat/prompts.js");
   const { CHAT_TOOLS } = await import("../src/chat/tool-calls.js");
+  const { filterToolsForEnabledConnectors } = await import("../src/chat/router.js");
   const messages = [
     { role: "system", content: buildIdentitySystemPrompt("vesper") },
     { role: "user", content: [{ type: "text", text: "What is in this picture?" }, { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } }] },
   ];
+  // A standard request sends only the tools that do not need an enabled connector.
+  const standardTools = filterToolsForEnabledConnectors(CHAT_TOOLS, { connectorEnabled: {} });
   // responseTokenBudget's output budgets for normal, high and max effort.
   for (const [effort, maxTokens] of [["normal", 2_048], ["high", 4_096], ["max", 8_192]]) {
-    const hold = inferenceTokenBudget(messages, CHAT_TOOLS, maxTokens);
-    // A normal-effort image prompt fits twice in Plus's 5-hour window; every
-    // effort fits in the whole window and in 46% of Pro's.
-    if (effort === "normal") assert.ok(hold < LIMITS.plus.vesper.rolling / 2, `normal: ${hold} is under half of Plus's ${LIMITS.plus.vesper.rolling}`);
-    assert.ok(hold < LIMITS.plus.vesper.rolling, `${effort}: ${hold} is under Plus's ${LIMITS.plus.vesper.rolling}`);
-    assert.ok(hold < LIMITS.pro.vesper.rolling * 0.46, `${effort}: ${hold} fits in 46% of Pro's ${LIMITS.pro.vesper.rolling}`);
+    const hold = inferenceTokenBudget(messages, standardTools, maxTokens);
+    // Vulcan is on Pro (not Plus), so Pro's 5-hour window is the one that matters: a normal-effort image prompt
+    // is held to well under 60% of it, and every effort fits in under half of it.
+    if (effort === "normal") {
+      assert.ok(hold < LIMITS.pro.vesper.rolling * 0.6, `normal: ${hold} is under 60% of Pro's ${LIMITS.pro.vesper.rolling}`);
+    }
+    assert.ok(hold < LIMITS.pro.vesper.rolling, `${effort}: ${hold} is under Pro's ${LIMITS.pro.vesper.rolling}`);
+    assert.ok(hold < LIMITS.pro.vesper.rolling * 0.5, `${effort}: ${hold} fits in half of Pro's ${LIMITS.pro.vesper.rolling}`);
   }
+  const fullHold = inferenceTokenBudget(messages, CHAT_TOOLS, 2_048);
+  assert.ok(fullHold < LIMITS.pro.vesper.rolling, `the full connector directory still fits in Pro's window (${fullHold})`);
 });
 test("failed generations refund reserved credits exactly once", async () => {
   const f = await fixture();
@@ -290,14 +318,15 @@ test("Plus monthly limits reset on the subscription billing-date anniversary", (
   );
 });
 
-test("Nebula estimates the highest verified route rates without a cache discount or quota change", () => {
+test("Nebula estimates current endpoint route rates with cache read pricing and no quota change", () => {
   const usage = { prompt_tokens: 1000, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 400 } };
-  assert.equal(actualApiCostUsd("nebula", usage), (1000 * 0.65 + 200 * 3.41) / 1e6);
+  assert.equal(actualApiCostUsd("nebula", usage), (600 * 0.75 + 200 * 3.75 + 400 * 0.075) / 1e6);
+  assert.equal(actualApiCostUsd("vesper", usage), (600 * 1.00 + 200 * 5.00 + 400 * 0.05) / 1e6);
   assert.deepEqual(LIMITS.plus.nebula, { monthly: 1500000, rolling: 150000 });
   assert.deepEqual(LIMITS.pro.nebula, { monthly: 3000000, rolling: 300000 });
 });
 
-test("the same pending-inclusive totals drive Vesper blocking and public quota metadata", () => {
+test("the same pending-inclusive totals drive Vulcan blocking and public quota metadata", () => {
   const usage = { ...blank("pro"), rollingTokenBreakdown: { vesper: { total: 16682 } }, rollingReservedTokenBreakdown: { vesper: 34894 }, nextRollingTokenReleaseAt: { vesper: new Date("2026-10-04T22:00:00Z") } };
   assert.doesNotThrow(() => checkUsageLimit(usage, "vesper", 28424));
   assert.throws(() => checkUsageLimit(usage, "vesper", 28425), (error) => error.window === "rolling" && error.requestTooLarge && error.pending === 34894 && error.used === 51576 && error.limit === 80000 && error.percentage === 64 && error.resetAt === "2026-10-04T22:00:00.000Z");

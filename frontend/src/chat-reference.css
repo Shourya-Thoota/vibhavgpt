@@ -1,0 +1,663 @@
+/* ==========================================================================
+   The chat interface, drawn to the owner's reference screenshot.
+
+   Every size, position and colour here was measured from that screenshot
+   (1900 by 991) rather than estimated: the sidebar is 351px of white against
+   an off-white page; rows are 40px pills with 20px icons at x 14 and text at
+   x 51; the greeting is about 49.5px; the composer is a solid white pill,
+   825 by 80; the tabs and three suggestion rows sit under it on a pale blue
+   glow. Text is set in Google Sans (SIL Open Font License, self-hosted: see
+   fonts/README.md), at the sizes that reproduce the reference's text widths.
+
+   It is one stylesheet, imported last, scoped under .workspace so it wins over
+   the shared rules without editing them. Nothing here changes behaviour.
+   ========================================================================== */
+
+/* --- Type ------------------------------------------------------------------ */
+
+@font-face {
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("./fonts/GoogleSans-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* --- Tokens ---------------------------------------------------------------- */
+
+/* The app's one font stack (self-hosted Google Sans, see fonts/README.md), set at the root so portalled menus, pickers and sheets
+   match the workspace text. */
+:root {
+  --font-app: "Google Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-ui: var(--font-app);
+}
+
+/* By day (the reference). */
+.workspace {
+  --ref-font: var(--font-app);
+  --ref-side: var(--color-paper-2);
+  --ref-main: var(--color-paper);
+  --ref-row: var(--color-paper-3); /* the selected row */
+  --ref-text: var(--color-ink);
+  --ref-title: var(--color-ink);
+  --ref-label: var(--color-muted); /* section labels, the plan under the name */
+  --ref-placeholder: var(--color-faint);
+  --ref-composer: var(--color-paper-2);
+  --ref-composer-shadow: 0 1px 3px rgb(60 64 67 / 0.14), 0 2px 10px rgb(60 64 67 / 0.09);
+  --ref-seg: var(--color-paper-2); /* the selected tab */
+  /* Fitted to the reference's background pixels (36,000 of them, outside the text and controls): the centre, the radii and the stops are its measured radial profile; the mean error is 1.3 of 255 per channel. */
+  --ref-glow-shape: 62.4% 56.8% at 52.1% 54%;
+  --ref-glow-stops: color-mix(in srgb, var(--color-accent) 24%, #ffffff) 0%, color-mix(in srgb, var(--color-accent) 22%, #ffffff) 8%, color-mix(in srgb, var(--color-accent) 20%, #ffffff) 15%, color-mix(in srgb, var(--color-accent) 18%, #ffffff) 23%, color-mix(in srgb, var(--color-accent) 16%, #ffffff) 30%, color-mix(in srgb, var(--color-accent) 12%, #ffffff) 38%, color-mix(in srgb, var(--color-accent) 10%, #ffffff) 45%, color-mix(in srgb, var(--color-accent) 7%, #ffffff) 53%, color-mix(in srgb, var(--color-accent) 5%, #ffffff) 60%, color-mix(in srgb, var(--color-accent) 3.5%, #ffffff) 68%, color-mix(in srgb, var(--color-accent) 2%, #ffffff) 75%, color-mix(in srgb, var(--color-accent) 1%, #ffffff) 83%, color-mix(in srgb, var(--color-accent) 0.5%, #ffffff) 90%, color-mix(in srgb, var(--color-accent) 0%, #ffffff) 100%;
+  --ref-glow: radial-gradient(ellipse var(--ref-glow-shape), var(--ref-glow-stops));
+  /* The reading scrim under the conversation while the contour background is on (chat-topography.css): the sky's own paper colour,
+     part-strength, and a slight softening of the lines beneath the text. Set from worst-case contrast measurements over the animation
+     (test/browser-readability.test.js), so every text zone keeps at least 4.5:1. */
+  --ref-reading-scrim: color-mix(in srgb, var(--color-paper) 52%, transparent);
+  /* A soft glass blur over the whole chat viewport (chat-topography.css): the lines read as frosted, never as sharp detail under text. */
+  --ref-reading-blur: 6px;
+}
+/* By night: the same shapes on warm charcoal. */
+:root:not([data-theme="light"]) .workspace {
+  --ref-side: var(--color-paper-2);
+  --ref-main: var(--color-paper);
+  --ref-row: var(--color-paper-4);
+  --ref-text: var(--color-ink);
+  --ref-title: var(--color-ink);
+  --ref-label: var(--color-muted);
+  --ref-placeholder: var(--color-faint);
+  --ref-composer: var(--color-paper-raised);
+  --ref-composer-shadow: 0 0 0 1px rgb(255 255 255 / 0.09), 0 2px 12px rgb(0 0 0 / 0.35);
+  --ref-seg: var(--color-paper-3);
+  --ref-reading-scrim: color-mix(in srgb, var(--color-paper) 58%, transparent);
+  --ref-glow-stops: color-mix(in srgb, var(--color-accent) 50%, transparent) 0%, color-mix(in srgb, var(--color-accent) 47%, transparent) 8%, color-mix(in srgb, var(--color-accent) 44.5%, transparent) 15%, color-mix(in srgb, var(--color-accent) 39%, transparent) 23%, color-mix(in srgb, var(--color-accent) 35%, transparent) 30%, color-mix(in srgb, var(--color-accent) 27%, transparent) 38%, color-mix(in srgb, var(--color-accent) 21.5%, transparent) 45%, color-mix(in srgb, var(--color-accent) 16.5%, transparent) 53%, color-mix(in srgb, var(--color-accent) 11%, transparent) 60%, color-mix(in srgb, var(--color-accent) 7.5%, transparent) 68%, color-mix(in srgb, var(--color-accent) 4.5%, transparent) 75%, color-mix(in srgb, var(--color-accent) 3%, transparent) 83%, color-mix(in srgb, var(--color-accent) 2%, transparent) 90%, color-mix(in srgb, var(--color-accent) 0%, transparent) 100%;
+}
+:root[data-theme="light"] .workspace {
+  --ref-side: var(--color-paper-2);
+}
+
+/* The sidebar is 295px at a 1900px window: the reference's 351px, scaled to 0.84 with the rest of the app. The width spring reads --sidebar-w as a plain number, so it is
+   stepped by screen width in pixels rather than computed with clamp(). */
+@media (min-width: 761px) { .workspace:not([data-collapsed="true"]) { --sidebar-w: 235px; } }
+@media (min-width: 1440px) { .workspace:not([data-collapsed="true"]) { --sidebar-w: 252px; } }
+@media (min-width: 1600px) { .workspace:not([data-collapsed="true"]) { --sidebar-w: 274px; } }
+@media (min-width: 1800px) { .workspace:not([data-collapsed="true"]) { --sidebar-w: 295px; } }
+
+/* --- The sidebar ----------------------------------------------------------- */
+
+.workspace .sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  gap: 0;
+  padding: 17px 8.5px 6.5px 2px;
+  border-right: 0;
+  background: color-mix(in srgb, var(--ref-side) 80%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  scrollbar-width: none;
+}
+.workspace .sidebar::-webkit-scrollbar { display: none; }
+
+/* The brand: small and quiet, where the reference has its own. */
+.workspace .sidebar__head { min-height: 33.5px; margin-bottom: 17.5px; padding: 0 2.5px 0 6.5px; }
+.workspace .sidebar__brand { gap: 10px; color: var(--ref-text); font-family: var(--ref-font); font-size: 20px; font-weight: 500; letter-spacing: 0; }
+.workspace .sidebar__brand img { width: 22px; height: 22px; }
+.workspace .sidebar__toggle { width: 33.5px; height: 33.5px; color: #444746; }
+:root:not([data-theme="light"]) .workspace .sidebar__toggle { color: var(--ref-label); }
+.workspace .sidebar__toggle svg { width: 18.5px; height: 18.5px; stroke-width: 1.5; }
+
+/* Rows: 40px pills; the icon at x 14, the text at x 51. */
+.workspace .sidebar__new,
+.workspace .sidebar__link,
+.workspace .library__new {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14.5px;
+  width: 100%;
+  min-height: 33.5px;
+  height: 33.5px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 17px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-align: left;
+  filter: none;
+}
+.workspace .sidebar__new svg,
+.workspace .sidebar__link svg,
+.workspace .library__new svg { flex: 0 0 auto; width: 17px; height: 17px; color: var(--ref-text); }
+.workspace .sidebar__new:hover:not([data-selected]),
+.workspace .sidebar__link:hover:not([data-active]),
+.workspace .library__new:hover { background: color-mix(in srgb, var(--ref-row) 62%, transparent); filter: none; }
+.workspace .sidebar__new[data-selected],
+.workspace .sidebar__link[data-active] { background: var(--ref-row); color: var(--ref-text); font-weight: 500; }
+.workspace .sidebar__nav { gap: 0; }
+/* "Resources" is still the nav's name for assistive technology; it is not drawn. */
+.workspace .sidebar__apps-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Notebooks, folders and chats. */
+.workspace .library,
+.workspace .conversation-history { margin-top: 15px; padding: 0; font-family: var(--ref-font); flex: 1 1 0%; min-height: 0; overflow: hidden; }
+.workspace .conversation-history__list { flex: 1 1 0%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* The footer never scrolls away: it takes only the room its content needs. */
+.workspace .sidebar__foot { flex: 0 0 auto; }
+.workspace .library .conversation-history__list,
+.workspace .conversation-history__list { gap: 0; padding: 0; }
+.workspace .library__section + .library__section { margin-top: 0; }
+.workspace .library__head,
+.workspace .conversation-history__head {
+  min-height: 33.5px;
+  height: 33.5px;
+  padding: 0 10px 0 7.5px;
+  color: var(--ref-label);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.workspace .library__add { width: 27px; height: 27px; color: var(--ref-label); }
+.workspace .library__add svg { width: 17px; height: 17px; }
+.workspace .library__hint { padding: 4px 12px 8px 9px; color: var(--ref-label); font-family: var(--ref-font); font-size: 14.5px; line-height: 1.4; }
+
+.workspace .library-group__row,
+.workspace .conversation-item {
+  min-height: 33.5px;
+  height: 33.5px;
+  border-radius: 17px;
+  background: transparent;
+}
+.workspace .library-group__row:hover,
+.workspace .conversation-item:hover:not([data-active]) { background: color-mix(in srgb, var(--ref-row) 62%, transparent); }
+.workspace .conversation-item[data-active] { background: var(--ref-row); }
+.workspace .library-group__toggle,
+.workspace .conversation-item__open {
+  min-height: 33.5px;
+  height: 33.5px;
+  padding: 0 10px 0 7.5px;
+  gap: 14.5px;
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 400;
+}
+.workspace .library-group__toggle { padding-left: 10px; }
+.workspace .conversation-item__open { display: flex; align-items: center; text-align: left; }
+.workspace .conversation-item__open > span,
+.workspace .conversation-item[data-active] .conversation-item__open > span { font-size: 14px; font-weight: 400; color: var(--ref-text); }
+/* No timestamps, no counts and no carets in the list: the reference has none. They are drawn only for assistive technology. */
+.workspace .conversation-item__open small,
+.workspace .library-group__count,
+.workspace .library-group__caret { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.workspace .library-group__icon,
+.workspace .library-group[data-kind="project"] > .library-group__row .library-group__icon { width: 17px; height: 17px; color: var(--ref-text); }
+.workspace .library-group__name { font-size: 14px; font-weight: 400; }
+.workspace .library-group__children { padding-left: 12px; }
+
+/* The account: the avatar, the name over the plan, a gear. */
+.workspace .sidebar__foot { gap: 2px; padding: 6px 0 0 0; }
+.workspace .plan-nudge { padding: 4px 12px 6px 9px; font-family: var(--ref-font); }
+.workspace .plan-nudge__tier { color: var(--ref-label); font-size: 12px; }
+.workspace .account-row { display: flex; align-items: center; gap: 4px; width: 100%; }
+.workspace .account-row > .ui-menu { flex: 1 1 auto; min-width: 0; }
+.workspace .account { min-height: 48px; padding: 4px 6px 4px 8px; gap: 9px; border-radius: 24px; font-family: var(--ref-font); }
+.workspace .account:hover { background: color-mix(in srgb, var(--ref-row) 62%, transparent); }
+.workspace .avatar { width: 32px; height: 32px; font-size: 12px; font-weight: 500; }
+.workspace .account__copy { gap: 0; min-width: 0; }
+.workspace .account__copy strong { color: var(--ref-text); font-size: 14.5px; font-weight: 500; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.workspace .account__copy small { color: var(--ref-label); font-size: 12px; line-height: 1.25; }
+.workspace .account__settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 22px;
+  border: none;
+  background: transparent;
+  color: #444746;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+:root:not([data-theme="light"]) .workspace .account__settings-btn { color: var(--ref-label); }
+.workspace .account__settings-btn:hover { background: color-mix(in srgb, var(--ref-row) 62%, transparent); }
+.workspace .account__settings-btn:focus-visible { outline: 2px solid var(--ref-accent, #1a73e8); outline-offset: -2px; }
+.workspace .account__gear { flex: 0 0 auto; color: inherit; transition: transform 200ms ease; }
+.workspace .account__settings-btn:hover .account__gear { transform: rotate(30deg); }
+
+/* The collapsed rail keeps its icons centred. */
+.workspace[data-collapsed="true"] .sidebar { padding-left: 6.5px; padding-right: 6.5px; }
+.workspace[data-collapsed="true"] .sidebar__new,
+.workspace[data-collapsed="true"] .sidebar__link { justify-content: center; padding: 0; }
+.workspace[data-collapsed="true"] .sidebar__head { padding: 0; justify-content: center; }
+
+/* --- The page -------------------------------------------------------------- */
+
+/* The chat page is the off-white of the reference; every other page keeps the app's own wash. */
+:root:root:root .workspace[data-page="chat"] { background-color: transparent; }
+.workspace[data-page="chat"] .workspace__main { background: transparent; font-family: var(--ref-font); }
+/* On a new chat, the glow: strongest just under the composer, gone by the edges. */
+.workspace[data-page="chat"] .workspace__main:has(.chat__scroll[data-empty]) { background: var(--ref-glow), transparent; }
+
+.workspace[data-page="chat"] .topbar-mobile { background: color-mix(in srgb, var(--ref-main) 75%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+
+/* Two controls: Chat | Image in the strip above, and Chat | Study under the composer on a new chat.
+   Mode controls remain in document flow in their own dedicated row beneath any workspace notices,
+   never overlapping or colliding with alerts or notices. */
+.workspace__main > .mode-tabs-bar {
+  position: relative;
+  z-index: 4;
+  padding-top: 10px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+/* The phone title bar already holds Chat | Image. This strip is the desktop copy. */
+@media (max-width: 760px) {
+  .workspace__main > .mode-tabs-bar { display: none; }
+}
+
+/* Chat | Image notch design in workspace header */
+.workspace .mode-tabs--notch {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
+  width: min(100%, 180px);
+  padding: 3px;
+  border-radius: 20px;
+  background: var(--ref-row);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.05), 0 1px 2px rgb(0 0 0 / 0.03);
+}
+:root:not([data-theme="light"]) .workspace .mode-tabs--notch {
+  background: var(--ref-row);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.15);
+}
+.workspace .mode-tabs--notch::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / var(--tab-count));
+  border-radius: 17px;
+  background: var(--ref-seg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 0 0 1px rgb(0 0 0 / 0.04);
+  transform: translateX(calc(100% * var(--tab-index)));
+  transition: transform var(--t-base, 180ms) var(--spring, cubic-bezier(0.2, 0.9, 0.3, 1));
+  display: block;
+  pointer-events: none;
+}
+:root:not([data-theme="light"]) .workspace .mode-tabs--notch::before {
+  background: var(--ref-composer);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+/* Chat | Study (under the composer) wears exactly the Chat | Image notch treatment above, in both skies. */
+.workspace .mode-tabs--study {
+  --seg-surface: var(--ref-row);
+  --seg-line: transparent;
+  --seg-shadow: inset 0 1px 2px rgb(0 0 0 / 0.05), 0 1px 2px rgb(0 0 0 / 0.03);
+  --seg-thumb: var(--ref-seg);
+  --seg-thumb-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 0 0 1px rgb(0 0 0 / 0.04);
+}
+:root:not([data-theme="light"]) .workspace .mode-tabs--study {
+  --seg-surface: var(--ref-row);
+  --seg-shadow: inset 0 1px 2px rgb(0 0 0 / 0.35), 0 1px 2px rgb(0 0 0 / 0.15);
+  --seg-thumb: var(--ref-composer);
+  --seg-thumb-shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.workspace .mode-tabs--notch .mode-tabs__tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ref-label);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--dur-micro, 120ms) var(--ease-out, ease-out);
+}
+.workspace .mode-tabs--notch .mode-tabs__tab:hover {
+  background: transparent;
+  color: var(--ref-text);
+}
+.workspace .mode-tabs--notch .mode-tabs__tab[aria-selected="true"] {
+  background: transparent;
+  color: var(--ref-text);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+/* Redundant Get app promotions removed; Apps is preserved in navigation and sidebar. */
+.workspace .get-app { display: none !important; }
+
+/* --- A new chat: greeting, composer, tabs, suggestions --------------------- */
+
+.workspace .chat:has(> .chat__scroll[data-empty]) {
+  justify-content: flex-start;
+  overflow-y: auto;
+  padding-top: clamp(60.5px, 35.3vh, 294px);
+}
+.workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap { padding: 42px 20px calc(47px + env(safe-area-inset-bottom)); background: none; }
+.workspace .chat__scroll[data-empty] .opening { margin: 0 auto; max-width: 806.5px; padding: 0 20px; text-align: center; }
+.workspace .opening__title {
+  margin: 0;
+  color: var(--ref-title);
+  font-family: var(--ref-font);
+  font-size: 41.5px;
+  font-weight: 400;
+  line-height: 50.5px;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+.workspace .opening__title em { color: inherit; }
+/* The one-line hint is still read aloud; it is not drawn (the reference has no line there). */
+.workspace .opening__lede { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The composer: one solid white pill, a plus on the left, the pickers and the microphone on the right. */
+.workspace .composer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 9px;
+  width: min(100%, 693px);
+  min-height: 67px;
+  margin: 0 auto;
+  padding: 0 17px 0 16px;
+  border: 0;
+  border-radius: 33.5px;
+  background: var(--ref-composer);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: var(--ref-composer-shadow);
+  font-family: var(--ref-font);
+}
+.workspace .composer::after { display: none; }
+.workspace .composer:focus-within { box-shadow: var(--ref-composer-shadow), 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent); }
+.workspace .composer__bar { display: contents; }
+.workspace .composer__left { grid-column: 1; grid-row: 1; }
+.workspace .composer__input {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 0;
+  padding: 22px 0;
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 23.5px;
+}
+.workspace .composer .composer__input { font-weight: 400; }
+.workspace .composer__input::placeholder { color: var(--ref-placeholder); opacity: 1; }
+.workspace .composer__right { grid-column: 3; grid-row: 1; margin-left: 0; gap: 12px; }
+.workspace .composer .tray { grid-column: 1 / -1; grid-row: 2; padding: 0 0 12px; }
+
+.workspace .composer__add-trigger { width: 33.5px; height: 33.5px; border-radius: 17px; color: var(--ref-text); }
+.workspace .composer__add-trigger svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.workspace .composer__mic { width: 33.5px; height: 33.5px; border-radius: 17px; color: var(--ref-text); }
+.workspace .composer__mic svg { width: 20px; height: 20px; stroke-width: 1.5; }
+/* Send appears once there is something to send (the reference shows only the microphone until then). */
+.workspace .composer__send:disabled { display: none; }
+.workspace .composer__send { width: 33.5px; height: 33.5px; }
+
+/* The pickers read as plain text with a chevron: no box, no orb. */
+.workspace .composer .ui-select__trigger {
+  min-width: 0;
+  height: 33.5px;
+  padding: 0 3.5px 0 6.5px;
+  gap: 8.5px;
+  border: 0;
+  border-radius: 17px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 15px;
+  font-weight: 400;
+}
+.workspace .composer .ui-select__trigger:hover { background: color-mix(in srgb, var(--ref-row) 62%, transparent); }
+.workspace .composer .ui-select__trigger svg { width: 15px; height: 15px; color: #444746; }
+:root:not([data-theme="light"]) .workspace .composer .ui-select__trigger svg { color: var(--ref-label); }
+.workspace .composer__model .model-orb { display: none; }
+.workspace .composer__model .ui-select__value { gap: 0; }
+
+/* One line of help under the box is not in the reference. */
+.workspace .composer-context { display: none; }
+
+/* Chat | Study under the composer: a white segmented control (defined in
+   mobile.css as .mode-tabs--study). This file only places it, centred and close
+   to the composer, with a fixed height so switching never shifts the page. */
+.workspace .start-below { width: min(100%, 693px); margin: 0 auto; }
+.workspace .start-below__tabs { display: flex; justify-content: center; margin-top: 14px; min-height: 50px; }
+
+
+/* --- A phone: the same design, one column ---------------------------------- */
+
+@media (max-width: 760px) {
+  .workspace .sidebar { padding-left: 8px; padding-right: 8px; }
+  .workspace .opening__title { font-size: 34px; line-height: 42px; }
+  .workspace .chat:has(> .chat__scroll[data-empty]) { padding-top: clamp(48px, 16vh, 140px); }
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap { padding: 28px 12px calc(24px + env(safe-area-inset-bottom)); }
+  /* The phone pill: the plus, the field, the microphone and (when there is text) send. */
+  .workspace .composer,
+  .workspace .composer[data-layout="pill"] { display: block; min-height: 64px; padding: 0 10px 0 10px; border-radius: 32px; box-shadow: var(--ref-composer-shadow); }
+  .workspace .composer .composer__row { min-height: 64px; gap: 6px; }
+  .workspace .composer .composer__input { padding: 18px 0; font-size: 18px; line-height: 28px; }
+  .workspace { --ref-glow-shape: 105% 46% at 50% 58%; }
+  .workspace .get-app { display: none !important; }
+}
+
+/* --- A phone and a small tablet: the composer has one place ------------------
+   In a new chat the greeting, composer, tabs and suggestions used to be one centred group (padding in vh, the composer in flow), and
+   sending the first message switched to the conversation layout, where the composer is pinned to the bottom: the composer jumped by
+   hundreds of pixels, and the vh padding moved again whenever the browser bar or the keyboard changed the viewport.
+   Here a new chat uses the conversation's layout: the composer is pinned to the bottom (safe area included), the tabs and suggestions sit
+   above it, and the greeting is centred in the room that is left. The composer's bottom edge is then the same before and after the send,
+   and when the keyboard opens. With little height left (the keyboard, a phone on its side) the suggestions step aside. */
+@media (max-width: 760px) {
+  .workspace .chat:has(> .chat__scroll[data-empty]) { padding-top: 0; overflow-y: hidden; }
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .chat__scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+  }
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 12px max(12px, var(--safe-bottom, env(safe-area-inset-bottom)));
+    background: linear-gradient(to top, var(--wash-fade) 0 max(12px, var(--safe-bottom, env(safe-area-inset-bottom))), transparent calc(max(12px, var(--safe-bottom, env(safe-area-inset-bottom))) + 18px));
+  }
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap > .start-below { order: -1; margin-bottom: var(--space-xs); }
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap > .start-below .start-below__tabs { margin-top: 0; }
+}
+@media (max-width: 760px) and (max-height: 560px) {
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap > .start-below .study-starters,
+  .workspace .chat:has(> .chat__scroll[data-empty]) > .composer-wrap > .start-below .starters { display: none; }
+}
+
+/* The temporary-chat notice in a new chat (owner request, 2026-11-14): it must not move the composer. On a wider screen the greeting and
+   composer are one group placed by the padding above it, so the notice is taken out of the flow and sits centred above the greeting, in
+   that padding; the greeting and composer stay exactly where they are without it. On a phone the composer is pinned to the bottom (below),
+   so the notice stays in the flow under the greeting. */
+.workspace .opening .temporary-banner { margin-top: 18px; }
+@media (min-width: 761px) {
+  .workspace .chat__scroll[data-empty] .opening { position: relative; }
+  .workspace .chat__scroll[data-empty] .opening .temporary-banner {
+    position: absolute;
+    bottom: calc(100% + 20px);
+    left: 50%;
+    width: max-content;
+    max-width: min(560px, calc(100vw - 48px));
+    margin: 0;
+    transform: translateX(-50%);
+  }
+}
+
+/* --- Glass surfaces (owner request, 2026-11-14) --------------------------------------------------------------------------------------
+   In Glass mode the composer, the Chat | Study control, menus and pickers are translucent and frosted, so the contour background reads
+   through them. Only their backgrounds are translucent: text and icons keep full opacity, and the paper share (76 to 84%) keeps every
+   label at 4.5:1 or better over the brightest contour line. Every fallback (the Solid setting, reduced transparency, more contrast, no
+   backdrop-filter support) returns them to solid paper. */
+:root {
+  --surface-glass: color-mix(in srgb, var(--color-paper-2) 78%, transparent);
+  --surface-glass-raised: color-mix(in srgb, var(--color-paper-raised) 84%, transparent);
+  --surface-glass-filter: blur(16px) saturate(150%);
+}
+:root[data-effects="solid"] { --surface-glass: var(--color-paper-2); --surface-glass-raised: var(--color-paper-raised); --surface-glass-filter: none; }
+@media (prefers-reduced-transparency: reduce) { :root { --surface-glass: var(--color-paper-2); --surface-glass-raised: var(--color-paper-raised); --surface-glass-filter: none; } }
+@media (prefers-contrast: more) { :root { --surface-glass: var(--color-paper-2); --surface-glass-raised: var(--color-paper-raised); --surface-glass-filter: none; } }
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root { --surface-glass: var(--color-paper-2); --surface-glass-raised: var(--color-paper-raised); --surface-glass-filter: none; }
+}
+
+.workspace { --ref-composer: var(--surface-glass); }
+:root:not([data-theme="light"]) .workspace { --ref-composer: var(--surface-glass-raised); }
+.workspace .composer,
+.workspace .mode-tabs--study {
+  -webkit-backdrop-filter: var(--surface-glass-filter);
+  backdrop-filter: var(--surface-glass-filter);
+}
+.ui-popover,
+.ui-menu__submenu {
+  background: var(--surface-glass-raised);
+  -webkit-backdrop-filter: var(--surface-glass-filter);
+  backdrop-filter: var(--surface-glass-filter);
+}
+
+/* Chat | Study wears the Chat | Image switcher's exact shape (owner request, 2026-11-14): the same 180px pill track, 3px inset, 17px thumb,
+   32px segments and 14px label, in both skies. The Chat | Image switcher itself is unchanged (its rules are above). On a phone both
+   switchers' segments grow to the same 44px target (mobile.css). */
+.workspace .start-below .mode-tabs--study {
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
+  grid-auto-flow: row;
+  width: min(100%, 180px);
+  padding: 3px;
+  border: 0;
+  border-radius: 20px;
+}
+.workspace .start-below .mode-tabs--study::before { top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / var(--tab-count)); border-radius: 17px; }
+.workspace .start-below .mode-tabs--study .mode-tabs__tab {
+  min-width: 0;
+  min-height: 0;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  color: var(--ref-label);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: normal;
+}
+.workspace .start-below .mode-tabs--study .mode-tabs__tab:hover:not([aria-selected="true"]) { background: transparent !important; color: var(--ref-text); }
+.workspace .start-below .mode-tabs--study .mode-tabs__tab[aria-selected="true"] { color: var(--ref-text); font-weight: 600; }
+.workspace .start-below .mode-tabs--study .mode-tabs__tab:focus-visible { outline-offset: 1px; }
+@media (max-width: 760px) {
+  .workspace .start-below .mode-tabs--study .mode-tabs__tab { height: auto; min-height: 44px; }
+}
+
+/* The sidebar's Projects stay put while the chat list scrolls (owner request, 2026-11-14). The list is two regions: Projects takes the room
+   it needs, up to about two fifths of the column, scrolling on its own past that; the chats take the rest and scroll on their own. Scrolling
+   through the chats never moves Projects out of view. */
+.workspace .library > .conversation-history__list { display: flex; flex-direction: column; overflow: hidden; }
+.workspace .library .library__section[data-section="projects"] { flex: 0 1 auto; max-height: 42%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; }
+/* "Your chats" (and "Your builds"): the section is a column of a fixed heading and the one list that scrolls. The heading is outside the
+   scrolling box, so rows never overlap it, and no fade or mask reaches it. A focused row is kept clear of the box's edges. */
+.workspace .library .library__section[data-section="recent"] { display: flex; flex-direction: column; flex: 1 1 0%; min-height: 0; overflow: hidden; }
+.workspace .library .library__section[data-section="recent"] > .library__head { flex: 0 0 auto; padding-bottom: 4px; }
+.workspace .library .library__rows { display: grid; gap: 1px; align-content: start; flex: 1 1 0%; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 8px; }
+
+/* Build below Pro (owner request, 2026-11-14): one plain notice under the greeting, with the way to upgrade. */
+.workspace .build-gate { display: grid; justify-items: center; gap: 12px; margin-top: 18px; padding: 14px 18px; border: 1px solid var(--color-rule); border-radius: 16px; background: var(--color-paper-raised); color: var(--color-ink-2); font-size: 14px; text-align: center; }
+.workspace .build-gate p { margin: 0; }
+.workspace .build-gate strong { color: var(--color-ink); }
+/* Chat | Image | Build: each segment keeps the two-tab switcher's 90px. */
+.workspace .mode-tabs--notch { width: min(100%, calc(90px * var(--tab-count))); }
+
+/* A reply whose earlier context was summarized to fit says so, quietly, under the reply. */
+.workspace .turn__context-note { margin: 8px 0 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.45; }
+/* The row under the composer keeps its 50px (so switching never shifts the page) but no longer stretches the switcher to fill it: stretched,
+   the pill was 50px tall with a 44px thumb while its 32px segments sat at the top, so the labels looked high. Centred, it is the top
+   switcher's 38px pill with a 32px thumb, and each label is centred in its segment both ways. */
+.workspace .start-below__tabs { align-items: center; }
+
+/* Build's sidebar (owner request, 2026-11-15): "VibhavGPT Tecton" under the wordmark, then New build, Search builds, the way back to Chat
+   and Image, and "Your builds" (whose heading stays above its scrolling list, like "Your chats"). */
+
+/* Build's Threads background (components/threads): it fills Build's column (the main area beside the sidebar), sits behind everything in
+   it, and is out of the layout, so nothing moves or scrolls because of it. The column's own wash is cleared so the canvas shows through;
+   the page's light or dark base colour stays beneath it. Messages, code and the composer keep their own surfaces above it. */
+.workspace[data-build-threads="on"] .workspace__main { isolation: isolate; --ref-main: transparent; background: var(--color-paper, var(--paper)); }
+.workspace .build-threads { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; user-select: none; -webkit-user-select: none; contain: strict; }
+.workspace .build-threads * { pointer-events: none; }
+.workspace[data-build-threads="on"] .workspace__main > :not(.build-threads) { position: relative; z-index: 1; }
+.workspace .build-threads__still { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* Build's project card (components/BuildProject.jsx): the saved files, downloads and versions, above the conversation. */
+.workspace .build-project { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--color-rule); border-radius: 16px; background: var(--ref-composer, var(--color-paper-raised)); font-family: var(--ref-font); }
+.workspace .build-project__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.workspace .build-project__head > div { display: grid; gap: 2px; min-width: 0; }
+.workspace .build-project__head small, .workspace .build-project__files small { color: var(--color-ink-2); font-size: 12px; }
+.workspace .build-project__zip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; }
+.workspace .build-project__note { margin: 0; color: var(--color-ink-2); font-size: 13px; line-height: 1.45; }
+/* Files | Preview, and the sandboxed preview (BuildPreview.jsx). */
+.workspace .build-project__tabs { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--color-rule); border-radius: 999px; width: fit-content; }
+.workspace .build-project__tabs button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; color: var(--color-ink-2); font: inherit; font-size: 13px; cursor: pointer; }
+.workspace .build-project__tabs button[aria-selected="true"] { background: var(--tint-hover, var(--color-paper-3)); color: var(--color-ink); font-weight: 600; }
+.workspace .build-project__tabs button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.workspace .build-preview { display: grid; gap: 8px; }
+.workspace .build-preview__bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.workspace .build-preview__status { margin: 0; color: var(--color-ink-2); font-size: 13px; }
+.workspace .build-preview__frame { width: 100%; height: min(70dvh, 560px); border: 1px solid var(--color-rule); border-radius: 12px; background: #fff; }
+.workspace .build-preview__error { margin: 0; color: var(--color-danger); font-size: 13px; }
+.workspace .build-preview__errors { padding: 8px 12px; border-radius: 10px; background: var(--color-danger-soft); color: var(--color-ink); font-size: 12.5px; }
+.workspace .build-preview__errors ul { margin: 4px 0 0; padding-left: 18px; }
+.workspace .build-preview__note { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--color-muted); font-size: 12px; }
+.workspace .build-project__files { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; max-height: 260px; overflow-y: auto; }
+.workspace .build-project__files li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; }
+.workspace .build-project__path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono, monospace); }
+.workspace .build-project__path em { color: var(--color-ink-2); font-style: normal; font-family: var(--ref-font); }
+.workspace .build-project__versions summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
+.workspace .build-project__versions ol { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; font-size: 13px; }
+.workspace .build-project__versions li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.workspace .build-project__viewer { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--color-rule); border-radius: 12px; background: var(--color-paper); }
+.workspace .build-project__viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.workspace .build-project__viewer pre { max-height: 420px; margin: 0; overflow: auto; font-size: 12px; line-height: 1.5; white-space: pre; }
+.workspace .build-project__error { margin: 0; color: var(--color-danger, #b42318); font-size: 13px; }
+@media (max-width: 760px) { .workspace .build-project__files li { grid-template-columns: auto minmax(0, 1fr) auto auto; } .workspace .build-project__files li small { display: none; } }

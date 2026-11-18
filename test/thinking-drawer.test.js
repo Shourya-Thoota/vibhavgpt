@@ -74,7 +74,7 @@ test("the live relay drops the deliberation, keeps the reasoning and separates l
 });
 
 test("the thinking tiers are told to keep their thinking on the user's problem", () => {
-  for (const tier of ["nova", "nebula", "vesper"]) assert.ok(buildIdentitySystemPrompt(tier, { query: "hi" }).includes(REASONING_GUIDELINES), tier);
+  for (const tier of ["vesper", "zenith"]) assert.ok(buildIdentitySystemPrompt(tier, { query: "hi" }).includes(REASONING_GUIDELINES), tier);
   for (const tier of ["lumen", "study"]) assert.ok(!buildIdentitySystemPrompt(tier, { query: "hi" }).includes(REASONING_GUIDELINES), tier);
   assert.match(REASONING_GUIDELINES, /^Reasoning Guidelines: Use your thinking scratchpad exclusively for domain analysis, problem-solving, and formulating the response to the user's query\. Never deliberate on, recite, verify, or mention system guidelines, persona boundaries, developer instructions, or memory constraints within your thinking process\./);
   assert.ok(!REASONING_GUIDELINES.includes("—"), "no em dash");
@@ -94,16 +94,12 @@ test("the drawer shows titled phases as numbered steps, and plain thinking as pa
   assert.match(component, /aria-expanded=\{open\}/, "the Thought for X s pill still folds and unfolds");
 });
 
-test("the landing page's source link sits above every other layer and is the only clickable part of the footer", () => {
+test("the landing page's source link is a plain footer link that nothing overlays", () => {
   const html = read("frontend/public/home/index.html");
-  const footer = html.match(/<footer style="([^"]*)">[\s\S]*?<a ([^>]*)>Source code<\/a><\/footer>/);
-  assert.ok(footer, "the footer and its link are there");
-  const footerZ = Number(footer[1].match(/z-index:(\d+)/)[1]);
-  const otherZ = [...html.matchAll(/z-index:(-?\d+)/g)].map((match) => Number(match[1])).filter((value) => value !== footerZ);
-  assert.ok(otherZ.length > 0 && otherZ.every((value) => value < footerZ), `footer z-index ${footerZ} is above ${Math.max(...otherZ)}`);
-  assert.match(footer[1], /pointer-events:none/, "the footer strip blocks nothing");
-  assert.match(footer[2], /href="https:\/\/github\.com\/Shourya-Thoota\/vibhavgpt"/);
-  assert.match(footer[2], /target="_blank" rel="noopener noreferrer"/);
-  assert.match(footer[2], /pointer-events:auto/);
-  assert.match(footer[2], /cursor:pointer/);
+  // The redesigned footer sits in normal page flow at the end of the page.
+  const footer = html.match(/<footer class="site-footer">([\s\S]*?)<\/footer>/);
+  assert.ok(footer, "the footer is there");
+  assert.match(footer[1], /Made by Vibhav Thoota/);
+  assert.match(footer[1], /<a href="https:\/\/github\.com\/Shourya-Thoota\/vibhavgpt" target="_blank" rel="noopener noreferrer" aria-label="Source code \(opens in a new tab\)">Source code<\/a>/);
+  assert.doesNotMatch(html, /<footer[^>]*position:fixed/, "not a fixed overlay strip");
 });

@@ -97,41 +97,158 @@
 .model-sheet__copy small { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 .model-sheet__check { flex: 0 0 auto; color: var(--accent); }
 
-/* Workspace tabs: a segmented control with a sliding thumb. Phones show it
-   in the title bar; wider screens in a strip above the conversation. */
-.mode-tabs {
+/* ==========================================================================
+   Workspace Mode Controls:
+   1. Chat | Image (Notch Design)
+   2. Chat | Study (Transparent Minimal Design)
+   ========================================================================== */
+
+/* --- 1. CHAT | IMAGE (Notch Design) --------------------------------------- */
+/* Restored original segmented container with sliding thumb selection treatment */
+.mode-tabs--notch {
   position: relative;
   display: grid;
   grid-template-columns: repeat(var(--tab-count), minmax(0, 1fr));
-  width: min(100%, 300px);
+  width: min(100%, calc(90px * var(--tab-count)));
   padding: 3px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-pill, 9999px);
   background: var(--surface-2);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+  gap: 0;
 }
-.mode-tabs::before {
+:root:not([data-theme="light"]) .mode-tabs--notch {
+  background: color-mix(in srgb, var(--surface-2) 80%, #000 20%);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.2);
+}
+.mode-tabs--notch::before {
   content: "";
   position: absolute;
   top: 3px;
   bottom: 3px;
   left: 3px;
   width: calc((100% - 6px) / var(--tab-count));
-  border-radius: var(--r-pill);
+  border-radius: var(--r-pill, 9999px);
   background: var(--surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-sm, 0 1px 3px rgb(0 0 0 / 0.12));
   transform: translateX(calc(100% * var(--tab-index)));
-  transition: transform var(--t-base) var(--spring);
+  transition: transform var(--t-base, 180ms) var(--spring, cubic-bezier(0.2, 0.9, 0.3, 1));
+  display: block;
+  pointer-events: none;
 }
-.mode-tabs__tab {
+:root:not([data-theme="light"]) .mode-tabs--notch::before {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.mode-tabs--notch .mode-tabs__tab {
   position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 32px;
-  border-radius: var(--r-pill);
+  border-radius: var(--r-pill, 9999px);
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 600;
-  transition: color var(--t-fast) var(--ease);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--t-fast, 140ms) var(--ease, ease);
 }
-.mode-tabs__tab[aria-selected="true"] { color: var(--ink); }
-.mode-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.mode-tabs--notch .mode-tabs__tab:hover {
+  background: transparent;
+  color: var(--ink);
+}
+.mode-tabs--notch .mode-tabs__tab[aria-selected="true"] {
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+.mode-tabs--notch .mode-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* --- 2. CHAT | STUDY (segmented control under the composer) --------------- */
+/* Two real segments with a selected thumb that slides on --tab-index, so nothing reflows when switching. It wears the Chat | Image
+   notch's own treatment above (the same track, thumb and shadows, in both skies); only its size differs, for 44px targets.
+   Inside the workspace, chat-reference.css gives both switchers the workspace's values. */
+.mode-tabs--study {
+  --seg-pad: 3px;
+  --seg-surface: var(--surface-2);
+  --seg-line: transparent;
+  --seg-shadow: inset 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 2px rgb(0 0 0 / 0.04);
+  --seg-thumb: var(--surface);
+  --seg-thumb-shadow: var(--shadow-sm, 0 1px 3px rgb(0 0 0 / 0.12));
+  position: relative;
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  width: auto;
+  gap: 0;
+  padding: var(--seg-pad);
+  border: 1px solid var(--seg-line);
+  border-radius: var(--r-pill, 9999px);
+  background: var(--seg-surface) !important;
+  box-shadow: var(--seg-shadow) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+:root:not([data-theme="light"]) .mode-tabs--study {
+  --seg-surface: color-mix(in srgb, var(--surface-2) 80%, #000 20%);
+  --seg-shadow: inset 0 1px 2px rgb(0 0 0 / 0.4), 0 1px 2px rgb(0 0 0 / 0.2);
+  --seg-thumb: var(--surface);
+  --seg-thumb-shadow: 0 1px 3px rgb(0 0 0 / 0.45), 0 0 0 1px rgb(255 255 255 / 0.08);
+}
+.mode-tabs--study::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute;
+  top: var(--seg-pad);
+  bottom: var(--seg-pad);
+  left: var(--seg-pad);
+  width: calc((100% - (var(--seg-pad) * 2)) / var(--tab-count, 2));
+  border-radius: inherit;
+  background: var(--seg-thumb);
+  box-shadow: var(--seg-thumb-shadow);
+  transform: translateX(calc(var(--tab-index, 0) * 100%));
+  transition: transform var(--t-fast, 180ms) var(--ease-out, ease-out);
+  pointer-events: none;
+}
+.mode-tabs--study .mode-tabs__tab {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: var(--r-pill, 9999px);
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-ink-2, var(--muted));
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--t-fast, 140ms) var(--ease, ease);
+}
+.mode-tabs--study .mode-tabs__tab:hover:not([aria-selected="true"]) {
+  background: color-mix(in srgb, var(--color-ink, #1c1612) 6%, transparent) !important;
+  color: var(--color-ink, var(--ink));
+}
+.mode-tabs--study .mode-tabs__tab[aria-selected="true"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-ink, var(--ink));
+  font-weight: 650;
+}
+.mode-tabs--study .mode-tabs__tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .mode-tabs--study::before { transition: none; } }
+@media (max-width: 420px) { .mode-tabs--study .mode-tabs__tab { min-width: 84px; padding: 0 18px; } }
+
+/* Common tab rules */
 .mode-tabs__tab:disabled { cursor: default; }
 /* An image job running (or finished) while another tab is open. */
 .mode-tabs__dot { position: absolute; top: 7px; right: 10px; width: 6px; height: 6px; border-radius: var(--radius-round); background: var(--accent); }
@@ -148,9 +265,11 @@
 .add-sheet__tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 2px 4px 8px; }
 .add-sheet__tile {
   display: grid;
-  justify-items: center;
+  justify-items: start;
   gap: 8px;
-  padding: 16px 8px 14px;
+  padding: 14px;
+  text-align: left;
+  font-family: var(--font-ui);
   border-radius: var(--r-md);
   background: var(--surface-2);
   color: var(--ink);
@@ -165,7 +284,9 @@
 .add-sheet__row {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 14px;
+  font-family: var(--font-ui);
   width: 100%;
   min-height: 52px;
   padding: 8px 10px;
@@ -181,7 +302,7 @@
 .add-sheet__row:disabled { opacity: 0.45; }
 .add-sheet__copy { display: grid; flex: 1; gap: 2px; min-width: 0; font-size: 0.95rem; font-weight: 550; }
 .add-sheet__copy small { color: var(--muted); font-size: 0.8rem; font-weight: 450; }
-.add-sheet__label { margin: 10px 10px 2px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.07em; text-transform: uppercase; }
+.add-sheet__label { margin: 12px 12px 4px; color: var(--muted); font-size: 0.8125rem; font-weight: 600; letter-spacing: var(--tracking-small); }
 
 @media (max-width: 760px) {
   .workspace {
@@ -192,7 +313,8 @@
 
   /* Menu, workspace tabs (or the page title off the chat screen), new chat. */
   .topbar-mobile {
-    grid-template-columns: 44px minmax(0, 1fr) 44px;
+    /* Equal side columns keep Chat | Image centred whether the right side holds one button or two. */
+    grid-template-columns: minmax(44px, 1fr) auto minmax(44px, 1fr);
     gap: 4px;
     height: var(--topbar-h);
     padding: env(safe-area-inset-top) 6px 0;
@@ -201,6 +323,8 @@
   }
   .topbar-mobile .ui-icon-button { width: 44px; height: 44px; color: var(--ink); }
   .topbar-mobile .mode-tabs { justify-self: center; }
+  .topbar-mobile > .ui-icon-button:first-child { justify-self: start; }
+  .topbar-mobile__actions { display: flex; align-items: center; justify-self: end; gap: 0; }
   .mode-tabs-bar { display: none; }
   .topbar-mobile__title {
     justify-self: center;
@@ -240,7 +364,7 @@
   /* The drawer closes by swipe, by tapping the dimmed page, or by Back, so
      the X in its head is redundant on phones. */
   .sidebar__close { display: none; }
-  .sidebar__new { min-height: 46px; }
+  .sidebar__new { min-height: 44px; }
   .sidebar__link, .conversation-item__open { min-height: 44px; }
 
   /* Always mounted; shown and hidden by opacity so it fades both ways. The
@@ -311,8 +435,9 @@
 
   .composer-wrap {
     padding: 4px 12px max(12px, var(--safe-bottom));
-    background: linear-gradient(to top, var(--paper) 74%, transparent);
+    background: linear-gradient(to top, var(--wash-fade) 0 max(12px, var(--safe-bottom)), transparent calc(max(12px, var(--safe-bottom)) + 18px));
   }
+  .chat { --composer-overlap: 52px; }
 
 
   /* One rounded row: add, the growing text field, and Send. Buttons sit on
@@ -401,4 +526,23 @@
 }
 @keyframes screen-in-back {
   from { opacity: 0; transform: translateX(-24%); }
+}
+
+/* Phone comfort (owner feedback 2026-11-09): tappable mode tabs, and inputs at 16px so tapping a field does not zoom the page. */
+@media (max-width: 760px) {
+  .workspace .mode-tabs--notch .mode-tabs__tab,
+  .workspace .mode-tabs__tab { min-height: 44px; }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  .settings-mobile-picker { font-size: 16px; }
+  /* The phone drawer's rows: comfortable to tap without wasting space. */
+  .sidebar[data-open="true"] :is(a, button):not(.sidebar__toggle) { min-height: 44px; }
+}
+/* Any touch screen (tablets too): 16px input text so tapping a field does not zoom the page. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  .settings-mobile-picker { font-size: 16px !important; }
 }

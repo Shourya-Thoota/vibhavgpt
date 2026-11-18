@@ -15,7 +15,9 @@ test("interrupted code is kept verbatim and clearly marked unsaved and incomplet
 test("a real interrupted provider stream keeps the already-rendered code rather than replacing it with an error", async () => {
   const { config } = await import("../src/config.js");
   const { callModelStreaming } = await import("../src/chat/providers.js");
-  config.chatModels.vesper = "fixture-vesper"; config.providerKeys.paid = "fixture-key";
+  config.chatModels.vesper = "fixture-vesper";
+  config.providerKeys.direct = "fixture-key";
+  config.vesperDataPolicyVerified = true;
   let visible = "", partial = null;
   try {
     await callModelStreaming("vesper", [{ role: "user", content: "write code" }], undefined, {
@@ -27,7 +29,7 @@ test("a real interrupted provider stream keeps the already-rendered code rather 
     });
     assert.fail("The interrupted stream must fail");
   } catch {
-    partial = interruptedStreamMessage(visible, "VibhavGPT Vesper");
+    partial = interruptedStreamMessage(visible, "VibhavGPT Vulcan");
   }
   assert.equal(partial.content, "Here is your code: <html>");
   assert.equal(partial.incomplete, true);

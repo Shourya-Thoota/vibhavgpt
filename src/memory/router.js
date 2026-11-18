@@ -5,7 +5,7 @@ import { Router } from "express";
 import { accessPayload } from "../../frontend/src/access-status.js";
 import multer from "multer";
 import { requireSession } from "../middleware/require-session.js";
-import { clearFacts, createFact, deleteFact, getFacts, importFactCandidates, importFacts, isMemoryEnabled, parseImportedFacts, setMemoryEnabled, updateFact } from "./service.js";
+import { clearFacts, createFact, deleteFact, getMemorySettings, importFactCandidates, importFacts, listFactsForManage, ownedProject, parseImportedFacts, promoteFact, setMemorySettings, updateFact } from "./service.js";
 import { UploadError, canonicalDocumentType, extractText, incomingDirectory, normalizedExtractedText, ensureUploadDirectories } from "../uploads/service.js";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,18 +18,25 @@ const memoryImportUpload = multer({ storage: multer.memoryStorage(), limits: { f
 memoryRouter.get("/", async (req, res, next) => {
   try {
     const userId = req.authSession.user.id;
-    const [facts, enabled] = await Promise.all([getFacts(userId), isMemoryEnabled(userId)]);
-    return res.json({ facts, enabled });
+    const [facts, settings] = await Promise.all([listFactsForManage(userId), getMemorySettings(userId)]);
+    // `enabled` is kept for older clients: it is "use memory when answering".
+    return res.json({ facts, enabled: settings.use, useEnabled: settings.use, saveEnabled: settings.save });
   } catch (error) {
     return next(error);
   }
 });
 
-// The Settings switch: off means chats neither read nor save memory.
+// Settings: "Use memory when answering" (use) and "Save new memories" (save), separately. The older single switch (enabled) sets both.
+// Turning either off deletes nothing.
 memoryRouter.put("/settings", async (req, res, next) => {
   try {
-    if (typeof req.body?.enabled !== "boolean") return res.status(400).json({ error: "Choose on or off." });
-    return res.json({ enabled: await setMemoryEnabled(req.authSession.user.id, req.body.enabled) });
+    const body = req.body ?? {};
+    const legacy = typeof body.enabled === "boolean";
+    const use = legacy ? body.enabled : body.use;
+    const save = legacy ? body.enabled : body.save;
+    if (typeof use !== "boolean" && typeof save !== "boolean") return res.status(400).json({ error: "Choose on or off." });
+    const settings = await setMemorySettings(req.authSession.user.id, { use, save });
+    return res.json({ enabled: settings.use, useEnabled: settings.use, saveEnabled: settings.save });
   } catch (error) { return next(error); }
 });
 
@@ -42,10 +49,18 @@ memoryRouter.delete("/", async (req, res, next) => {
 
 memoryRouter.post("/", async (req, res, next) => {
   try {
-    const fact = await createFact(req.authSession.user.id, req.body?.content, "manual", {
+    const userId = req.authSession.user.id;
+    // A memory added on the Memory page goes to personal memory, or to one of the person's own projects.
+    let target = { scope: "personal" };
+    if (req.body?.projectId != null) {
+      const project = await ownedProject(userId, req.body.projectId);
+      if (!project) return res.status(404).json({ error: "Project not found." });
+      target = { scope: "project", projectId: project.id };
+    }
+    const fact = await createFact(userId, req.body?.content, "manual", {
       category: req.body?.category,
       area: req.body?.area,
-    });
+    }, target);
     if (!fact) return res.status(400).json({ error: "That memory entry is invalid or already saved." });
     return res.status(201).json({ fact });
   } catch (error) {
@@ -104,6 +119,11 @@ memoryRouter.post("/import/confirm", async (req, res, next) => {
 memoryRouter.patch("/:id", async (req, res, next) => {
   try {
     if (!UUID_PATTERN.test(req.params.id)) return res.status(400).json({ error: "Invalid memory entry." });
+    // Move a project memory to personal memory: the only way a project memory is ever used outside its project.
+    if (req.body?.scope === "personal") {
+      const promoted = await promoteFact(req.authSession.user.id, req.params.id);
+      return promoted ? res.json({ fact: promoted }) : res.status(404).json({ error: "Memory entry not found." });
+    }
     const fact = await updateFact(req.authSession.user.id, req.params.id, req.body?.content, {
       category: req.body?.category,
       area: req.body?.area,

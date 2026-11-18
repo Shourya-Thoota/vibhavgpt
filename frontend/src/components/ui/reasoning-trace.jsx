@@ -6,16 +6,16 @@ import "./thinking-tool.css";
 import "./reasoning-trace.css";
 
 // The waiting reply's status, with a live seconds counter while thinking.
-export function LiveStatusLabel({ phase, attempt, maxAttempts, startedAt }) {
+export function LiveStatusLabel({ phase, attempt, maxAttempts, service, tier, startedAt }) {
   const [now, setNow] = React.useState(() => Date.now());
-  const counting = phase !== "attachments" && phase !== "searching" && phase !== "retrying";
+  const counting = phase !== "attachments" && phase !== "searching" && phase !== "retrying" && phase !== "busy" && !(service && String(phase).startsWith("connector_"));
   React.useEffect(() => {
     if (!counting) return undefined;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(timer);
   }, [counting, startedAt]);
-  return <span aria-live="polite">{liveStatusLabel({ phase, attempt, maxAttempts, seconds: startedAt ? (now - startedAt) / 1000 : 0 })}</span>;
+  return <span aria-live="polite">{liveStatusLabel({ phase, attempt, maxAttempts, service, tier, seconds: startedAt ? (now - startedAt) / 1000 : 0 })}</span>;
 }
 
 // The thinking itself, as titled steps: each titled phase gets a small
@@ -63,8 +63,8 @@ export function ReasoningTrace({ text = "", live = false, seconds = null }) {
       <div ref={bodyRef} className="reasoning-trace__body" aria-label="Model thinking"><ThinkingSteps text={text} /></div>
     </div>;
   }
-  if (seconds === null && !hasText) return null;
-  const label = seconds === null ? "Thought" : thoughtLabel(seconds);
+  if (!hasText && (seconds === null || Number(seconds) < 1)) return null;
+  const label = seconds === null || Number(seconds) < 1 ? "Thought" : thoughtLabel(seconds);
   if (!hasText) return <div className="reasoning-trace"><button type="button" className="thinking-tool__toggle" disabled>{restingOrb}<span>{label}</span></button></div>;
   return <div className="reasoning-trace">
     <button type="button" className="thinking-tool__toggle" aria-expanded={open} aria-controls={contentId} onClick={() => setOpen((value) => !value)}>

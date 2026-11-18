@@ -273,7 +273,7 @@ test("the argument scanner sees a call whose log text contains a semicolon", () 
 });
 
 test("no log call in the reported files passes an error's message, stack, cause or object", () => {
-  const files = ["src/billing/router.js", "src/memory/service.js", "src/email/service.js", "src/voice/live-usage.js", "src/billing/service.js", "src/chat/moderation.js", "src/voice/live-comet.js", "src/server.js"];
+  const files = ["src/billing/router.js", "src/memory/service.js", "src/email/service.js", "src/voice/live-usage.js", "src/billing/service.js", "src/chat/moderation.js", "src/voice/live-comet.js", "src/server.js", "src/generation/image-handoff.js"];
   for (const path of files) {
     const source = readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
     // Every direct console.error/warn call must be a fixed string, or the structured start-up and auth records.
@@ -288,4 +288,28 @@ test("no log call in the reported files passes an error's message, stack, cause 
     for (const match of source.matchAll(/logFailure\(([^)]*)/g)) assert.match(match[1], /^"[a-z][a-z0-9_]{2,60}"\s*,/, `${path}: logFailure label is not a literal`);
     assert.doesNotMatch(source, /logFailure\([^)]*\.(message|stack|cause)\b/, `${path}: logFailure is given error text`);
   }
+});
+
+test("image prompt rewrite failures log through logFailure with no message, prompt or context text", async () => {
+  const { expandImagePrompt } = await import("../src/generation/image-handoff.js");
+  const prompt = `SENTINEL_PROMPT_${SENTINELS[0]}`;
+  const contextText = `SENTINEL_CONTEXT_${SENTINELS[1]}`;
+  const history = [{ role: "assistant", content: `Analogy about ${contextText}` }];
+  const error = hostile({ message: `Rewriter error: ${SENTINELS[0]}` });
+
+  const lines = await captured(async () => {
+    const result = await expandImagePrompt(prompt, history, {
+      callModel: async () => { throw error; },
+    });
+    assert.equal(result.expanded, false);
+    assert.equal(result.prompt, prompt);
+  });
+
+  assert.equal(lines.length, 1);
+  assertClean(lines[0]);
+  assert.equal(lines[0].includes(prompt), false, "prompt text is not logged");
+  assert.equal(lines[0].includes(contextText), false, "context text is not logged");
+  const parsed = JSON.parse(lines[0]);
+  assert.equal(parsed.event, "image_prompt_rewrite_unavailable");
+  assert.equal(parsed.errorType, "Error");
 });

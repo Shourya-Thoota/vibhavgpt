@@ -23,7 +23,7 @@ test("Image routes round-trip without changing conversation identity", () => {
 
 test("Image mode is an accepted workspace on the server", () => {
   const router = readFileSync(new URL("../src/profile/router.js", import.meta.url), "utf8");
-  assert.match(router, /\["chat", "study", "image"\]\.includes\(productMode\)/);
+  assert.match(router, /\["chat", "study", "image", "build"\]\.includes\(productMode\)/);
 });
 
 test("Every aspect ratio choice maps to a supported generation size", () => {
@@ -32,9 +32,9 @@ test("Every aspect ratio choice maps to a supported generation size", () => {
 
 test("Image generation loops per variation and enforces the per-tier quota on each call", () => {
   const router = readFileSync(new URL("../src/generation/router.js", import.meta.url), "utf8");
-  assert.match(router, /Math\.min\(MAX_VARIATIONS, Math\.max\(1, Number\.parseInt\(req\.body\?\.variations, 10\) \|\| 1\)\)/);
-  assert.match(router, /const size = typeof req\.body\?\.size === "string"/);
-  assert.match(router, /await generateImage\(\{ userId, prompt: finalPrompt, aspectRatio, size, referenceImage \}\)/);
+  assert.match(router, /isFree \? 1 : Math\.min\(MAX_VARIATIONS, Math\.max\(1, Number\.parseInt\(req\.body\?\.variations, 10\) \|\| 1\)\)/, "Free is one image per request");
+  assert.match(router, /const size = !isFree && typeof req\.body\?\.size === "string"/, "and no custom size");
+  assert.match(router, /await generateImage\(\{ userId, prompt: finalPrompt, aspectRatio, size, referenceImage, imageModel \}\)/, "the model chosen at Generate goes with every variation");
   assert.match(router, /if \(images\.length\) break;/, "a later variation failing (e.g. quota exhausted) must keep the earlier successful ones instead of discarding them");
 });
 
@@ -47,7 +47,9 @@ test("A reference image may come from an upload or an earlier generation, never 
 test("Image generation uses the dedicated image endpoint without a model fallback", () => {
   const service = readFileSync(new URL("../src/generation/service.js", import.meta.url), "utf8");
   assert.match(service, /`\$\{baseUrl\}\/images`/);
-  assert.match(service, /model: config\.imageGenerationModel/);
+  // The engine comes from the chosen model (image-models.js); Prism's engine is exactly the configured image model.
+  assert.match(service, /model: engine,/);
+  assert.match(readFileSync(new URL("../src/generation/image-models.js", import.meta.url), "utf8"), /engine: \(\) => config\.imageGenerationModel/);
   assert.doesNotMatch(service, /\bquality\b/);
   assert.doesNotMatch(service, /images\/generations|requestedModel|gpt-image/);
 });
@@ -185,7 +187,7 @@ test("Image studio offers only shapes and styles the server understands", async 
   const values = (name) => [...workspace.slice(workspace.indexOf(`const ${name} = [`), workspace.indexOf("];", workspace.indexOf(`const ${name} = [`))).matchAll(/value: "([^"]*)"/g)].map((match) => match[1]);
   assert.deepEqual(values("SHAPES").sort(), Object.keys(IMAGE_ASPECT_RATIOS).sort());
   for (const style of values("STYLE_PRESETS").filter(Boolean)) assert.ok(Object.hasOwn(IMAGE_STYLES, style), `${style} must be a server style preset`);
-  assert.ok(workspace.includes("aspectRatio: shape, style, ...(reference?.id ? { referenceAttachmentId: reference.id } : {})"), "a chosen reference image is sent with the request");
+  assert.ok(workspace.includes("aspectRatio: shape, style, imageModel, ...(reference?.id ? { referenceAttachmentId: reference.id } : {})"), "a chosen reference image is sent with the request");
   // One image per request: the count selector was removed.
   assert.doesNotMatch(workspace, /COUNTS|variations: count/);
 });

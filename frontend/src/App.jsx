@@ -1,33 +1,67 @@
 import { Children, createContext, Fragment, isValidElement, lazy, Suspense, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import ReactMarkdown from "react-markdown";
+import { attachmentGuidance, perFileProblem } from "./upload-guidance.js";
+import BuildThreads from "./components/threads/BuildThreads.jsx";
+import BuildProject from "./components/BuildProject.jsx";
+import { visibleBuildStream } from "./build-stream.js";
+import { IMAGES_PER_MONTH, IMAGES_PER_WEEK, countText } from "./plan-entitlements.js";
+import { backgroundReply, liveRepliesSnapshot, liveReplyForConversation, readReplyEvents, seedLiveReplies, subscribeLiveReplies, trackLiveReply, untrackLiveReply } from "./live-replies.js";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { loadedMath, loadMath, needsMath } from "./math-loader.js";
 import {
-  ArrowUp, BarChart3, Brain, Check, ChevronRight, Copy, CreditCard, Eye, EyeOff, FileText, Fingerprint,
-  Image as ImageIcon, LogOut, Mail, Menu as MenuIcon, Mic,
-  Moon, Paperclip, Plus, RotateCw, Settings as SettingsIcon,
-  Download, Lock, MessageSquareText, Palette, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
-  PenLine, ScanSearch, Wand2,
+  AlignJustify, AlignLeft, ArrowLeft, ArrowRight, ArrowUp, BarChart3, Brain, Check, ChevronDown, ChevronRight, Copy, CreditCard, Eye, EyeOff, FileText, Fingerprint,
+  Image as ImageIcon, Layers, LogOut, MapPin, Mail, Menu as MenuIcon, Mic,
+  Moon, Paperclip, Plug, Plus, RotateCw, Settings as SettingsIcon,
+  Download, Lock, MessageSquareText, Palette, Search, ShieldCheck, SlidersHorizontal, Sparkles, SquarePen, Sun, Trash2, UserRound, X,
+  PenLine, ScanSearch, Wand2, BookOpen, GraduationCap, ListChecks,
+  HatGlasses, Square,
 } from "lucide-react";
+import { canonicalModelKey } from "./token-quotas.js";
 import SecurityPanel from "./components/SecurityPanel.jsx";
 import ImageWorkspace from "./components/ImageWorkspace.jsx";
 import { imageJobs } from "./image-jobs.js";
 import Sidebar from "./components/Sidebar.jsx";
+import ChatSearch from "./components/ChatSearch.jsx";
+import KeyboardShortcutsDialog from "./components/KeyboardShortcutsDialog.jsx";
+import { launchPathFromLink, shortcutForEvent } from "./keyboard-shortcuts.js";
+import ProfilePicture from "./components/ProfilePicture.jsx";
+import Library from "./components/Library.jsx";
+import SavedAvatars from "./components/SavedAvatars.jsx";
+import LocationSettings from "./components/LocationSettings.jsx";
+import ConnectorsSettings from "./components/ConnectorsSettings.jsx";
+import ActionApprovalCard from "./components/ActionApprovalCard.jsx";
+import ModelSelector from "./components/catalog/ModelSelector.jsx";
+import Extensions from "./components/extensions/Extensions.jsx";
+import {
+  ComposerMentionChips,
+  ComposerMentionsPopover,
+  connectorDisplayName,
+  detectMentionTrigger,
+  filterConnectorsForPicker,
+  filterSkillsForPicker,
+} from "./components/composer/ComposerMentions.jsx";
+import MentionMirror from "./components/composer/MentionMirror.jsx";
+import { useMentionedDraft } from "./components/composer/useMentionedDraft.js";
+import { connectorsFromMentions } from "./composer-mentions.js";
 import { useDrawerSwipe } from "./components/useDrawerSwipe.js";
+import { useSidebarWidth } from "./components/useSidebarWidth.js";
+import { visibleAppLinks } from "./desktop-app.js";
+import { PublicNav } from "./components/PublicNav.jsx";
 import "./study.css";
 import "./auth.css";
+import "./signin.css";
 import "./composer.css";
 import "./cosmos.css";
 import "./settings.css";
 import "./pricing.css";
-import { productModeFromPath, productPath, STUDY_TAGLINES, STUDY_STARTERS } from "./product-modes.js";
+import "./plans-clean.css";
+import { BUILD_MODEL, buildIncluded, productModeFromPath, productPath, STUDY_TAGLINES, STUDY_STARTERS } from "./product-modes.js";
 import { passkeysSupported, signInWithPasskey as runPasskeySignIn } from "./passkey-auth.js";
-import { BottomSheet, ChoiceCards, dismissTopOverlay, Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal, NARROW_QUERY, Segmented, Select, SettingsSelect, useMediaQuery } from "./components/ui.jsx";
+import { Banner, MenuGroup, BottomSheet, ChoiceCards, dismissTopOverlay, Field, IconButton, Menu, MenuItem, MenuSeparator, Modal, NARROW_QUERY, Segmented, Select, SettingsSelect, useMediaQuery } from "./components/ui.jsx";
 import { RevealWords, TypingDots, useTypewriter } from "./components/Typing.jsx";
 import { copyText } from "./clipboard.js";
 import { joinDictation, useDictation } from "./dictation.js";
@@ -35,10 +69,13 @@ import { protectPlainDollarSigns, normalizeTexDelimiters } from "./markdown.js";
 import { emailOtpVerificationRequest } from "./auth-code-endpoint.js";
 import { api, apiRequest, responseError } from "./api.js";
 import { accessStatus } from "./access-status.js";
+import WorkspaceNotice from "./components/notice/WorkspaceNotice.jsx";
 import { PrivateFileLink, PrivateImage, ResourceLink, saveFile } from "./components/PrivateMedia.jsx";
 import { ThinkingTool } from "./components/ui/thinking-tool.jsx";
 import { LiveStatusLabel, ReasoningTrace } from "./components/ui/reasoning-trace.jsx";
 import { SourcesDisclosure } from "./components/ui/sources-disclosure.jsx";
+import { citationLabel, remarkCitations, sourcesByNumber } from "./citations.js";
+import { ImagePromptDisclosure } from "./components/ui/image-prompt-disclosure.jsx";
 import { elapsedSeconds } from "./live-status.js";
 import { applyPageMetadata } from "./seo.js";
 import { DELETION_PLAN_NOTICE } from "./public-pages.js";
@@ -51,13 +88,41 @@ import InteractiveFlashcards from "./components/InteractiveFlashcards.jsx";
 import InteractiveQuiz from "./components/InteractiveQuiz.jsx";
 import StudyWritingTools from "./components/StudyWritingTools.jsx";
 import { createReplyLabels } from "./model-labels.js";
+import { DiscordMark, GitHubMark, MicrosoftMark } from "./components/SocialSignInMarks.jsx";
+import {
+  HOUSE_INTELLIGENCE, HOUSE_MIN_PLAN, HOUSE_MODELS, HOUSE_PLAN_COPY, INTELLIGENCE_LABELS, INTELLIGENCE_TONES, RETIRED_HOUSE_NAMES, isRetiredHouseKey,
+  PICKER_SECTIONS, PROVIDER_MARK_FILES, COLOR_MARKS, RETIRED_THIRD_PARTY_IDS, RETIRED_THIRD_PARTY_NAMES, inheritedThinkingLevel, thirdPartyReplacement, THIRD_PARTY_BILLING_NOTE, THIRD_PARTY_MODELS, THIRD_PARTY_PROVIDERS, THINKING_LEVEL_LABELS, currentThirdPartyKey, marketplaceThinking, resolveMarketplaceThinking, intelligenceRank, providerLogo, providerName, thirdPartyPlanCopy,
+} from "./model-marketplace.js";
 import { mergeOlderPage, messageKey, restoredScrollTop } from "./conversation-pages.js";
 import DiagramViewer from "./components/DiagramViewer.jsx";
 import { isDiagramLanguage } from "./diagrams.js";
-import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
+import { productKnowledgeFor } from "./product-knowledge.js";
+import { FLEX_DASHBOARD_BLURB_CREDITS, FLEX_DASHBOARD_BLURB_LEGACY, USAGE_NAV_DESCRIPTION_LEGACY, creditsPricingFootnote, usageNavDescription, usageSettingsDescription } from "./credits-copy.js";
+import { useCreditsMode } from "./credits-runtime.js";
+import { CreditPurchase } from "./components/CreditPurchase.jsx";
+import { usageCounters } from "./usage-counters.js";
 import { usagePercentage, combinedTokenUsage } from "./usage-percentage.js";
 import { interruptedStreamMessage } from "./stream-recovery.js";
-import { CODING_NUDGE_COPY, shouldSuggestNebula } from "./coding-nudge.js";
+import { createReplyStreamGuard } from "./reasoning-guard.js";
+import SiteFooter from "./components/SiteFooter.jsx";
+import EligibilityGate from "./components/EligibilityGate.jsx";
+import { DEFAULT_UNIFIED_LEVEL, THINKING_CHOICES, toUnified, unifiedLabel } from "./thinking-levels.js";
+import { THEME_KEYS, THEME_CHOSEN_KEY, readSurfaceThemes, surfaceForView } from "./theme-surfaces.js";
+import { ChatTopography } from "./components/ChatTopography.jsx";
+import { MOTION_KEY, STUDY_TOPOGRAPHY_KEY, TOPOGRAPHY_KEY, readMotionPreference, readStudyTopographyPreference, readTopographyPreference, resolveReducedMotion } from "./chat-topography.js";
+// Development-only catalog preview.
+// The dev-only catalog preview and the "Browse models" modal are retired (Slice 7): the composer's picker, fed by the model catalog
+// API, is the one model picker.
+import "./components/catalog/catalog.css";
+import { AllowancePanel } from "./components/allowance/AllowancePanel.jsx";
+import { AllowanceExhaustedNotice } from "./components/allowance/AllowanceExhaustedNotice.jsx";
+import { allowanceViewFromChatError } from "./components/allowance/allowance-view.js";
+import { isAllowanceUiEnabled } from "./components/allowance/allowance-gate.js";
+import "./components/allowance/allowance.css";
+import "./chat-reference.css";
+import "./compact.css";
+import "./menus.css";
+import "./usage-limits.css";
 import Onboarding, { PersonalitySlider } from "./components/Onboarding.jsx";
 import {
   accentForTheme, CAPABILITY_OPTIONS, landingModeFor, mergeInstructions, personalityHeadline,
@@ -66,8 +131,7 @@ import {
 } from "./onboarding.js";
 import { checkDirectAndroidUpdate } from "./direct-distribution.js";
 import { NAMELESS_GREETING, workspaceNames } from "./display-names.js";
-import { COMPARISON_GROUPS, monthlyEquivalent, yearlySaving } from "./plan-comparison.js";
-import { SOURCE_REPO_URL } from "./source-repo.js";
+import { comparisonGroupsFor, monthlyEquivalent, yearlySaving } from "./plan-comparison.js";
 import Sentry from "./sentry.js";
 
 // Terms and Privacy load on demand, in their own chunk, so the app bundle
@@ -98,13 +162,13 @@ const NATIVE_OAUTH_VERIFIER_KEY = "vibhavgpt-native-oauth-verifier";
 
 const base64Url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
-async function startNativeGoogleSignIn() {
+async function startNativeSocialSignIn(provider) {
   const verifier = base64Url(crypto.getRandomValues(new Uint8Array(32)));
   const verifierHash = base64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier))));
   // localStorage rather than memory: Android may kill the backgrounded app
   // while the browser is open, and the return link then cold-starts it.
   localStorage.setItem(NATIVE_OAUTH_VERIFIER_KEY, verifier);
-  const { url } = await api("/api/native-auth/google/start", { method: "POST", body: JSON.stringify({ verifierHash }) });
+  const { url } = await api(`/api/native-auth/${encodeURIComponent(provider)}/start`, { method: "POST", body: JSON.stringify({ verifierHash }) });
   try {
     await Browser.open({ url });
   } catch {
@@ -150,6 +214,9 @@ function useCapacitorReturnLinks() {
         void finishNativeGoogleSignIn(parsed);
         return;
       }
+      // A launcher shortcut (Android res/xml/shortcuts.xml): vibhavgpt://open/app/chat, image or build, and nothing else.
+      const launch = launchPathFromLink(url);
+      if (launch) { window.location.assign(launch); return; }
       const path = capacitorReturnPath(url);
       if (path) window.location.assign(path);
     };
@@ -205,8 +272,8 @@ const ACCENTS = [
 
 const THEMES = [
   { id: "system", label: "Match system", description: "Follow your device between Daybreak and Deep Space." },
-  { id: "light", label: "Daybreak", description: "Cool paper grounds and dark ink, like a planet seen at altitude." },
-  { id: "dark", label: "Deep Space", description: "Deep navy grounds and light ink, the night side." },
+  { id: "light", label: "Daybreak", description: "Light grey grounds and dark ink." },
+  { id: "dark", label: "Deep Space", description: "Deep neutral grounds and light ink." },
 ];
 
 const prefersLight = () => window.matchMedia?.("(prefers-color-scheme: light)").matches ?? false;
@@ -214,30 +281,36 @@ const prefersLight = () => window.matchMedia?.("(prefers-color-scheme: light)").
 // Deep Space is the default sky. Older builds saved "system" for every reader
 // who never opened the setting, so "system" counts only once the reader has
 // picked a sky themselves (vibhavgpt-theme-chosen). Mirrors
-// theme/appearance-boot.js.
-function resolveSavedTheme() {
-  try {
-    const saved = localStorage.getItem("vibhavgpt-theme");
-    if (saved === "light" || saved === "dark") return saved;
-    if (saved === "system" && localStorage.getItem("vibhavgpt-theme-chosen") === "1") return "system";
-  } catch {
-    // Storage blocked: fall through to the default sky.
-  }
-  return "dark";
+// theme/appearance-boot.js. Chat and Study each keep their own sky (theme-surfaces.js).
+function resolveSavedThemes() {
+  try { return readSurfaceThemes(localStorage); } catch { return { chat: "dark", study: "dark" }; }
 }
 
 // Appearance lives above sign-in so the login screen honours it too. Theme and
 // accent are independent: theme picks the sky, accent picks the light running
 // through it, and the accent's value depends on which sky resolved.
 function useAppearance() {
-  const [accentId, setAccentId] = useState(() => localStorage.getItem("vibhavgpt-accent") || "cerulean");
-  const [themeId, setSavedThemeId] = useState(resolveSavedTheme);
-  // Every sky the reader picks (Settings, the account menu, onboarding) goes
-  // through here, so a later "Match system" is known to be deliberate.
-  const setThemeId = useCallback((value) => {
-    try { localStorage.setItem("vibhavgpt-theme-chosen", "1"); } catch { /* storage blocked */ }
-    setSavedThemeId(value);
+  const [accentId, setAccentIdLocal] = useState(() => localStorage.getItem("vibhavgpt-accent") || "ember");
+  // The reader's choice is also saved to the account, so it follows them to another device. Signed out there is no account:
+  // the request is refused and the choice stays on this device only until they sign in.
+  const setAccentId = useCallback((id) => {
+    setAccentIdLocal(id);
+    api("/api/me/preferences", { method: "PATCH", body: JSON.stringify({ accent: id }) }).catch(() => {});
   }, []);
+  // Adopting the account's accent, or going back to the default, is not a choice to save.
+  const adoptAccent = useCallback((id) => setAccentIdLocal(ACCENTS.some((option) => option.id === id) ? id : "ember"), []);
+  // Chat and Study each have their own sky. `surface` is the one on screen (see surfaceForView); `themeId` is its choice.
+  const [themeIds, setThemeIds] = useState(resolveSavedThemes);
+  const [surface, setSurface] = useState("chat");
+  const themeId = themeIds[surface];
+  // Every sky the reader picks (Settings, onboarding) goes through here, so a later
+  // "Match system" is known to be deliberate. One surface's choice leaves the other's alone.
+  const setSurfaceTheme = useCallback((which, value) => {
+    try { localStorage.setItem(THEME_CHOSEN_KEY, "1"); localStorage.setItem(THEME_KEYS[which], value); } catch { /* storage blocked */ }
+    setThemeIds((current) => ({ ...current, [which]: value }));
+  }, []);
+  // The setup questions ask once, for the app as a whole: that sets both.
+  const setThemeId = useCallback((value) => { setSurfaceTheme("chat", value); setSurfaceTheme("study", value); }, [setSurfaceTheme]);
   const [systemTheme, setSystemTheme] = useState(() => (prefersLight() ? "light" : "dark"));
 
   // Tracked unconditionally rather than only while themeId === "system", so
@@ -253,8 +326,10 @@ function useAppearance() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", resolved);
-    localStorage.setItem("vibhavgpt-theme", themeId);
-  }, [resolved, themeId]);
+  }, [resolved]);
+  useEffect(() => {
+    try { localStorage.setItem(THEME_KEYS.chat, themeIds.chat); localStorage.setItem(THEME_KEYS.study, themeIds.study); } catch { /* storage blocked */ }
+  }, [themeIds]);
 
   // The boot script in each HTML entry already set data-accent before first
   // paint; this keeps it in step with the picker from then on.
@@ -264,7 +339,56 @@ function useAppearance() {
     localStorage.setItem("vibhavgpt-accent", accent.id);
   }, [accentId]);
 
-  return { accentId, setAccentId, themeId, setThemeId, resolved };
+  // Glass or solid floating controls. The boot script applies the saved
+  // choice before first paint; this keeps it in step with the setting.
+  const [effects, setEffects] = useState(() => {
+    try { return localStorage.getItem("vibhavgpt-effects") === "solid" ? "solid" : "glass"; } catch { return "glass"; }
+  });
+  useEffect(() => {
+    if (effects === "solid") document.documentElement.setAttribute("data-effects", "solid");
+    else document.documentElement.removeAttribute("data-effects");
+    try { localStorage.setItem("vibhavgpt-effects", effects); } catch { /* storage blocked */ }
+  }, [effects]);
+
+  // Chat's decorative background (contour lines behind the conversation): on unless this device turned it off. It sits over the sky
+  // and never replaces it, and Study never shows it.
+  const [topography, setTopographyState] = useState(() => { try { return readTopographyPreference(localStorage); } catch { return "on"; } });
+  const setTopography = useCallback((value) => {
+    const next = value === "off" ? "off" : "on";
+    setTopographyState(next);
+    try { localStorage.setItem(TOPOGRAPHY_KEY, next); } catch { /* storage blocked */ }
+  }, []);
+
+  // Study's own contour background, chosen separately (off unless turned on here).
+  const [studyTopography, setStudyTopographyState] = useState(() => { try { return readStudyTopographyPreference(localStorage); } catch { return "on"; } });
+  const setStudyTopography = useCallback((value) => {
+    const next = value === "on" ? "on" : "off";
+    setStudyTopographyState(next);
+    try { localStorage.setItem(STUDY_TOPOGRAPHY_KEY, next); } catch { /* storage blocked */ }
+  }, []);
+
+  // Motion: follow the device, or stop background movement, or allow it. Applied at once to the whole page (data-motion on <html>).
+  const [motion, setMotionState] = useState(() => { try { return readMotionPreference(localStorage); } catch { return "system"; } });
+  const [deviceReducesMotion, setDeviceReducesMotion] = useState(() => { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { return false; } });
+  useEffect(() => {
+    let list = null;
+    try { list = window.matchMedia("(prefers-reduced-motion: reduce)"); } catch { return undefined; }
+    const update = () => setDeviceReducesMotion(list.matches);
+    list.addEventListener?.("change", update);
+    return () => list.removeEventListener?.("change", update);
+  }, []);
+  const setMotion = useCallback((value) => {
+    const next = ["system", "reduce", "full"].includes(value) ? value : "system";
+    setMotionState(next);
+    try { localStorage.setItem(MOTION_KEY, next); } catch { /* storage blocked */ }
+  }, []);
+  const reducedMotion = resolveReducedMotion(motion, deviceReducesMotion);
+  useEffect(() => {
+    if (reducedMotion) document.documentElement.setAttribute("data-motion", "reduce");
+    else document.documentElement.removeAttribute("data-motion");
+  }, [reducedMotion]);
+
+  return { accentId, setAccentId, adoptAccent, themeId, themeIds, setThemeId, setSurfaceTheme, setSurface, surface, systemTheme, resolved, effects, setEffects, topography, setTopography, studyTopography, setStudyTopography, motion, setMotion, reducedMotion };
 }
 
 /* -- Turnstile ------------------------------------------------------------ */
@@ -440,7 +564,7 @@ function MobileTurnstileBridge({ theme }) {
           <section className="auth__card" aria-labelledby="bridge-title">
             <div className="auth__step">
               <div className="auth__head">
-                <h1 className="auth__title" id="bridge-title">Quick security check.</h1>
+                <h1 className="auth__title" id="bridge-title">Security check</h1>
                 <p className="auth__subtitle">Complete this check to continue securely in VibhavGPT.</p>
               </div>
               {complete ? <p className="note note--good">Verification complete. Passing it to the app…</p> : <TurnstileWidget onToken={sendToken} onError={reportError} onReady={() => postBridgeStatus("turnstile-widget-ready")} resetKey={cycle} theme={theme} />}
@@ -456,13 +580,14 @@ function MobileTurnstileBridge({ theme }) {
 /* -- Transport ------------------------------------------------------------ */
 
 
-async function streamChat(payload, onStatus, { signal, onDelta, onConversation } = {}) {
+async function streamChat(payload, onStatus, { signal, onDelta, onConversation, onReply } = {}) {
   let response;
   try {
     response = await apiRequest("/api/chat/stream", {
       method: "POST",
       credentials: "include",
-      headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+      // X-Reply-Detach: the reply keeps running if this page goes away; it is stopped only by the Stop button (src/chat/live-replies.js).
+      headers: { "Content-Type": "application/json", Accept: "text/event-stream", "X-Reply-Detach": "1" },
       body: JSON.stringify(payload),
       signal,
     });
@@ -493,6 +618,7 @@ async function streamChat(payload, onStatus, { signal, onDelta, onConversation }
     try { data = JSON.parse(encoded); } catch {
       throw new Error("VibhavGPT returned an unreadable response. Please retry your message.");
     }
+    if (event === "reply") onReply?.(data);
     if (event === "status") onStatus(data.phase, data);
     if (event === "delta") onDelta?.(data);
     // The message was saved before any reply: the conversation it is in.
@@ -517,6 +643,58 @@ async function streamChat(payload, onStatus, { signal, onDelta, onConversation }
   if (buffer.trim()) handleEvent(buffer);
   if (!complete) throw new Error("The response ended before VibhavGPT could reply.");
   return complete;
+}
+
+/**
+ * Follows a reply that is already running (after a reload, or from a chat opened while it runs). Nothing is sent: the reply's events so
+ * far are replayed and the rest follow. Returns the complete event, or null when the reply is no longer running (the conversation then
+ * has everything that was saved). Throws the reply's own error, if it ended in one.
+ */
+async function attachReplyStream(replyId, { signal, onStatus, onDelta, onConversation } = {}) {
+  let response;
+  try {
+    response = await apiRequest(`/api/chat/replies/${encodeURIComponent(replyId)}/events?after=0`, { method: "GET", credentials: "include", headers: { Accept: "text/event-stream" }, signal });
+  } catch (error) {
+    if (signal?.aborted) throw new DOMException("Request aborted", "AbortError");
+    if (error?.status === 404) return null;
+    throw error;
+  }
+  if (!response.ok || !response.body) return null;
+  let complete = null;
+  let replayGone = false;
+  await readReplyEvents(response, (event, data) => {
+    if (event === "status") onStatus?.(data.phase, data);
+    if (event === "delta") onDelta?.(data);
+    if (event === "conversation") onConversation?.(data);
+    if (event === "error") { if (data?.reload) { replayGone = true; return; } throw responseError(data, data.status); }
+    if (event === "complete") complete = data;
+  });
+  return replayGone ? null : complete;
+}
+
+// Social sign-in (Slice 8): the page offers only the providers the server says are set up (GET /api/sign-in-options), in this order.
+const SOCIAL_SIGN_IN = [
+  { id: "google", label: "Google", Mark: () => <GoogleMark /> },
+  { id: "github", label: "GitHub", Mark: GitHubMark },
+  { id: "microsoft", label: "Microsoft", Mark: MicrosoftMark },
+  { id: "discord", label: "Discord", Mark: DiscordMark },
+];
+const SOCIAL_PROVIDER_KEY = "vibhavgpt-social-provider";
+const socialLabel = (id) => SOCIAL_SIGN_IN.find((provider) => provider.id === id)?.label ?? "Social";
+
+// The words for a social sign-in that came back with ?error= (Better Auth's codes, the native app's, and ours).
+function socialSignInErrorMessage(code, provider) {
+  const label = socialLabel(provider);
+  switch (code) {
+    case "access_denied":
+      return `${label} sign-in was cancelled.`;
+    case "email_not_verified":
+      return `${label} hasn't verified your email address, so an account can't be created from it. Verify your email with ${label}, or sign up with your email.`;
+    case "account_not_linked":
+      return `An account with this email already exists, and ${label} hasn't confirmed the email is yours, so we can't sign you in with ${label}. Sign in with your email instead.`;
+    default:
+      return `${label} sign-in didn't finish. Please try again.`;
+  }
 }
 
 function authErrorMessage(error, isSignUp) {
@@ -560,7 +738,10 @@ export default function App() {
   const appearance = useAppearance();
   const isMobileTurnstileBridge = window.location.pathname === "/mobile-auth/turnstile";
   const [user, setUser] = useState(null);
-  const [mode, setMode] = useState(() => window.location.pathname === "/signup" ? "signup" : "signin");
+  const [mode, setMode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get("mode") === "signup" || window.location.pathname === "/signup") ? "signup" : "signin";
+  });
   const [loading, setLoading] = useState(true);
   const [legal, setLegal] = useState(() => legalPageFromPath(window.location.pathname));
 
@@ -596,6 +777,11 @@ export default function App() {
       .catch(() => null)
       .finally(() => setLoading(false));
   }, [isMobileTurnstileBridge]);
+  // The accent saved to the account wins over this device's copy, so a second device shows the same colours.
+  useEffect(() => {
+    if (user?.accent) appearance.adoptAccent(user.accent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.accent]);
 
 
   // Preserve query/hash based sign-in callbacks and old billing deep links.
@@ -644,12 +830,18 @@ export default function App() {
   if (user && window.location.pathname === "/onboarding" && onboardingForUser(user).onboarding_completed) {
     window.history.replaceState(null, "", "/app");
   }
+  if (user && (window.location.pathname === "/login" || window.location.pathname === "/signup")) {
+    window.history.replaceState(null, "", "/app");
+  }
   return user ? (
+    <EligibilityGate key={user.id} onLegal={openLegal} onSignOut={async () => { await api("/api/auth/sign-out", { method: "POST" }).catch(() => {}); window.history.replaceState(null, "", "/app"); setUser(null); }}>
     <Workspace
       user={user}
       appearance={appearance}
       onSignOut={async () => {
         await api("/api/auth/sign-out", { method: "POST" });
+        // The next person on this device starts from the default accent, not this account's.
+        appearance.adoptAccent("ember");
         window.history.replaceState(null, "", "/app");
         setUser(null);
       }}
@@ -657,6 +849,7 @@ export default function App() {
         // The account is gone on the server; nothing of it should stay on
         // this device either. Appearance choices are not account data.
         clearAccountLocalData(user?.id);
+        appearance.adoptAccent("ember");
         // On the web, the deletion page confirms it in words; the app shell
         // has no such page, so it returns to sign-in.
         if (!Capacitor.isNativePlatform()) { window.location.replace("/account-deletion?deleted=1"); return; }
@@ -664,7 +857,9 @@ export default function App() {
         setUser(null);
       }}
       onLegal={openLegal}
+      onUserChange={async () => { const fresh = await api("/api/me", { cache: "no-store" }); if (fresh?.user) setUser(fresh.user); }}
     />
+    </EligibilityGate>
   ) : (
     <Auth mode={mode} setMode={setMode} onUser={(session) => { window.history.replaceState({}, "", settingsRoute(window.location.pathname, window.location.search)?.redirect ?? (settingsRoute(window.location.pathname) ? `${window.location.pathname}${window.location.search}` : `${productPath(productModeFromPath(window.location.pathname))}${window.location.search}`)); setUser(session); }} onLegal={openLegal} theme={appearance.resolved} />
   );
@@ -682,81 +877,6 @@ function clearAccountLocalData(userId) {
 
 /* -- Auth ----------------------------------------------------------------- */
 
-// What an account here does and doesn't do, in the words the policy uses.
-// Shown beside the form on wide screens and under it on phones.
-const ACCOUNT_FACTS = [
-  "No ads.",
-  "We don't sell your data.",
-  "We don't train AI models on your chats.",
-  "Export your data or delete your account from Settings.",
-];
-
-function AccountFacts({ className = "" }) {
-  return (
-    <section className={`auth__facts ${className}`.trim()} aria-label="How we treat your account">
-      <p className="auth__facts-title">How we treat your account</p>
-      <ul>
-        {ACCOUNT_FACTS.map((fact) => <li key={fact}>{fact}</li>)}
-      </ul>
-    </section>
-  );
-}
-
-// A light that follows a fine pointer across one surface, written as
-// --spot-x/--spot-y on that element (one write per frame). Never on touch
-// and never under reduced motion; the surface reads the same without it.
-function usePointerSpotlight(ref) {
-  useEffect(() => {
-    const element = ref.current;
-    if (!element) return undefined;
-    const finePointer = window.matchMedia?.("(pointer: fine)");
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-    if (!finePointer?.matches || reducedMotion?.matches) return undefined;
-    let frame = 0;
-    let last = null;
-    const paint = () => {
-      frame = 0;
-      if (!last) return;
-      const box = element.getBoundingClientRect();
-      element.style.setProperty("--spot-x", `${Math.round(last.clientX - box.left)}px`);
-      element.style.setProperty("--spot-y", `${Math.round(last.clientY - box.top)}px`);
-      element.dataset.spot = "";
-    };
-    const move = (event) => {
-      last = event;
-      if (!frame) frame = requestAnimationFrame(paint);
-    };
-    const leave = () => {
-      last = null;
-      delete element.dataset.spot;
-    };
-    element.addEventListener("pointermove", move);
-    element.addEventListener("pointerleave", leave);
-    return () => {
-      cancelAnimationFrame(frame);
-      element.removeEventListener("pointermove", move);
-      element.removeEventListener("pointerleave", leave);
-    };
-  }, [ref]);
-}
-
-function AuthSky({ skyRef }) {
-  return (
-    <aside className="auth__sky" ref={skyRef}>
-      <span className="auth__stars" aria-hidden="true" />
-      <span className="auth__stars-lit" aria-hidden="true" />
-      <span className="auth__atmosphere" aria-hidden="true" />
-      <div className="auth__planet" aria-hidden="true">
-        <img src="/planets/earth.webp" alt="" width="800" height="800" decoding="async" />
-      </div>
-      <div className="auth__sky-copy">
-        <p className="auth__quote">A quiet place to think out loud.</p>
-        <AccountFacts />
-      </div>
-    </aside>
-  );
-}
-
 function Auth({ mode, setMode, onUser, onLegal, theme }) {
   const signUp = mode === "signup";
   const [name, setName] = useState("");
@@ -767,19 +887,30 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
   const [turnstileCycle, setTurnstileCycle] = useState(0);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [otp, setOtp] = useState("");
-  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [step, setStep] = useState("password");
+  const [signInMethod, setSignInMethod] = useState("password");
   const [factorMethod, setFactorMethod] = useState("otp");
   const [factorMethods, setFactorMethods] = useState([]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
+  // Which social sign-in is starting (its id), or null.
+  const [socialBusy, setSocialBusy] = useState(null);
+  const googleBusy = socialBusy !== null;
+  // The social sign-in providers the server has set up; none until it answers, so a button never appears that cannot work.
+  const [socialProviders, setSocialProviders] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api("/api/sign-in-options")
+      .then((options) => { if (!cancelled) setSocialProviders(Array.isArray(options?.socialProviders) ? options.socialProviders : []); })
+      .catch(() => { if (!cancelled) setSocialProviders([]); });
+    return () => { cancelled = true; };
+  }, []);
+  // The buttons this page offers: the known providers the server reports, in the page's order (an unknown name shows nothing).
+  const offeredSocial = SOCIAL_SIGN_IN.filter((provider) => socialProviders.includes(provider.id));
   const [codeSent, setCodeSent] = useState(false);
   const [resendUntil, setResendUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
-  const [emailCodeDialogOpen, setEmailCodeDialogOpen] = useState(false);
-  const [emailCodeAddress, setEmailCodeAddress] = useState("");
   const [passwordResetDialogOpen, setPasswordResetDialogOpen] = useState(false);
   const [passwordResetStep, setPasswordResetStep] = useState("request");
   const [passwordResetEmail, setPasswordResetEmail] = useState("");
@@ -787,10 +918,6 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [passwordResetNotice, setPasswordResetNotice] = useState("");
-  const cardRef = useRef(null);
-  const skyRef = useRef(null);
-  usePointerSpotlight(cardRef);
-  usePointerSpotlight(skyRef);
 
   const resetPasswordResetFlow = () => {
     setPasswordResetStep("request");
@@ -817,12 +944,12 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
       window.history.replaceState({}, "", window.location.pathname);
       return;
     }
-    // Set by a failed Google sign-in (Better Auth's errorURL, or the native
-    // app's return link).
+    // Set by a failed social sign-in (Better Auth's errorURL, or the native app's return link). The provider is the one this page
+    // started; an error that arrives without one is worded for Google, the only provider before Slice 8.
     if (params.has("error")) {
-      setError(params.get("error") === "access_denied"
-        ? "Google sign-in was cancelled."
-        : "Google sign-in didn't finish. Please try again.");
+      let provider = "google";
+      try { provider = sessionStorage.getItem(SOCIAL_PROVIDER_KEY) || localStorage.getItem(SOCIAL_PROVIDER_KEY) || "google"; } catch { /* storage unavailable */ }
+      setError(socialSignInErrorMessage(params.get("error"), provider));
       window.history.replaceState({}, "", window.location.pathname);
       return;
     }
@@ -855,10 +982,6 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
 
   async function submit(event) {
     event.preventDefault();
-    if (signUp && !ageConfirmed) {
-      setError("Please confirm that you are at least 16 years old.");
-      return;
-    }
     if (!turnstileToken) {
       if (!turnstileError) setError("Please complete the bot check before continuing.");
       return;
@@ -896,8 +1019,8 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
     }
   }
 
-  async function sendSignInCode() {
-    const requestedEmail = emailCodeAddress.trim().toLowerCase();
+  async function sendSignInCode(address) {
+    const requestedEmail = String(address ?? "").trim().toLowerCase();
     if (!requestedEmail) return;
     setBusy(true);
     resetMessage();
@@ -907,7 +1030,6 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
         body: JSON.stringify({ email: requestedEmail, type: "sign-in" }),
       });
       setEmail(requestedEmail);
-      setEmailCodeDialogOpen(false);
       setStep("sign-in-otp");
       beginCooldown();
       setNotice("If an account exists for this email, a six-digit code is on its way.");
@@ -1043,26 +1165,28 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
     }
   }
 
-  async function signInWithGoogle() {
-    setGoogleBusy(true);
+  async function signInWithProvider(provider) {
+    setSocialBusy(provider);
     resetMessage();
+    // Remembered so an error that comes back names the right provider (localStorage too: the native app may be restarted on return).
+    try { sessionStorage.setItem(SOCIAL_PROVIDER_KEY, provider); localStorage.setItem(SOCIAL_PROVIDER_KEY, provider); } catch { /* storage unavailable */ }
     try {
       if (Capacitor.isNativePlatform()) {
-        await startNativeGoogleSignIn();
+        await startNativeSocialSignIn(provider);
         return;
       }
       const result = await api("/api/auth/sign-in/social", {
         method: "POST",
         // Land in the workspace after sign-in, not on the public homepage that
         // now owns a bare /. A brand-new account opens onboarding from there.
-        body: JSON.stringify({ provider: "google", callbackURL: `${window.location.origin}/app`, errorCallbackURL: `${window.location.origin}/app` }),
+        body: JSON.stringify({ provider, callbackURL: `${window.location.origin}/app`, errorCallbackURL: `${window.location.origin}/app` }),
       });
       if (result?.url) window.location.assign(result.url);
-      else setError("Google sign-in could not be started. Please try again.");
+      else setError(`${socialLabel(provider)} sign-in could not be started. Please try again.`);
     } catch (err) {
       setError(err.message);
     } finally {
-      setGoogleBusy(false);
+      setSocialBusy(null);
     }
   }
 
@@ -1111,26 +1235,21 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
     resetMessage();
   };
   const backupCode = step === "two-factor" && factorMethod === "backup";
+  const emailCode = !signUp && signInMethod === "code";
+  const submitEmailCode = (event) => { event.preventDefault(); sendSignInCode(email); };
 
   return (
-    <div className="auth">
-      <AuthSky skyRef={skyRef} />
+    <div className="auth auth--signin">
+      <div className="auth__backdrop" aria-hidden="true">
+        <span className="auth__blob auth__blob--a" />
+        <span className="auth__blob auth__blob--b" />
+        <span className="auth__blob auth__blob--c" />
+        <span className="auth__dots" />
+      </div>
       <main className="auth__main">
-        <header className="auth__top"><Brand size="brand--lg" /></header>
         <div className="auth__center">
-          <section className="auth__card" ref={cardRef} aria-labelledby="auth-title">
-            {!codeStep && (
-              <Segmented
-                className="auth__switch"
-                label="Sign in or create an account"
-                value={signUp ? "signup" : "signin"}
-                onChange={switchMode}
-                options={[
-                  { value: "signin", label: "Sign in" },
-                  { value: "signup", label: "Create account" },
-                ]}
-              />
-            )}
+          <section className="auth__card" aria-labelledby="auth-title">
+            <header className="auth__logo"><Brand size="brand--lg" /></header>
             <div className="auth__step" key={codeStep ? step : mode}>
               {codeStep ? (
                 <>
@@ -1197,89 +1316,125 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
               ) : (
                 <>
                   <div className="auth__head">
-                    <h1 className="auth__title" id="auth-title">{signUp ? "Create your account." : "Welcome back."}</h1>
+                    <h1 className="auth__title" id="auth-title">{signUp ? "Create your account" : "Welcome back"}</h1>
                     <p className="auth__subtitle">
                       {signUp
                         ? "One account for chat, study and image creation."
                         : "Your chats, memory and files are where you left them."}
                     </p>
                   </div>
-                  <form className="auth__form" onSubmit={submit}>
+                  {offeredSocial.length > 0 && (
+                    <div className="auth__social">
+                      {offeredSocial.map(({ id, label, Mark }) => (
+                        <button key={id} className={`btn btn--secondary btn--lg btn--block auth__provider auth__${id}`} type="button" data-provider={id} disabled={busy || googleBusy} onClick={() => signInWithProvider(id)}>
+                          <Mark />
+                          {socialBusy === id ? "Connecting…" : `Continue with ${label}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {offeredSocial.length > 0 && <div className="auth__divider">or</div>}
+                  {!signUp && (
+                    <Segmented
+                      className="auth__method"
+                      label="Sign-in method"
+                      value={signInMethod}
+                      onChange={(next) => { setSignInMethod(next); resetMessage(); }}
+                      options={[
+                        { value: "password", label: "Password" },
+                        { value: "code", label: "Email code" },
+                      ]}
+                    />
+                  )}
+                  <form className="auth__form" onSubmit={emailCode ? submitEmailCode : submit}>
                     {signUp && (
-                      <Field label="Name">
-                        <input className="input" required value={name} autoComplete="name" onChange={(event) => setName(event.target.value)} placeholder="Your name" />
+                      <Field label="Name" htmlFor="auth-name">
+                        <span className="input-affix input-affix--lead">
+                          <UserRound className="input-affix__icon" size={17} aria-hidden="true" />
+                          <input id="auth-name" className="input" required value={name} autoComplete="name" onChange={(event) => setName(event.target.value)} placeholder="Your name" />
+                        </span>
                       </Field>
                     )}
-                    <Field label="Email">
-                      <input
-                        className="input"
-                        required
-                        type="email"
-                        value={email}
-                        autoComplete={signUp ? "email" : "username webauthn"}
-                        onChange={(event) => setEmail(event.target.value)}
-                        placeholder="you@example.com"
-                      />
-                    </Field>
-                    <Field label="Password" htmlFor="auth-password">
-                      <span className="input-affix">
+                    <Field label="Email" htmlFor="auth-email">
+                      <span className="input-affix input-affix--lead">
+                        <Mail className="input-affix__icon" size={17} aria-hidden="true" />
                         <input
-                          id="auth-password"
+                          id="auth-email"
                           className="input"
                           required
-                          minLength="8"
-                          type={passwordVisible ? "text" : "password"}
-                          value={password}
-                          autoComplete={signUp ? "new-password" : "current-password webauthn"}
-                          onChange={(event) => setPassword(event.target.value)}
-                          placeholder="At least 8 characters"
+                          type="email"
+                          value={email}
+                          autoComplete={signUp ? "email" : "username webauthn"}
+                          onChange={(event) => setEmail(event.target.value)}
+                          placeholder="you@example.com"
                         />
-                        <button
-                          type="button"
-                          className="input-affix__button"
-                          onClick={() => setPasswordVisible((visible) => !visible)}
-                          aria-label={passwordVisible ? "Hide password" : "Show password"}
-                        >
-                          {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
-                        </button>
                       </span>
                     </Field>
-                    {!signUp && (
-                      <button
-                        className="btn btn--quiet auth__forgot"
-                        type="button"
-                        disabled={busy || googleBusy}
-                        onClick={() => {
-                          setPasswordResetEmail(email);
-                          resetPasswordResetFlow();
-                          setPasswordResetDialogOpen(true);
-                          setError("");
-                        }}
+                    {!emailCode && (
+                      <Field
+                        label="Password"
+                        htmlFor="auth-password"
+                        aside={!signUp ? (
+                          <button
+                            className="auth__forgot"
+                            type="button"
+                            disabled={busy || googleBusy}
+                            onClick={() => {
+                              setPasswordResetEmail(email);
+                              resetPasswordResetFlow();
+                              setPasswordResetDialogOpen(true);
+                              setError("");
+                            }}
+                          >
+                            Forgot password?
+                          </button>
+                        ) : undefined}
                       >
-                        Forgot password?
-                      </button>
+                        <span className="input-affix input-affix--lead">
+                          <Lock className="input-affix__icon" size={17} aria-hidden="true" />
+                          <input
+                            id="auth-password"
+                            className="input"
+                            required
+                            minLength="8"
+                            type={passwordVisible ? "text" : "password"}
+                            value={password}
+                            autoComplete={signUp ? "new-password" : "current-password webauthn"}
+                            onChange={(event) => setPassword(event.target.value)}
+                            placeholder="At least 8 characters"
+                          />
+                          <button
+                            type="button"
+                            className="input-affix__button"
+                            onClick={() => setPasswordVisible((visible) => !visible)}
+                            aria-label={passwordVisible ? "Hide password" : "Show password"}
+                          >
+                            {passwordVisible ? <EyeOff size={17} /> : <Eye size={17} />}
+                          </button>
+                        </span>
+                      </Field>
                     )}
                     {signUp && (
                       <>
-                        <label className="checkbox">
-                          <input type="checkbox" required checked={ageConfirmed} onChange={(event) => setAgeConfirmed(event.target.checked)} />
-                          I confirm I am at least 16 years old.
-                        </label>
+                        {/* The age question and the Terms acceptance come next, for every way of signing up (components/EligibilityGate.jsx). */}
                         <p className="auth__consent">
-                          By creating an account you agree to our{" "}
+                          After you create your account, we’ll ask your month and year of birth and for you to accept our{" "}
                           <LegalLink page="terms" onOpen={onLegal}>Terms of Service</LegalLink> and{" "}
                           <LegalLink page="privacy" onOpen={onLegal}>Privacy Policy</LegalLink>.
                         </p>
                       </>
                     )}
-                    <TurnstileWidget
-                      key={`${signUp}-${turnstileCycle}`}
-                      resetKey={turnstileCycle}
-                      theme={theme}
-                      onToken={handleTurnstileToken}
-                      onError={handleTurnstileError}
-                    />
-                    {turnstileError && (
+                    {/* The bot check guards the password and create-account forms; asking for an email code needs none. */}
+                    {!emailCode && (
+                      <TurnstileWidget
+                        key={`${signUp}-${turnstileCycle}`}
+                        resetKey={turnstileCycle}
+                        theme={theme}
+                        onToken={handleTurnstileToken}
+                        onError={handleTurnstileError}
+                      />
+                    )}
+                    {!emailCode && turnstileError && (
                       <div className="auth__captcha-error" role="alert">
                         <p className="note note--error">{turnstileError}</p>
                         <button
@@ -1297,74 +1452,29 @@ function Auth({ mode, setMode, onUser, onLegal, theme }) {
                     )}
                     {notice && <p className="note note--good">{notice}</p>}
                     {error && <p className="note note--error" role="alert">{error}</p>}
-                    <button className="btn btn--primary btn--lg btn--block" disabled={busy || googleBusy}>
-                      {busy ? "One moment…" : signUp ? "Create account" : "Sign in"}
+                    <button className="btn btn--primary btn--lg btn--block auth__submit" disabled={busy || googleBusy || (emailCode && !email.trim())}>
+                      {busy ? "One moment…" : (<>{emailCode ? "Email me a code" : signUp ? "Create account" : "Sign in"}<ArrowRight size={16} aria-hidden="true" /></>)}
                     </button>
                   </form>
-                  {!signUp && (
-                    <div className="auth__alt">
-                      <button className="btn btn--quiet" type="button" disabled={busy || googleBusy} onClick={() => {
-                        setEmailCodeAddress(email);
-                        setEmailCodeDialogOpen(true);
-                        resetMessage();
-                      }}>
-                        <Mail size={15} /> Email me a code
-                      </button>
-                      {/* Offered only where the browser can run passkeys at all; any
-                          warning appears only after someone chooses it. */}
-                      {passkeysSupported() && (
-                        <button className="btn btn--quiet" type="button" disabled={busy || googleBusy} onClick={signInWithPasskey}>
-                          <Fingerprint size={15} /> Use a passkey
-                        </button>
-                      )}
-                    </div>
+                  {/* Offered only where the browser can run passkeys at all; any
+                      warning appears only after someone chooses it. */}
+                  {!signUp && passkeysSupported() && (
+                    <button className="btn btn--secondary btn--lg btn--block auth__passkey" type="button" disabled={busy || googleBusy} onClick={signInWithPasskey}>
+                      <Fingerprint size={17} aria-hidden="true" /> Use a passkey
+                    </button>
                   )}
-                  <div className="auth__divider">or</div>
-                  <button className="btn btn--secondary btn--lg btn--block" type="button" disabled={busy || googleBusy} onClick={signInWithGoogle}>
-                    <GoogleMark />
-                    {googleBusy ? "Connecting…" : "Continue with Google"}
-                  </button>
                 </>
               )}
             </div>
           </section>
-          <AccountFacts className="auth__facts--main" />
+          {!codeStep && (
+            <p className="auth__switchline">
+              {signUp ? "Already have an account?" : "New to VibhavGPT?"}{" "}
+              <button type="button" className="auth__switchlink" onClick={() => switchMode(signUp ? "signin" : "signup")}>{signUp ? "Sign in" : "Create account"}</button>
+            </p>
+          )}
         </div>
-        <p className="auth__legal">
-          <LegalLink page="terms" onOpen={onLegal}>Terms</LegalLink>
-          <LegalLink page="privacy" onOpen={onLegal}>Privacy</LegalLink>
-        </p>
       </main>
-
-      <Modal
-        open={emailCodeDialogOpen}
-        onClose={() => { setEmailCodeDialogOpen(false); resetMessage(); }}
-        eyebrow="Passwordless sign-in"
-        title="Get a sign-in code"
-        description="Enter the email address for your VibhavGPT account and we'll send a six-digit code."
-        onSubmit={(event) => { event.preventDefault(); sendSignInCode(); }}
-      >
-        <Field label="Email address">
-          <input
-            className="input"
-            autoFocus
-            required
-            type="email"
-            value={emailCodeAddress}
-            onChange={(event) => setEmailCodeAddress(event.target.value)}
-            placeholder="you@example.com"
-          />
-        </Field>
-        {error && <p className="note note--error" role="alert">{error}</p>}
-        <div className="ui-modal__actions">
-          <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => { setEmailCodeDialogOpen(false); resetMessage(); }}>
-            Cancel
-          </button>
-          <button className="btn btn--primary" disabled={busy || !emailCodeAddress.trim()}>
-            {busy ? "Sending…" : "Email me a code"}
-          </button>
-        </div>
-      </Modal>
 
       <Modal
         open={passwordResetDialogOpen}
@@ -1476,20 +1586,90 @@ const GoogleMark = () => (
 
 /* -- Workspace ------------------------------------------------------------ */
 
-const MODELS = [
-  { value: "lumen", label: "Lumen", full: "VibhavGPT Lumen", description: "Fastest. Good for everyday questions.", badges: [{ label: "Entry", tone: "entry" }] },
-  { value: "nova", label: "Nova", full: "VibhavGPT Nova", description: "Balanced speed and depth. Reads images.", badges: [{ label: "Balanced", tone: "balanced" }, { label: "Vision" }] },
-  { value: "nebula", label: "Nebula", full: "VibhavGPT Nebula", description: "Strong reasoning for demanding, high-complexity work. Reads images.", badges: [{ label: "Premium", tone: "premium" }, { label: "Vision" }] },
-  { value: "vesper", label: "Vesper", full: "VibhavGPT Vesper", description: "Flagship. Highest reasoning capacity for the most difficult problems. Reads images.", badges: [{ label: "Top Tier", tone: "top-tier" }, { label: "Vision" }] },
+// The picker's lineup (model-marketplace.js): the house models first, then each provider's third-party models under the provider's
+// name. Each row is the maker's mark, the exact name, one line on what it is for, and a lock with "Upgrade" or a check; no badges.
+// Study is a product mode, not a row. The marks are local files (frontend/public/brand), never hotlinked.
+const HOUSE_GROUP = { id: "house", label: "VibhavGPT" };
+const BRAND_MARKS = { vibhavgpt: BRAND_ICON, ...PROVIDER_MARK_FILES };
+// The makers' official marks are single-colour (black on transparent); data-mono lets the dark sky draw them in white.
+const MONO_MARKS = new Set(Object.keys(PROVIDER_MARK_FILES).filter((logo) => !COLOR_MARKS.includes(logo)));
+function BrandMark({ logo, size = 20 }) {
+  const src = BRAND_MARKS[logo] ?? BRAND_ICON;
+  return <img className="model-brand" data-brand={logo} data-mono={MONO_MARKS.has(logo) || undefined} src={src} width={size} height={size} alt="" aria-hidden="true" decoding="async" draggable="false" />;
+}
+// The mark above a reply: the maker's for a third-party model (GPT-6: OpenAI; GLM: Z.AI), VibhavGPT's for the house tiers and Study.
+// A retired third-party id reads as its replacement's maker, which is the same maker.
+function replyLogo(modelKey) {
+  const entry = THIRD_PARTY_MODELS.find((model) => model.id === currentThirdPartyKey(modelKey));
+  return entry ? providerLogo(entry.provider) ?? "vibhavgpt" : "vibhavgpt";
+}
+function ReplyMark({ model }) {
+  const logo = replyLogo(model);
+  return <span className="turn__mark" data-brand={logo}><img src={BRAND_MARKS[logo] ?? BRAND_ICON} data-mono={MONO_MARKS.has(logo) || undefined} alt="" /></span>;
+}
+const intelligenceBadge = (level) => ({ label: INTELLIGENCE_LABELS[level], tone: INTELLIGENCE_TONES[level] });
+const MODELS = HOUSE_MODELS.map((entry) => ({
+  value: entry.id,
+  label: entry.name,
+  full: `VibhavGPT ${entry.name}`,
+  description: entry.description,
+  badges: [intelligenceBadge(HOUSE_INTELLIGENCE[entry.id])],
+  house: true,
+  logo: "vibhavgpt",
+  lockedCopy: HOUSE_PLAN_COPY[entry.id],
+  group: HOUSE_GROUP,
+}));
+// Every third-party model the app knows; the picker shows the ones the server lists now (guard verified, capable, live price known).
+const THIRD_PARTY_OPTIONS = THIRD_PARTY_MODELS.map((entry) => ({
+  value: entry.id,
+  label: entry.name,
+  full: entry.name,
+  description: entry.description,
+  badges: [intelligenceBadge(entry.intelligence)],
+  house: false,
+  providerLabel: providerName(entry.provider),
+  logo: providerLogo(entry.provider),
+  minPlan: entry.minPlan,
+  lockedCopy: thirdPartyPlanCopy(entry.id),
+  group: { id: entry.provider, label: providerName(entry.provider) },
+}));
+// A provider's section header is drawn only when enough of its models are listed (GPT-6: two or more); otherwise its rows stand alone.
+function withSectionHeaders(entries) {
+  const counts = entries.reduce((map, entry) => map.set(entry.group?.id, (map.get(entry.group?.id) ?? 0) + 1), new Map());
+  return entries.map((entry) => {
+    const provider = THIRD_PARTY_PROVIDERS.find((item) => item.id === entry.group?.id);
+    if (!provider || (counts.get(provider.id) ?? 0) >= (provider.headerMinEntries ?? 1)) return entry;
+    return { ...entry, group: { id: entry.group.id, label: null } };
+  });
+}
+// Saved replies are labeled by the model that wrote them (model-labels.js): a third-party reply by its own name.
+// A reply saved under a retired third-party id keeps that model's own name (it is never relabelled as its replacement).
+const RETIRED_REPLY_LABELS = [
+  ...Object.entries(RETIRED_THIRD_PARTY_NAMES).map(([value, name]) => ({ value, label: name, full: name })),
+  // Nova and Nebula replies keep "VibhavGPT Nova" / "VibhavGPT Nebula" (never relabelled as another tier).
+  ...Object.entries(RETIRED_HOUSE_NAMES).map(([value, name]) => ({ value, label: name, full: `VibhavGPT ${name}` })),
 ];
-// Saved replies are labeled by the model that wrote them (model-labels.js).
-const { modelLabel, modelSwitches } = createReplyLabels(MODELS);
-const VISION_MODELS = ["nova", "nebula", "vesper"];
+// Models that are not picker rows but write replies: Build's VibhavGPT Tecton. A reply is named by the model recorded with it
+// (metadata.model), never by the tab on screen; a reply with no recorded model keeps the plain "VibhavGPT".
+const BUILD_REPLY_LABELS = [{ value: "tecton", label: "Tecton", full: "VibhavGPT Tecton" }];
+const { modelLabel, modelSwitches } = createReplyLabels([...MODELS, ...THIRD_PARTY_OPTIONS, ...RETIRED_REPLY_LABELS, ...BUILD_REPLY_LABELS]);
+// The least plan each picker model needs: house models by plan (Zenith: Max), third-party models by their own floor (GLM and GPT-6
+// Luna: Plus; GPT-6.1 Terra: Pro; GPT-6.1 Sol and Astra: Max). The server enforces the same floors.
+const CATALOG_MODELS = [
+  ...MODELS.map((entry) => ({ value: entry.value, label: entry.label, minTier: HOUSE_MIN_PLAN[entry.value] })),
+  ...THIRD_PARTY_OPTIONS.map((entry) => ({ value: entry.value, label: entry.label, minTier: entry.minPlan ?? "max" })),
+];
+
+const VISION_MODELS = [...HOUSE_MODELS.filter((entry) => entry.vision).map((entry) => entry.id), ...THIRD_PARTY_MODELS.filter((entry) => entry.vision).map((entry) => entry.id)];
 const STUDY_MODEL = "study";
 
-// The four models are one ladder, Lumen to Vesper, so the picker draws each as
+// The four models are one ladder, Lumen to Vulcan, so the picker draws each as
 // an orb whose size is its rung: the comparison reads before the words do.
-const MODEL_RANK = Object.fromEntries(MODELS.map((entry, index) => [entry.value, index + 1]));
+const MODEL_RANK = Object.fromEntries([
+  ...MODELS.map((entry, index) => [entry.value, index + 1]),
+  // A third-party model's orb is sized by its intelligence label, on the same ladder.
+  ...THIRD_PARTY_MODELS.map((entry) => [entry.id, intelligenceRank(entry.intelligence) + 1]),
+]);
 const READS_IMAGES = / Reads images\.$/;
 
 function ModelOrb({ model, size = "md" }) {
@@ -1500,57 +1680,177 @@ function ModelOrb({ model, size = "md" }) {
 // sheet so both describe a model the same way.
 function ModelRow({ entry, allowed, selected }) {
   const vision = VISION_MODELS.includes(entry.value);
-  const tier = entry.badges.find((badge) => badge.tone)?.label;
+  const lockedDesc = entry.lockedCopy ?? HOUSE_PLAN_COPY[entry.value] ?? "Available with Plus, Pro, or Max.";
   return (
     <span className="model-row" data-locked={!allowed || undefined}>
-      <ModelOrb model={entry.value} />
+      <BrandMark logo={entry.logo} />
       <span className="model-row__text">
         <span className="model-row__head">
           <span className="model-row__name">{entry.label}</span>
-          {tier && <span className="model-row__tier">{tier.charAt(0) + tier.slice(1).toLowerCase()}</span>}
         </span>
-        <span className="model-row__desc">{allowed ? entry.description.replace(READS_IMAGES, "") : "Available with Plus or Pro."}</span>
+        <span className="model-row__desc">{allowed ? (entry.description || "").replace(READS_IMAGES, "") : lockedDesc}</span>
       </span>
       <span className="model-row__meta">
         {vision && <span className="model-row__vision" title="Reads images"><Eye size={14} strokeWidth={1.9} aria-hidden="true" /><span className="sr-only">Reads images</span></span>}
-        {!allowed && <span className="model-row__lock"><Lock size={12} strokeWidth={2.2} aria-hidden="true" />Plus</span>}
+        {!allowed && <span className="model-row__lock"><Lock size={12} strokeWidth={2.2} aria-hidden="true" />Upgrade</span>}
         {selected && <Check className="model-row__check" size={16} strokeWidth={2.6} aria-hidden="true" />}
       </span>
     </span>
   );
 }
-const THINKING_MODELS = ["nova", "nebula", "vesper"];
-const THINKING_OPTIONS = [
-  { value: "normal", label: "Normal", description: "Balanced reasoning for most questions." },
-  { value: "low", label: "Low", description: "Think less for a faster response." },
-  { value: "high", label: "High", description: "More deliberate reasoning." },
-  { value: "xhigh", label: "Extra High", description: "Deep reasoning; uses more output tokens." },
-  { value: "max", label: "Maximum", description: "Maximum reasoning; uses more output tokens." },
-];
+const THINKING_MODELS = ["vesper", "zenith"];
 
-const GREETINGS = ["Good to see you", "Where should we start", "What's on your mind", "The floor is yours", "Ready when you are"];
+// The model picker: a centered dialog (not an anchored dropdown), in sections by maker. VibhavGPT's own models first, then OpenAI, then
+// Z.AI. Each row: the maker's mark, the exact name, one line on what it is for, the image capability, and a lock with "Upgrade" or a
+// check. Arrow keys, Home and End move between rows; Escape or a click outside closes it. A marketplace model's thinking level is chosen
+// here, from the levels that exact model documents (model-marketplace.js), or shown as "Not adjustable".
+// Each marketplace model's thinking level, remembered on this device per model, so reopening a conversation keeps it.
+const THINKING_LEVELS_KEY = "vibhavgpt-marketplace-thinking";
+function readThinkingLevels() {
+  try { const value = JSON.parse(localStorage.getItem(THINKING_LEVELS_KEY) || "{}"); return value && typeof value === "object" ? value : {}; } catch { return {}; }
+}
+function writeThinkingLevels(levels) {
+  try { localStorage.setItem(THINKING_LEVELS_KEY, JSON.stringify(levels)); } catch { /* storage unavailable: kept for this session only */ }
+}
+/** The level a marketplace model uses now: the remembered one if it is still supported, otherwise its documented default. */
+const marketplaceLevelFor = (model, levels) => {
+  if (!model || !marketplaceThinking(model)) return null;
+  // Nothing remembered for this model yet: the level remembered for the model it replaced, as the maker's migration guide maps it.
+  const inherited = levels?.[model] == null
+    ? Object.entries(RETIRED_THIRD_PARTY_IDS).filter(([, to]) => to === model).map(([from]) => inheritedThinkingLevel(from, levels?.[from])).find(Boolean)
+    : null;
+  return toUnified(levels?.[model] ?? inherited) ?? DEFAULT_UNIFIED_LEVEL;
+};
+
+function ModelPickerModal({ open, onClose, entries, selected, allowedFor, onSelect, onUpgrade, disabled }) {
+  const listRef = useRef(null);
+  const sections = PICKER_SECTIONS
+    .map((section) => ({ ...section, rows: entries.filter((entry) => (entry.house ? "house" : entry.group?.id) === section.id) }))
+    .filter((section) => section.rows.length > 0);
+  const onKeyDown = (event) => {
+    if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+    const items = [...(listRef.current?.querySelectorAll("[data-model-option]") ?? [])];
+    if (!items.length) return;
+    const index = items.indexOf(document.activeElement);
+    const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : Math.max(0, Math.min(items.length - 1, (index < 0 ? -1 : index) + (event.key === "ArrowDown" ? 1 : -1)));
+    items[next].focus();
+    event.preventDefault();
+  };
+  const selectedEntry = entries.find((entry) => entry.value === selected) ?? null;
+  return (
+    <Modal open={open} onClose={onClose} title="Choose a model" size="lg">
+      <div className="model-modal" onKeyDown={onKeyDown}>
+        {/* The list is the only part that scrolls, and its scrolling stops at its own edges (owner request, 2026-11-16). */}
+        <div className="model-modal__list" ref={listRef}>
+        {sections.map((section) => (
+          <section key={section.id} className="model-modal__section" data-section={section.id}>
+            <h3 className="model-modal__heading" id={`model-section-${section.id}`}>{section.label}</h3>
+            <div role="radiogroup" aria-labelledby={`model-section-${section.id}`} className="model-modal__rows">
+              {section.rows.map((entry) => {
+                const allowed = allowedFor(entry.value);
+                const isSelected = entry.value === selected;
+                return (
+                  <button
+                    key={entry.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    data-model-option={entry.value}
+                    className="model-modal__option"
+                    aria-disabled={!allowed || disabled || undefined}
+                    tabIndex={isSelected || (!selected && entry === entries[0]) ? 0 : -1}
+                    autoFocus={isSelected}
+                    onClick={() => {
+                      if (disabled) return;
+                      if (!allowed) { onUpgrade(); return; }
+                      onSelect(entry.value);
+                      if (entry.house) onClose();
+                    }}
+                  >
+                    <ModelRow entry={entry} allowed={allowed} selected={isSelected} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+        </div>
+        {/* A thinking level is chosen in the composer, next to the model, for every model that has one (owner request, 2026-11-14). The
+            Done bar is the dialog's footer, outside the list: it stays put while the list scrolls. */}
+        {selectedEntry && !selectedEntry.house && (
+          <div className="model-modal__thinking" data-model={selectedEntry.value}>
+            <button type="button" className="btn btn--primary model-modal__done" onClick={onClose}>Done</button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// The composer's model control: the maker's mark, the exact name, the thinking level in muted text, and a chevron. It opens the picker.
+// The model button shows the maker's mark, the model's name and a chevron only. The thinking level has its own dropdown beside it, so it is
+// shown once (owner request, 2026-11-15).
+function ModelTrigger({ entry, levelLabel = null, onOpen, disabled }) {
+  return (
+    <button type="button" className="model-trigger" aria-haspopup="dialog" aria-label={`Model: ${entry?.label ?? "none chosen"}${levelLabel ? `, thinking ${levelLabel}` : ""}. Change model`} onClick={onOpen} disabled={disabled}>
+      <span className="model-trigger__logo"><BrandMark logo={entry?.logo ?? "vibhavgpt"} size={20} /></span>
+      <span className="model-trigger__name">{entry?.label ?? "Choose a model"}</span>
+      {levelLabel && <span className="model-trigger__level">{levelLabel}</span>}
+      <ChevronDown className="model-trigger__chevron" size={16} strokeWidth={2} aria-hidden="true" />
+    </button>
+  );
+}
+// One thinking control for every model (thinking-levels.js): Low, Medium, High.
+const THINKING_OPTIONS = THINKING_CHOICES;
+
+const STUDY_STARTER_ICON = { "Explain a topic": BookOpen, Flashcards: Layers, "Quiz me": ListChecks, Summary: FileText, "Study plan": GraduationCap };
+const GREETINGS = ["Good to see you", "Where should we start", "What's on your mind", "Ready when you are"];
 
 const RESPONSE_MODES = [
-  { value: "concise", label: "Concise", icon: <Sparkles size={19} strokeWidth={1.9} /> },
+  { value: "concise", label: "Concise", icon: <AlignLeft size={19} strokeWidth={1.9} /> },
   { value: "detailed", label: "Detailed", icon: <FileText size={19} strokeWidth={1.9} /> },
-  { value: "friendly", label: "Learning", icon: <Brain size={19} strokeWidth={1.9} /> },
+  { value: "friendly", label: "Learning", icon: <GraduationCap size={19} strokeWidth={1.9} /> },
 ];
 
 const PRODUCT_TABS = [
   { value: "chat", label: "Chat" },
   { value: "image", label: "Image" },
+  { value: "build", label: "Build" },
   { value: "study", label: "Study" },
 ];
 
-const TIER_LABEL = { free: "Free", plus: "Plus", pro: "Pro" };
+const TIER_LABEL = { free: "Free", plus: "Plus", pro: "Pro", max: "Max" };
 
 function modelAllowedForTier(model, tier, creditBalance = 0) {
+  const normTier = String(tier || "free").toLowerCase();
+  const catalogList = typeof CATALOG_MODELS !== "undefined" ? CATALOG_MODELS : [];
+  const catalogEntry = catalogList.find((entry) => entry.value === model);
+  if (catalogEntry) {
+    if (catalogEntry.minTier === "free") return true;
+    if (catalogEntry.minTier === "plus") return normTier !== "free";
+    if (catalogEntry.minTier === "pro") return normTier === "pro" || normTier === "max";
+    if (catalogEntry.minTier === "max") return normTier === "max";
+    return true;
+  }
   if (!MODELS.some((entry) => entry.value === model)) return false;
-  return tier !== "free" || model === "lumen" || model === "nova";
+  // Without the catalog list (it is always there in the app), the same floors: Vulcan needs Pro, Zenith needs Max.
+  if (model === "lumen") return true;
+  if (normTier === "free") return false;
+  if (model === "zenith") return normTier === "max";
+  if (normTier === "plus") return model !== "vesper";
+  return true;
 }
 
+// A selection that names a retired tier, carried from the saved preference to the chat, which then asks for a model.
+const RETIRED_PREFIX = "retired:";
+const retiredFrom = (value) => (typeof value === "string" && value.startsWith(RETIRED_PREFIX) ? value.slice(RETIRED_PREFIX.length) : null);
+
 function preferredModelForProfile(preferences, tier, creditBalance = 0) {
-  const currentKey = (key) => key === "spark" ? "lumen" : key === "ultra" ? "nebula" : key;
+  const currentKey = (key) => key === "spark" ? "lumen" : key ? currentThirdPartyKey(key) : key;
+  // The model this account last chose (a fixed default first). If that was a retired tier (Nova, Nebula), nothing is chosen for it:
+  // the chat asks for a model rather than quietly sending to another one.
+  const saved = [preferences?.retiredModel, preferences?.preferredModel, preferences?.lastUsedModel].find(Boolean);
+  if (saved && isRetiredHouseKey(saved)) return `${RETIRED_PREFIX}${String(saved).toLowerCase()}`;
   const candidates = [currentKey(preferences?.preferredModel), currentKey(preferences?.lastUsedModel), "lumen"];
   return candidates.find((model) => modelAllowedForTier(model, tier, creditBalance)) ?? "lumen";
 }
@@ -1566,7 +1866,7 @@ function relativeConversationTime(value) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(value));
 }
 
-const MOBILE_PAGE_TITLES = { memory: "Memory", billing: "Plan", usage: "Usage & limits", settings: "Settings" };
+const MOBILE_PAGE_TITLES = { library: "Library", memory: "Memory", billing: "Plan", usage: "Usage & limits", settings: "Settings", extensions: "Extensions" };
 
 const ONBOARDING_PATH = "/onboarding";
 
@@ -1599,12 +1899,16 @@ async function persistOnboardingProfile(record) {
   });
 }
 
-function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
+function Workspace({ user, appearance, onSignOut, onDeleted, onLegal, onUserChange = async () => {} }) {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [productMode, setProductMode] = useState(() => productModeFromPath(window.location.pathname));
   const [modeSaving, setModeSaving] = useState(false);
   const [modeError, setModeError] = useState("");
   const modeHydrated = useRef(false);
   const modeSessions = useRef({});
+  // The text being typed. It travels between Chat and Study; a new chat or another conversation starts empty.
+  const draftRef = useRef("");
   const [page, setPage] = useState(() => {
     const route = settingsRoute(window.location.pathname, window.location.search);
     if (route) return route.page;
@@ -1628,10 +1932,14 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // Study shows either its conversation ("chat") or VibhavGPT Writing Tools
   // ("writing"). The tools need no session, so they open straight away.
   const [studyView, setStudyView] = useState("chat");
+  const studyViewRef = useRef("chat");
+  studyViewRef.current = studyView;
   // Which tool the Writing Tools screen opens on.
   const [writingToolsTab, setWritingToolsTab] = useState("detector");
   useEffect(() => { if (productMode !== "study") setStudyView("chat"); }, [productMode]);
   const [lastSelectedModel, setLastSelectedModel] = useState(null);
+  // A saved model that has been replaced (thirdPartyReplacement): said in the chat, never moved silently.
+  const [modelReplacement, setModelReplacement] = useState(null);
   const [profileModelReady, setProfileModelReady] = useState(false);
   const [creditBalance, setCreditBalance] = useState(0);
   const [accessNotice, setAccessNotice] = useState(null);
@@ -1647,6 +1955,37 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   const narrow = useMediaQuery(NARROW_QUERY);
   const workspaceRef = useRef(null);
   const [backgroundTask, setBackgroundTask] = useState(null);
+  // Sidebar items this person hid (Settings > Appearance > Sidebar). Saved to the account; this device remembers it for a quick first paint.
+  const [sidebarHidden, setSidebarHiddenState] = useState(() => { try { const saved = JSON.parse(localStorage.getItem("vibhavgpt-sidebar-hidden") || "[]"); return Array.isArray(saved) ? saved : []; } catch { return []; } });
+  useEffect(() => {
+    api("/api/me/preferences").then((result) => {
+      const saved = result?.preferences?.sidebarHidden;
+      if (!Array.isArray(saved)) return;
+      setSidebarHiddenState(saved);
+      try { localStorage.setItem("vibhavgpt-sidebar-hidden", JSON.stringify(saved)); } catch { /* this device only */ }
+    }).catch(() => {});
+  }, []);
+  const setSidebarHidden = useCallback((next) => {
+    setSidebarHiddenState(next);
+    try { localStorage.setItem("vibhavgpt-sidebar-hidden", JSON.stringify(next)); } catch { /* this device only */ }
+    api("/api/me/preferences", { method: "PATCH", body: JSON.stringify({ sidebarHidden: next }) }).catch(() => {});
+  }, []);
+  // Replies still running anywhere in the app (live-replies.js), for the "reply in progress" indicator.
+  const liveReplies = useSyncExternalStore(subscribeLiveReplies, liveRepliesSnapshot);
+  useEffect(() => {
+    let stopped = false;
+    const refresh = () => api("/api/chat/replies").then((result) => { if (!stopped) seedLiveReplies(result?.replies); }).catch(() => {});
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => { stopped = true; window.removeEventListener("focus", refresh); };
+  }, []);
+  // A reply this page is not reading (one started before a reload) finishes on the server; check now and then so the indicator goes.
+  const hasUnreadReply = liveReplies.some((entry) => !entry.local);
+  useEffect(() => {
+    if (!hasUnreadReply) return undefined;
+    const timer = setInterval(() => { api("/api/chat/replies").then((result) => seedLiveReplies(result?.replies)).catch(() => {}); }, 8000);
+    return () => clearInterval(timer);
+  }, [hasUnreadReply]);
   // An image being made (or finished) while another tab is open.
   const { job: imageJob } = useSyncExternalStore(imageJobs.subscribe, imageJobs.get);
   // Signing out ends this workspace; its image job must not carry over.
@@ -1664,10 +2003,29 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   const [surveyToast, setSurveyToast] = useState("");
   const [memoryToast, setMemoryToast] = useState(null);
   const [pendingRecap, setPendingRecap] = useState(null);
+  const [pendingSkillAttach, setPendingSkillAttach] = useState(null);
+  // The background follows the screen on show: Study's own on the Study chat, Chat's everywhere else.
+  const themeSurface = surfaceForView({ page, productMode });
+  useEffect(() => { appearance.setSurface?.(themeSurface); }, [themeSurface]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The contour-line background: Chat by its own setting, Study by a separate one (off unless chosen), never Image, Settings or Usage.
+  const chatTopographyOn = page === "chat" && ((productMode === "chat" && appearance.topography !== "off") || (productMode === "study" && appearance.studyTopography === "on"));
   const currentWorkspace = useRef({ productMode, activeConversationId, chatKey });
   currentWorkspace.current = { productMode, activeConversationId, chatKey };
 
   useDrawerSwipe({ enabled: narrow, open: sidebarOpen, setOpen: setSidebarOpen, rootRef: workspaceRef });
+  useEffect(() => {
+    if (!narrow || !sidebarOpen) return undefined;
+    const opener = document.activeElement;
+    const drawer = workspaceRef.current?.querySelector(".sidebar");
+    const first = drawer?.querySelector("a[href], button:not([disabled]), input, [tabindex]:not([tabindex='-1'])");
+    first?.focus?.({ preventScroll: true });
+    const onKey = (event) => { if (event.key === "Escape") { event.preventDefault(); setSidebarOpen(false); } };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      if (opener instanceof HTMLElement && document.contains(opener)) opener.focus({ preventScroll: true });
+    };
+  }, [narrow, sidebarOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1696,6 +2054,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
 
   // The rail is a desktop affordance; the mobile drawer always shows labels.
   const rail = collapsed && !narrow;
+  useSidebarWidth({ rail, narrow, workspaceRef });
 
   useEffect(() => {
     localStorage.setItem("vibhavgpt-sidebar-collapsed", String(collapsed));
@@ -1706,7 +2065,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     return api("/api/usage")
     .then((usage) => {
       if (requestId !== usageRequest.current) return null;
-      setTier(usage.tier === "paid" ? "pro" : ["plus", "pro"].includes(usage.tier) ? usage.tier : "free");
+      setTier(usage.tier === "paid" ? "pro" : ["plus", "pro", "max"].includes(usage.tier) ? usage.tier : "free");
       setCreditBalance(usage.creditBalance ?? 0);
       return usage;
     })
@@ -1720,7 +2079,16 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
       setAccessNotice(null);
       void refreshUsageAccess();
     };
-    const access = (event) => setAccessNotice(event.detail);
+    const access = (event) => {
+      const detail = event.detail;
+      if (!detail) return;
+      setAccessNotice((current) => {
+        if (current && current.reason === detail.reason && current.feature === detail.feature && current.message === detail.message) {
+          return current;
+        }
+        return detail;
+      });
+    };
     window.addEventListener("vibhavgpt:subscription-changed", changed);
     window.addEventListener("vibhavgpt:access-status", access);
     return () => {
@@ -1728,6 +2096,20 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
       window.removeEventListener("vibhavgpt:access-status", access);
     };
   }, [user?.id, refreshUsageAccess]);
+
+  // Clear mode-specific access notices when switching between Chat and Image modes
+  useEffect(() => {
+    setAccessNotice((current) => {
+      if (!current) return null;
+      if (productMode === "image" && (current.reason === "plan" || current.feature?.includes("Vulcan") || current.feature?.includes("Nebula"))) {
+        return null;
+      }
+      if (productMode === "chat" && current.feature?.toLowerCase().includes("image")) {
+        return null;
+      }
+      return current;
+    });
+  }, [productMode]);
 
   useEffect(() => {
     if (upgradeConfirmation !== "confirming") void refreshUsageAccess();
@@ -1772,9 +2154,10 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
       .then((preferences) => {
         if (!cancelled) {
           setLastSelectedModel(preferredModelForProfile(preferences, tier, creditBalance));
+          setModelReplacement(thirdPartyReplacement(preferences?.preferredModel) ?? thirdPartyReplacement(preferences?.lastUsedModel));
           if (!modeHydrated.current) {
-            const explicit = Boolean(settingsRoute(window.location.pathname, window.location.search)) || window.location.pathname.startsWith("/app/study") || window.location.pathname.startsWith("/app/image") || new URLSearchParams(window.location.search).has("conversation");
-            const restored = explicit ? productModeFromPath(window.location.pathname) : ["study", "image"].includes(preferences.productMode) ? preferences.productMode : "chat";
+            const explicit = Boolean(settingsRoute(window.location.pathname, window.location.search)) || window.location.pathname.startsWith("/app/study") || window.location.pathname.startsWith("/app/image") || window.location.pathname.startsWith("/app/build") || new URLSearchParams(window.location.search).has("conversation");
+            const restored = explicit ? productModeFromPath(window.location.pathname) : ["study", "image", "build"].includes(preferences.productMode) ? preferences.productMode : "chat";
             setProductMode(restored);
             // Not while the survey owns the URL: its own answer decides the
             // landing tab, and it rewrites the path on the way out.
@@ -1797,12 +2180,11 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   const names = workspaceNames(user, onboarding);
   const { displayName } = names;
   const firstName = names.greetingName;
-  const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
   const tierKey = tier ?? "free";
 
-  const go = (next, section = "account") => {
+  const go = (next, section = "profile") => {
     const path = next === "settings" ? settingsPath(section) : next === "usage" ? "/app/usage" : next === "chat" ? productPath(productMode, activeConversationId) : `/app/${next}`;
-    const workspacePath = /^\/app(?:\/(?:chat|study|image))?\/?$/.test(window.location.pathname);
+    const workspacePath = /^\/app(?:\/(?:chat|study|image|build))?\/?$/.test(window.location.pathname);
     if ((next !== "chat" || !workspacePath) && window.location.pathname + window.location.search !== path) window.history.pushState(null, "", path);
     if (next === "settings") setSettingsSection(section);
     setPage(next);
@@ -1821,14 +2203,22 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     go("chat");
   };
 
+  // A new chat can start already temporary (the header's temporary-chat button inside a saved chat).
+  const [startTemporary, setStartTemporary] = useState(false);
   const newChat = () => {
+    draftRef.current = "";
     setStudyView("chat");
     setPendingGroup(null);
+    setStartTemporary(false);
     setActiveConversationId(null);
     modeSessions.current[productMode] = null;
     window.history.pushState(null, "", productPath(productMode));
     setChatKey((key) => key + 1);
     go("chat");
+  };
+  const startTemporaryChat = () => {
+    newChat();
+    setStartTemporary(true);
   };
   // `mode` defaults to whatever's already active, which is right for every
   // same-mode history click (Chat opening a chat, Study opening a study
@@ -1842,24 +2232,86 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
   // The composer's + menu asks for a tool by name; the chip and the sidebar
   // pass a click event, which opens the Detector.
   const openWritingTools = (tab) => {
+    const first = studyViewRef.current !== "writing";
+    // The tools live on the Study home, under the chips: from a conversation, start a fresh Study home first.
+    if (activeConversationId) newChat();
     setWritingToolsTab(tab === "humanizer" ? "humanizer" : "detector");
     setStudyView("writing");
     setSidebarOpen(false);
     go("chat");
+    // One history entry, so the browser's Back closes the panel instead of leaving Study.
+    if (first) window.history.pushState({ writingTools: true }, "", `${window.location.pathname}${window.location.search}`);
+  };
+  const closeWritingTools = () => {
+    if (window.history.state?.writingTools) window.history.back();
+    else setStudyView("chat");
   };
   const newChatInGroup = (group) => {
-    newChat();
+    const targetMode = group?.mode === "study" ? "study" : "chat";
+    setStudyView("chat");
     setPendingGroup(group);
+    setActiveConversationId(null);
+    modeSessions.current[targetMode] = null;
+    if (productMode !== targetMode) {
+      setProductMode(targetMode);
+      api("/api/profile/product-mode", { method: "PATCH", body: JSON.stringify({ productMode: targetMode }) }).catch(() => {});
+    }
+    window.history.pushState(null, "", productPath(targetMode));
+    setChatKey((key) => key + 1);
+    go("chat");
   };
   // "New Chat" in the Windows desktop app's tray menu (desktop/preload.js).
   const newChatRef = useRef(newChat);
   newChatRef.current = newChat;
+  // Math in replies loads apart from the first download (math-loader.js); fetch it once the browser is idle, so a reply with a
+  // formula seldom renders before it is there.
+  useEffect(() => {
+    const warm = () => { void loadMath().catch(() => {}); };
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(warm, { timeout: 4000 });
+      return () => window.cancelIdleCallback?.(handle);
+    }
+    const timer = setTimeout(warm, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+  // Keyboard shortcuts (keyboard-shortcuts.js): Ctrl/Cmd+N new chat, +K search (from anywhere, as before), +B the sidebar,
+  // +, Settings, +/ this list. The Windows app's menu sends the same actions (desktop/preload.js "desktop:shortcut"), and
+  // can also start a new image or build.
+  const shortcutActionsRef = useRef({});
+  shortcutActionsRef.current = {
+    "new-chat": () => newChat(),
+    "new-image": () => startNewIn("image"),
+    "new-build": () => startNewIn("build"),
+    search: () => { setSidebarOpen(false); setSearchOpen(true); },
+    "toggle-sidebar": () => { if (narrow) setSidebarOpen((open) => !open); else setCollapsed((value) => !value); },
+    settings: () => go("settings"),
+    shortcuts: () => { setSidebarOpen(false); setShortcutsOpen(true); },
+  };
+  useEffect(() => {
+    const onKey = (event) => {
+      const action = shortcutForEvent(event, { modalOpen: Boolean(document.querySelector('[aria-modal="true"]')) });
+      if (!action) return;
+      event.preventDefault();
+      shortcutActionsRef.current[action]?.();
+    };
+    const onDesktopShortcut = (event) => {
+      const action = event.detail;
+      if (typeof action === "string" && Object.hasOwn(shortcutActionsRef.current, action)) shortcutActionsRef.current[action]();
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("desktop:shortcut", onDesktopShortcut);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("desktop:shortcut", onDesktopShortcut);
+    };
+  }, []);
   useEffect(() => {
     const onDesktopNewChat = () => newChatRef.current();
     window.addEventListener("desktop:new-chat", onDesktopNewChat);
     return () => window.removeEventListener("desktop:new-chat", onDesktopNewChat);
   }, []);
   const openConversation = (conversationId, mode = productMode) => {
+    draftRef.current = "";
     setStudyView("chat");
     setPendingGroup(null);
     setActiveConversationId(conversationId);
@@ -1872,6 +2324,8 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
 
   useEffect(() => {
     const restoreRoute = () => {
+      // Back from the Writing tools entry only closes the panel: nothing else is rebuilt, so a half-typed message stays.
+      if (studyViewRef.current === "writing" && !window.history.state?.writingTools) { setStudyView("chat"); return; }
       if (window.location.pathname === ONBOARDING_PATH) { setSurveyOpen(true); return; }
       setSurveyOpen(false);
       const route = settingsRoute(window.location.pathname, window.location.search);
@@ -1993,45 +2447,63 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     }
   }, [appearance, user.id]);
 
-  async function switchMode(next) {
-    if (modeSaving) return;
-    setModeSaving(true); setModeError("");
-    try {
-      await api("/api/profile/product-mode", { method: "PATCH", body: JSON.stringify({ productMode: next }) });
-      if (next === productMode) { go("chat"); return; }
-      modeSessions.current[productMode] = activeConversationId;
-      const id = modeSessions.current[next] ?? null;
-      setProductMode(next); setActiveConversationId(id); setChatKey((key) => key + 1);
-      window.history.pushState(null, "", productPath(next, id)); go("chat");
-    } catch (err) { setModeError(err.message); }
-    finally { setModeSaving(false); }
+  // A fresh session in `mode`: New Chat when that is the mode on screen, otherwise that mode with no conversation open.
+  function startNewIn(mode) {
+    if (mode === productMode) { newChat(); return; }
+    modeSessions.current[mode] = null;
+    switchMode(mode);
+  }
+  // Switching is immediate: the app changes mode on the spot, with no page load, and the choice is saved in the background.
+  // Each mode keeps its own conversation, so nothing from one is shown in another; the text being typed travels with the switch.
+  function switchMode(next) {
+    if (next === productMode) { go("chat"); return; }
+    modeSessions.current[productMode] = activeConversationId;
+    const id = modeSessions.current[next] ?? null;
+    setModeError("");
+    setProductMode(next); setActiveConversationId(id); setChatKey((key) => key + 1);
+    window.history.pushState(null, "", productPath(next, id)); go("chat");
+    api("/api/profile/product-mode", { method: "PATCH", body: JSON.stringify({ productMode: next }) }).catch(() => {});
   }
   // Persistent top tabs for the three workspaces (was a dropdown in the
   // drawer head). Tapping the current tab returns to its conversation.
-  const activeTab = PRODUCT_TABS.findIndex((tab) => tab.value === productMode);
-  const modeTabs = (
-    <div className="mode-tabs" role="tablist" aria-label="Workspace" style={{ "--tab-count": PRODUCT_TABS.length, "--tab-index": Math.max(0, activeTab) }}>
-      {PRODUCT_TABS.map((tab) => (
-        <button
-          key={tab.value}
-          type="button"
-          role="tab"
-          className="mode-tabs__tab"
-          aria-selected={productMode === tab.value && page === "chat"}
-          disabled={modeSaving || !profileModelReady}
-          onClick={() => void switchMode(tab.value)}
-        >
-          {tab.label}
-          {tab.value === "image" && imageJob && !(productMode === "image" && page === "chat") && (
-            <>
-              <span className="mode-tabs__dot" data-state={imageJob.status} aria-hidden="true" />
-              <span className="sr-only">{imageJob.status === "generating" ? " (generating)" : imageJob.status === "done" ? " (image ready)" : " (image failed)"}</span>
-            </>
-          )}
-        </button>
-      ))}
-    </div>
-  );
+  // Two controls, never one list of three. At the top of the workspace: Chat | Image (Study is a kind of chat, so it shows Chat).
+  // Under the Chat and Study composer: Chat | Study.
+  const buildTabs = (values, label, selected, variant = "notch") => {
+    const tabs = PRODUCT_TABS.filter((tab) => values.includes(tab.value));
+    const activeIndex = tabs.findIndex((tab) => tab.value === selected);
+    return (
+      <div
+        className={`mode-tabs mode-tabs--${variant}`}
+        data-variant={variant}
+        role="tablist"
+        aria-label={label}
+        style={{ "--tab-count": tabs.length, "--tab-index": Math.max(0, activeIndex) }}
+      >
+        {tabs.map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            role="tab"
+            className={`mode-tabs__tab mode-tabs__tab--${variant}`}
+            aria-selected={tab.value === selected && page === "chat"}
+            disabled={!profileModelReady}
+            onClick={() => switchMode(tab.value)}
+          >
+            {tab.label}
+            {tab.value === "image" && imageJob && !(productMode === "image" && page === "chat") && (
+              <>
+                <span className="mode-tabs__dot" data-state={imageJob.status} aria-hidden="true" />
+                <span className="sr-only">{imageJob.status === "generating" ? " (generating)" : imageJob.status === "done" ? " (image ready)" : " (image failed)"}</span>
+              </>
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  };
+  const modeTabs = buildTabs(["chat", "image", "build"], "Workspace", productMode === "study" ? "chat" : productMode, "notch");
+  const studyTabs = buildTabs(["chat", "study"], "Chat or Study", productMode, "study");
+  // A Learning project is Study only (owner request, 2026-11-14): its new chat opens in Study (newChatInGroup) and offers no Chat | Study switch.
   const saveSession = (id, completedInBackground = false) => {
     const group = pendingGroupRef.current;
     if (group && id) {
@@ -2044,7 +2516,7 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     if (!completedInBackground || modeSessions.current[productMode] === activeConversationId) modeSessions.current[productMode] = id;
     // A completed request belongs to its originating workspace, not whichever
     // mode the user navigated to while it was running.
-    if (currentWorkspace.current.productMode !== productMode || currentWorkspace.current.chatKey !== chatKey || !/^\/app(?:\/(?:chat|study|image))?\/?$/.test(window.location.pathname)) return;
+    if (currentWorkspace.current.productMode !== productMode || currentWorkspace.current.chatKey !== chatKey || !/^\/app(?:\/(?:chat|study|image|build))?\/?$/.test(window.location.pathname)) return;
     setActiveConversationId(id);
     window.history.replaceState(null, "", productPath(productMode, id));
     if (completedInBackground && page === "chat") setChatKey((key) => key + 1);
@@ -2081,12 +2553,14 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
     );
   }
 
-  const renderChat = (studyProps = {}) => <Chat key={chatKey} userName={firstName} tier={tier} creditBalance={creditBalance} initialConversationId={activeConversationId} initialModel={lastSelectedModel} onModelChange={setLastSelectedModel} onUsageChanged={refreshUsageAccess} onOpenSettings={() => go("settings")} onConversationSaved={saveSession} onBackgroundTask={setBackgroundTask} autoPrompt={pendingRecap} onAutoPromptSent={() => setPendingRecap(null)} group={pendingGroup} {...studyProps} />;
+  const renderChat = (studyProps = {}) => <Chat key={chatKey} user={user} userName={firstName} tier={tier} creditBalance={creditBalance} initialConversationId={activeConversationId} initialModel={lastSelectedModel} modelReplacement={modelReplacement} onDismissModelReplacement={() => setModelReplacement(null)} onModelChange={setLastSelectedModel} onUsageChanged={refreshUsageAccess} onOpenSettings={() => go("settings")} onOpenExtensions={() => go("extensions")} onOpenBilling={() => go("billing")} go={go} onConversationSaved={saveSession} onBackgroundTask={setBackgroundTask} autoPrompt={pendingRecap} onAutoPromptSent={() => setPendingRecap(null)} pendingSkillAttach={pendingSkillAttach} onPendingSkillAttachConsumed={() => setPendingSkillAttach(null)} group={pendingGroup} onCloseWritingTools={closeWritingTools} toolsPanel={writingToolsOpen ? <div className="writing-tools-inline"><StudyWritingTools key={writingToolsTab} api={api} initialTab={writingToolsTab} onBack={closeWritingTools} /></div> : null} {...studyProps} tabsBelow={pendingGroup?.mode === "study" || productMode === "build" ? null : studyTabs} initialDraft={draftRef.current} onDraftChange={(text) => { draftRef.current = text; }} initialTemporary={startTemporary} onStartTemporaryChat={startTemporaryChat} onExitTemporaryChat={newChat} onOpenInMode={(id, mode) => openConversation(id, mode)} />;
 
   return (
-    <div className="workspace" ref={workspaceRef} data-collapsed={rail} data-page={page}>
+    <div className="workspace" ref={workspaceRef} data-collapsed={rail} data-page={page} data-topography={chatTopographyOn ? "on" : undefined} data-build-threads={page === "chat" && productMode === "build" ? "on" : undefined}>
+      {chatTopographyOn && <ChatTopography resolved={appearance.resolved} motion={appearance.motion} />}
       <Sidebar
         variant={productMode}
+        onSwitchMode={switchMode}
         api={api}
         user={user}
         appearance={appearance}
@@ -2104,11 +2578,11 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
         newChatInGroup={newChatInGroup}
         openConversation={openConversation}
         onOpenImageSession={(id) => openConversation(id, "chat")}
-        onOpenWritingTools={openWritingTools}
-        writingToolsActive={writingToolsOpen}
+        onSearch={() => { setSidebarOpen(false); setSearchOpen(true); }}
         activeConversationId={activeConversationId}
         historyRevision={historyRevision}
         onSignOut={onSignOut}
+        hiddenItems={sidebarHidden}
       />
 
       {/* Always mounted so it can fade out as well as in, and so a swipe can
@@ -2124,36 +2598,63 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
       />
 
       <div className="workspace__main" data-product-mode={page === "chat" ? productMode : undefined}>
-        <AccessNotice access={accessNotice} onAction={(action) => {
+          {/* Build's background (BuildThreads): behind Build's own column only, never under the sidebar. */}
+          {page === "chat" && productMode === "build" && <BuildThreads reducedMotion={appearance.reducedMotion} />}
+        <WorkspaceNotice
+          access={accessNotice}
+          tier={tier}
+          onAction={(action) => {
             if (action === "plans" || action === "restore") go("billing");
             else if (action === "credits" || action === "usage") go("usage");
             else if (action === "storage") go("chat");
             else if (action === "support") window.location.assign("mailto:support@pansophy.com");
             else setAccessNotice(null);
-          }} onDismiss={() => setAccessNotice(null)} />
-        {page === "chat" && <div className="mode-tabs-bar">{modeTabs}</div>}
-        {modeError && <p className="banner banner--error" role="alert">{modeError}</p>}
-        {upgradeConfirmation === "confirming" && <p className="banner" role="status">Confirming your plan…</p>}
-        {upgradeConfirmation === "confirmed" && <p className="banner" role="status">Your new plan is ready to use.</p>}
-        {upgradeConfirmation === "delayed" && <p className="banner banner--error" role="status">Your payment is still being confirmed. Refresh this page in a minute. If your plan has not changed, email support@pansophy.com.</p>}
+          }}
+          onDismiss={() => setAccessNotice(null)}
+        />
+        {page === "chat" && <div className="mode-tabs-bar">{modeTabs}<div className="chat-header-actions" id="chat-header-actions" /></div>}
+        {modeError && <Banner tone="error">{modeError}</Banner>}
+        {upgradeConfirmation === "confirming" && <Banner tone="info" title="Confirming your plan…" help="Your payment went through checkout. We're waiting for the payment provider to confirm the new plan; this page checks every few seconds and updates by itself. If it isn't confirmed within about 20 seconds, you'll see what to do next." />}
+        {upgradeConfirmation === "confirmed" && <Banner tone="success" title="Your new plan is ready to use." />}
+        {upgradeConfirmation === "delayed" && <Banner tone="warning" title="Payment still confirming" live="status">Your payment is still being confirmed. Refresh this page in a minute. If your plan has not changed, email support@pansophy.com.</Banner>}
         {directUpdate && (
-          <div className="banner direct-update" role="status">
-            <span><strong>VibhavGPT {directUpdate.versionName} is available.</strong>{directUpdate.releaseNotes ? ` ${directUpdate.releaseNotes}` : ""}</span>
-            <a className="btn btn--secondary" href={directUpdate.downloadPage || "/android"} target="_blank" rel="noreferrer">View update</a>
-            <button className="btn btn--quiet" type="button" aria-label="Dismiss update notice" onClick={() => setDirectUpdate(null)}>Dismiss</button>
-          </div>
+          <Banner
+            tone="info"
+            title={`VibhavGPT ${directUpdate.versionName} is available.`}
+            className="direct-update"
+            onDismiss={() => setDirectUpdate(null)}
+            dismissLabel="Dismiss update notice"
+            help="A newer version of the VibhavGPT Android app is available to download. Your chats, projects and memory are saved to your account, so updating doesn't lose them."
+            action={<a className="btn btn--secondary" href={directUpdate.downloadPage || "/android"} target="_blank" rel="noreferrer">View update</a>}
+          >
+            {directUpdate.releaseNotes || null}
+          </Banner>
         )}
         <DesktopUpdateBanner />
-        {backgroundTask && page !== "chat" && (
-          <div className="background-task" role="status">
-            <strong>{backgroundTask.label}</strong>
-            <span>{backgroundTask.detail}</span>
-          </div>
-        )}
+        {(() => {
+          // A reply in progress somewhere other than the chat on screen: say so, and open the chat it belongs to.
+          const live = backgroundReply(liveReplies, { page, activeConversationId });
+          const task = live ?? (backgroundTask && page !== "chat" ? backgroundTask : null);
+          if (!task) return null;
+          return (
+            <div className="background-task" role="status" data-reply={live?.replyId || undefined}>
+              <strong>{live ? (live.label || "Writing a reply") : task.label}</strong>
+              <span>{live ? (live.detail || "A reply is in progress in another chat.") : task.detail}</span>
+              {live?.conversationId && (
+                <button type="button" className="background-task__open" onClick={() => openConversation(live.conversationId, ["study", "build"].includes(live.mode) ? live.mode : "chat")}>
+                  Open chat
+                </button>
+              )}
+            </div>
+          );
+        })()}
         <header className="topbar-mobile">
           <IconButton label="Open navigation" aria-expanded={sidebarOpen} onClick={() => setSidebarOpen(true)}><MenuIcon size={21} strokeWidth={1.9} /></IconButton>
           {page === "chat" ? modeTabs : <h1 className="topbar-mobile__title">{mobileTitle}</h1>}
-          <IconButton label={productMode === "study" ? "New study session" : "New chat"} onClick={newChat}><SquarePen size={20} strokeWidth={1.9} /></IconButton>
+          <div className="topbar-mobile__actions">
+            {page === "chat" && <div className="chat-header-actions" id="chat-header-actions-mobile" />}
+            <IconButton label={productMode === "study" ? "New study session" : "New chat"} onClick={newChat}><SquarePen size={20} strokeWidth={1.9} /></IconButton>
+          </div>
         </header>
 
         <div className="screen" key={screenKey} data-direction={lastScreen.current.direction}>
@@ -2161,18 +2662,32 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
           <main className="page page--centered"><TypingDots label="Opening your workspace" /></main>
         ) : page === "chat" ? (
           productMode === "image" ? <ImageWorkspace api={api} />
-          : writingToolsOpen ? <div className="writing-tools-scroll"><StudyWritingTools api={api} initialTab={writingToolsTab} onBack={() => setStudyView("chat")} /></div>
           : renderChat({ mode: productMode, onOpenWritingTools: productMode === "study" ? openWritingTools : undefined })
+        ) : page === "library" ? (
+          <Library api={api} onOpenConversation={openConversation} />
         ) : page === "memory" ? (
-          <Memory onMemoriesAdded={(added) => setMemoryToast(added)} />
+          <Memory onMemoriesAdded={(added) => setMemoryToast(added)} onOpenConversation={openConversation} />
         ) : page === "billing" ? (
           <Billing tier={tier} userId={user.id} onEntitlementChanged={refreshUsageAccess} />
         ) : page === "usage" ? (
-          <UsageDashboard onOpenSettings={() => go("settings")} onLegal={onLegal} />
+          <UsageDashboard userId={user?.id} onOpenSettings={() => go("settings")} onOpenPlans={() => go("billing")} onLegal={onLegal} />
+        ) : page === "extensions" ? (
+          <Extensions
+            api={api}
+            user={user}
+            tier={tier}
+            onBack={() => go("chat")}
+            onOpenSettings={(sec) => go("settings", sec)}
+            onUseSkill={(skill) => {
+              setPendingSkillAttach(skill);
+              go("chat");
+            }}
+          />
         ) : (
           <Settings
             section={settingsSection}
             onSectionChange={(section) => go("settings", section)}
+            onBack={() => go("chat")}
             user={user}
             appearance={appearance}
             tier={tierKey}
@@ -2184,10 +2699,16 @@ function Workspace({ user, appearance, onSignOut, onDeleted, onLegal }) {
             onboarding={onboarding}
             onSaveOnboarding={saveOnboarding}
             onRerunOnboarding={rerunSurvey}
+            onUserChange={onUserChange}
+            sidebarHidden={sidebarHidden}
+            onSidebarHiddenChange={setSidebarHidden}
           />
         )}
         </div>
       </div>
+
+      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ChatSearch open={searchOpen} api={api} scope={productMode === "build" ? "build" : "chat"} onClose={() => setSearchOpen(false)} onOpenResult={(id, mode) => { setSearchOpen(false); openConversation(id, mode); }} />
 
       {memoryToast?.length > 0 && (
         <MemoryUpdatedToast facts={memoryToast} onOpen={() => openMemoryRecap(memoryToast)} onDismiss={() => setMemoryToast(null)} />
@@ -2271,25 +2792,47 @@ function CodeBlock({ inline, className, children, ...props }) {
   return STUDY_BLOCK_LANGUAGES.has(language.toLowerCase()) ? <StudyBlock language={language.toLowerCase()} text={text} fallback={block} /> : block;
 }
 
+// The math plugins (remark-math, rehype-katex and KaTeX's stylesheet) for a reply, from math-loader.js. A reply with no unescaped $
+// renders the same with or without them, so it never waits for them; one with math loads them once (the workspace also warms them
+// when the browser is idle, so they are usually there already).
+function useMath(text) {
+  const needed = needsMath(text);
+  const [math, setMath] = useState(loadedMath);
+  useEffect(() => {
+    if (!needed || math) return undefined;
+    let live = true;
+    loadMath().then((plugins) => { if (live) setMath(plugins); }, () => {});
+    return () => { live = false; };
+  }, [needed, math]);
+  return math;
+}
+
 // `streaming`: the reply is still arriving from the server. `onAsk` lets
 // its widgets send a follow-up message.
-function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null, onStudyResult = null }) {
+function AssistantBody({ text, animate, onTick, streaming = false, onAsk = null, onStudyResult = null, sources = [] }) {
   const { shown, done } = useTypewriter(text, { enabled: animate, onTick });
+  // [n] in the reply cites the nth web source under it (citations.js): a small numbered link to that page.
+  const citations = useMemo(() => sourcesByNumber(sources), [sources]);
   const settled = !streaming && (!animate || done);
   // Models sometimes use HTML line-break tags. Convert only that harmless
   // formatting shorthand to Markdown before rendering; do not enable raw HTML
   // from model output in the DOM.
   const rendered = protectPlainDollarSigns(normalizeTexDelimiters(shown).replace(/<br\s*\/?\s*>/gi, "  \n"));
+  const math = useMath(rendered);
   return (
     <ReplySettledContext.Provider value={settled}>
     <ReplyAskContext.Provider value={onAsk}>
     <ReplyResultContext.Provider value={onStudyResult}>
     <div className="prose" data-typing={animate && !done ? "true" : undefined}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, [remarkMath, { singleDollarTextMath: true }] ]}
-        rehypePlugins={[rehypeKatex]}
+        remarkPlugins={[remarkGfm, ...(math ? [[math.remarkMath, { singleDollarTextMath: true }]] : []), [remarkCitations, { sources }]]}
+        rehypePlugins={math ? [math.rehypeKatex] : []}
         components={{
-          a: ({ href, children }) => <ResourceLink href={href}>{children}</ResourceLink>,
+          a: ({ href, children, ...props }) => {
+            const source = citations.get(Number(props["data-citation"] ?? props.dataCitation));
+            if (source) return <a className="citation" href={source.href} target="_blank" rel="noopener noreferrer" aria-label={citationLabel(source)} title={citationLabel(source)}>{source.n}</a>;
+            return <ResourceLink href={href}>{children}</ResourceLink>;
+          },
           code: CodeBlock,
           img: ({ src, alt }) => <PrivateImage src={src} alt={alt} />,
           pre: CodeBlock,
@@ -2339,6 +2882,7 @@ function historyMessage(message) {
     role: message.role,
     content: message.content,
     attachment: message.attachment ?? null,
+    imagePrompt: message.imagePrompt ?? null,
     sources: message.sources ?? [],
     activitySummary: message.activitySummary ?? [],
     thoughtSeconds: message.thoughtSeconds ?? null,
@@ -2352,16 +2896,44 @@ function historyMessage(message) {
 // a server that sends neither field has no earlier pages to offer.
 const olderCursorFrom = (result) => (result?.hasMore === true && typeof result.nextCursor === "string" ? result.nextCursor : null);
 
-function Chat({ userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, onModelChange, onUsageChanged, onOpenSettings, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, group = null, onOpenWritingTools }) {
-  const [model, setModel] = useState(initialModel || "lumen");
+function Chat({ initialDraft = "", onDraftChange, user, userName, tier = "free", creditBalance = 0, initialConversationId = null, initialModel = null, modelReplacement = null, onDismissModelReplacement, onModelChange, onUsageChanged, onOpenSettings, onOpenExtensions, onOpenBilling, go: goProp, onConversationSaved, onBackgroundTask, mode = "chat", autoPrompt = null, onAutoPromptSent, pendingSkillAttach = null, onPendingSkillAttachConsumed = null, group = null, onOpenWritingTools, onCloseWritingTools, toolsPanel = null, tabsBelow = null, initialTemporary = false, onStartTemporaryChat, onExitTemporaryChat, onOpenInMode }) {
+  const go = goProp || onOpenBilling || (() => {});
+  // null: no model chosen yet (a retired tier was selected before); the person is asked to choose one, and nothing is sent until they do.
+  const [model, setModel] = useState(retiredFrom(initialModel) ? null : initialModel || "lumen");
+  const [retiredSelection, setRetiredSelection] = useState(retiredFrom(initialModel));
+  // A conversation last on a replaced model opens on its replacement, and says so (the profile's own replacement comes as a prop).
+  const [conversationReplacement, setConversationReplacement] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [thinkingLevels, setThinkingLevels] = useState(readThinkingLevels);
+  const changeThinkingLevel = useCallback((key, level) => {
+    setThinkingLevels((current) => { const next = { ...current, [key]: level }; writeThinkingLevels(next); return next; });
+  }, []);
+  // Set once the person picks a model here, so a conversation that finishes loading afterwards does not replace their pick.
+  const userPickedModelRef = useRef(false);
+  // The third-party models the server lists now (GET /api/models/catalog, Slice 7). Until it answers, the picker shows the house models.
+  const [listedThirdParty, setListedThirdParty] = useState([]);
   const studyMode = mode === "study";
-  const sentModel = studyMode ? STUDY_MODEL : model;
+  // Build: VibhavGPT Tecton, always, and only on Pro and up (the server refuses it below Pro before any inference or charge).
+  const buildMode = mode === "build";
+  const buildLocked = buildMode && !buildIncluded(tier);
+  const sentModel = studyMode ? STUDY_MODEL : buildMode ? BUILD_MODEL : model;
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(initialConversationId);
+  // A temporary chat: chosen before the first message, fixed after it. The server enforces it (no memory used or saved, not listed,
+  // deleted after 24 hours); this only chooses it and shows it.
+  const [temporaryChat, setTemporaryChat] = useState(Boolean(initialTemporary) && !initialConversationId);
+  const [leaveTemporaryOpen, setLeaveTemporaryOpen] = useState(false);
+  // The header slot the temporary-chat button goes in: the desktop tab bar, or the phone's top bar.
+  const [headerSlot, setHeaderSlot] = useState(null);
   // Shown in the header once a saved conversation loads; a new chat's first
   // reply does not return its title, so it keeps the generic label.
   const [loadingConversation, setLoadingConversation] = useState(Boolean(initialConversationId));
-  const [draft, setDraft] = useState("");
+  // Memory is controlled in Settings (Personalization) and on the Memory page. The composer's + menu no longer has a per-chat
+  // "Use memory" switch, so this component neither sends nor reads a per-conversation memory choice. The server still accepts and
+  // applies one (the stored per-conversation value is kept), so a chat where someone once chose Off stays Off.
+  // The draft and the mentions inside it, together: every change to the text moves, keeps or drops the mentions with it.
+  const { draft, mentions, setDraft, insertMention, deleteMention, read: readDraft } = useMentionedDraft(initialDraft);
+  useEffect(() => { onDraftChange?.(draft); }, [draft]); // eslint-disable-line react-hooks/exhaustive-deps
   // Counts sends; the composer's data-send-pulse flips with it so its pop
   // (desktop.css, Windows app only) restarts on every send.
   const [sendPulse, setSendPulse] = useState(0);
@@ -2381,7 +2953,20 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const clientKeyRef = useRef(0);
   const nextClientKey = () => `local-${(clientKeyRef.current += 1)}`;
   const activeRequestRef = useRef(null);
+  // Set when the person cancels a reply that is still waiting for a free slot (nothing of it was saved, reserved or sent yet).
+  const cancelledWaitRef = useRef(false);
+  // The running reply on screen (live-replies.js): its id once the server names it, whether Stop was pressed, and an attached view's reader.
+  const replyIdRef = useRef(null);
+  const stopRequestedRef = useRef(false);
+  // The Stop response button's state: "stopping" while the server is asked, "failed" if it refused (the reply is still running).
+  const [stopState, setStopState] = useState("idle");
+  // Build: read the project card again after a reply that saved (or tried to save) files.
+  const [buildRefresh, setBuildRefresh] = useState(0);
+  const streamStartedRef = useRef(false);
+  const attachRef = useRef(null);
   const [error, setError] = useState("");
+  // Warning for a busy or rate-limited moment (nothing went wrong with the message); error for everything else.
+  const [errorTone, setErrorTone] = useState("error");
   const [attachments, setAttachments] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [uploadLimits, setUploadLimits] = useState(null);
@@ -2400,7 +2985,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const closeSheet = useCallback(() => setSheet(null), []);
   const [scrolled, setScrolled] = useState(false);
   const [failed, setFailed] = useState(null);
-  const [codingNudge, setCodingNudge] = useState(false);
+  // The chat's refusal when the paid allowance cannot fund a request. It only offers
+  // choices: nothing is switched or sent until the customer clicks.
+  const [allowanceBlock, setAllowanceBlock] = useState(null);
   // Messages sent while a reply is still coming in. They wait here, visible in
   // the thread, and go out one at a time, in order, once the reply is done.
   const [queue, setQueue] = useState([]);
@@ -2413,6 +3000,31 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   const scrollRef = useRef(null);
   const endRef = useRef(null);
   const inputRef = useRef(null);
+  // The connectors a message is routed to come only from the mentions still intact in the text, never from reading names out of it: edit or
+  // delete a mention and its routing goes with it, and typing "@YouTube" by hand routes nothing.
+  const selectedConnectors = useMemo(() => connectorsFromMentions(mentions), [mentions]);
+  const [selectedSkills, setSelectedSkills] = useState([]);
+  useEffect(() => {
+    if (!pendingSkillAttach?.id) return undefined;
+    setSelectedSkills((prev) => {
+      if (prev.some((entry) => entry.id === pendingSkillAttach.id)) return prev;
+      return [...prev, { id: pendingSkillAttach.id, name: pendingSkillAttach.name }];
+    });
+    onPendingSkillAttachConsumed?.();
+    return undefined;
+  }, [pendingSkillAttach, onPendingSkillAttachConsumed]);
+  const [mentionTrigger, setMentionTrigger] = useState(null);
+  const [mentionHighlight, setMentionHighlight] = useState(0);
+  const [connectorsCatalog, setConnectorsCatalog] = useState([]);
+  const [skillsCatalog, setSkillsCatalog] = useState([]);
+  const [mentionsLoading, setMentionsLoading] = useState(false);
+  const imeComposingRef = useRef(false);
+  const mentionSuppressRef = useRef(false);
+  // Where the caret goes after the draft changes under it (a mention inserted or removed). It is set in a layout effect, before anything else
+  // can be typed, so a letter typed straight away is never put in front of it.
+  const pendingCaretRef = useRef(null);
+  // The "@" the person closed the list for with Escape. Key-up and click would otherwise find the same "@query" and open it again.
+  const mentionDismissedRef = useRef(null);
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const mountedRef = useRef(true);
@@ -2423,7 +3035,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     onTranscript: (spoken) => setDraft(joinDictation(dictationBaseRef.current, spoken)),
     onError: (message) => setError(message),
   });
-  const [quickPreferences, setQuickPreferences] = useState({ responseStyle: "balanced", customInstructions: "", thinkingEffort: "normal" });
+  const [quickPreferences, setQuickPreferences] = useState({ responseStyle: "balanced", customInstructions: "", thinkingEffort: "low" });
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [modelSaving, setModelSaving] = useState(false);
   // Keep the server's explicit preferred default separate from the transient
@@ -2431,20 +3043,37 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   // default selected in Settings.
   const preferredModelRef = useRef(undefined);
 
-  const modelInfo = MODELS.find((entry) => entry.value === model) ?? MODELS[0];
+  const selectedEntry = model ? (MODELS.find((entry) => entry.value === model) || THIRD_PARTY_OPTIONS.find((entry) => entry.value === model) || null) : null;
+  const modelInfo = selectedEntry ?? { value: null, label: "Choose a model", full: "Choose a model", description: "" };
+  // The thinking level this message will be sent with: a marketplace model's own level, or the house tier's effort where it applies.
+  const marketplaceLevel = model && !buildMode ? marketplaceLevelFor(model, thinkingLevels) : null;
   const replySwitches = useMemo(() => modelSwitches(messages), [messages]);
   const activeConversationRef = useRef(conversationId);
   activeConversationRef.current = conversationId;
-  const modelOptions = MODELS.map((entry) => {
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    let cancelled = false;
+    api("/api/models/catalog")
+      .then((catalog) => {
+        if (cancelled) return;
+        const listed = new Set((catalog?.lineup?.providers ?? []).flatMap((provider) => (provider.models ?? []).map((entry) => entry.id)));
+        setListedThirdParty(THIRD_PARTY_OPTIONS.filter((entry) => listed.has(entry.value)).map((entry) => entry.value));
+      })
+      .catch(() => { if (!cancelled) setListedThirdParty([]); });
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  // The picker: house models first, then each provider's listed models under its name (GPT-6's header from two models up).
+  const pickerModels = useMemo(() => withSectionHeaders([...MODELS, ...THIRD_PARTY_OPTIONS.filter((entry) => listedThirdParty.includes(entry.value))]), [listedThirdParty]);
+  const modelOptions = useMemo(() => pickerModels.map((entry) => {
     const allowed = modelAllowedForTier(entry.value, tier, creditBalance);
     return {
       ...entry,
       icon: <Sparkles size={14} strokeWidth={1.9} />,
       disabled: !allowed,
-      description: allowed ? entry.description : "Available with Plus or Pro.",
-      badges: allowed ? entry.badges : [...entry.badges, { label: "Plus", tone: "premium" }],
+      description: allowed ? entry.description : (entry.lockedCopy ?? HOUSE_PLAN_COPY[entry.value] ?? "Available with Plus, Pro, or Max."),
     };
-  });
+  }), [pickerModels, tier, creditBalance]);
   const initialThread = useRef(initialConversationId);
 
   useEffect(() => {
@@ -2457,13 +3086,36 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     api(`/api/chat/conversations/${initialThread.current}`)
       .then((result) => {
         if (cancelled) return;
+        // Build and Chat keep their own conversations (the stored mode). Opened in the other one, it reopens where it belongs, with that
+        // workspace's sidebar and model, instead of being continued on the wrong model.
+        const storedMode = result.conversation.mode === "build" ? "build" : null;
+        if ((storedMode === "build") !== (mode === "build") && onOpenInMode) {
+          onOpenInMode(result.conversation.id, storedMode ?? "chat");
+          return;
+        }
         setConversationId(result.conversation.id);
-        const restoredModel = result.conversation.model === "spark" ? "lumen" : result.conversation.model;
+        setTemporaryChat(result.conversation.temporary === true);
+        const restoredModel = result.conversation.model === "spark" ? "lumen" : result.conversation.model ? currentThirdPartyKey(result.conversation.model) : result.conversation.model;
+        setConversationReplacement(thirdPartyReplacement(result.conversation.model));
         const conversationModel = modelAllowedForTier(restoredModel, tier, creditBalance) ? restoredModel : "lumen";
-        setModel(conversationModel);
-        onModelChange?.(conversationModel);
+        // A model picked while the conversation was still loading stays picked. A conversation last on a retired tier keeps its
+        // history, and asks for a model: it is never moved to another tier on its own.
+        if (!userPickedModelRef.current) {
+          if (isRetiredHouseKey(result.conversation.model)) {
+            setModel(null);
+            setRetiredSelection(String(result.conversation.model).toLowerCase());
+          } else {
+            setModel(conversationModel);
+            onModelChange?.(conversationModel);
+          }
+        }
         setMessages((result.history ?? []).map(historyMessage));
         setOlderCursor(olderCursorFrom(result));
+        // A reply still being written for this conversation (started before a reload, or in this chat before leaving it): follow it.
+        const loadedId = result.conversation.id;
+        const known = liveReplyForConversation(loadedId);
+        const findRunning = known ? Promise.resolve(known) : api("/api/chat/replies").then((list) => { seedLiveReplies(list?.replies); return liveReplyForConversation(loadedId); }).catch(() => null);
+        void findRunning.then((running) => { if (!cancelled && running?.replyId) void attachToRunningReply(running.replyId, result.conversation.model ?? conversationModel, running.startedAt); });
       })
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoadingConversation(false); });
@@ -2499,9 +3151,10 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, busy]);
 
+  // The server's limits for this account; read again when the plan changes, so the guidance follows an upgrade or a downgrade.
   useEffect(() => {
     api("/api/uploads/limits").then(setUploadLimits).catch(() => null);
-  }, []);
+  }, [tier]);
 
   // The same material strip serves ordinary chats and legacy Study sessions.
   useEffect(() => {
@@ -2525,7 +3178,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         setQuickPreferences({
           responseStyle: preferences.responseStyle ?? "balanced",
           customInstructions: preferences.customInstructions ?? "",
-          thinkingEffort: preferences.thinkingEffort ?? "normal",
+          thinkingEffort: preferences.thinkingEffort ?? "low",
         });
         preferredModelRef.current = preferences.preferredModel ?? null;
         setPreferencesLoaded(true);
@@ -2536,6 +3189,16 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     return () => { cancelled = true; };
   }, [initialConversationId, initialModel, tier, creditBalance]);
 
+  useLayoutEffect(() => {
+    const caret = pendingCaretRef.current;
+    if (caret === null) return;
+    pendingCaretRef.current = null;
+    const node = inputRef.current;
+    if (!node) return;
+    node.focus();
+    node.setSelectionRange(caret, caret);
+  });
+
   // Grow the composer with its content instead of scrolling a one-line box.
   useEffect(() => {
     const node = inputRef.current;
@@ -2544,11 +3207,12 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     node.style.height = `${Math.min(node.scrollHeight, 220)}px`;
   }, [draft]);
 
-  const attachmentLabel = uploadLimits
-    ? `${TIER_LABEL[uploadLimits.tier] ?? "Free"}: up to ${Math.round(uploadLimits.fileBytes / 1024 / 1024)} MB per file`
-    : "Attach files";
+  // Images and documents have different per-file limits (upload-guidance.js): the line names the ones that apply to what is attached.
+  const attachmentLabel = attachmentGuidance(uploadLimits, attachments.map((attachment) => attachment.file));
   const hasImages = attachments.some((attachment) => attachment.file.type.startsWith("image/"));
   const visionModelRequired = !studyMode && hasImages && !VISION_MODELS.includes(model);
+  // The first model in the picker that reads images and that this plan includes (and is listed now), to offer when an image needs one.
+  const imageModelForPlan = pickerModels.find((entry) => VISION_MODELS.includes(entry.value) && modelAllowedForTier(entry.value, tier, creditBalance)) ?? null;
 
   function addAttachmentFiles(files) {
     const chosen = Array.from(files ?? []).map((file) => ({
@@ -2563,8 +3227,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     }
     if (uploadLimits) {
       const total = next.reduce((sum, attachment) => sum + attachment.file.size, 0);
-      if (next.some((attachment) => attachment.file.size > (attachment.file.type.startsWith("image/") ? uploadLimits.imageBytes : uploadLimits.fileBytes))) {
-        setError("One or more files exceed your plan's per-file limit.");
+      const tooLarge = perFileProblem(uploadLimits, next.map((attachment) => attachment.file));
+      if (tooLarge) {
+        setError(tooLarge);
         return;
       }
       if (total > uploadLimits.messageBytes) {
@@ -2581,7 +3246,145 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     event.target.value = "";
   }
 
+  const selectedConnectorIdSet = useMemo(() => new Set(selectedConnectors.map((entry) => entry.id)), [selectedConnectors]);
+  const selectedSkillIdSet = useMemo(() => new Set(selectedSkills.map((entry) => entry.id)), [selectedSkills]);
+
+  const mentionPickerItems = useMemo(() => {
+    if (!mentionTrigger) return [];
+    if (mentionTrigger.kind === "connector") {
+      return filterConnectorsForPicker(connectorsCatalog, mentionTrigger.query, selectedConnectorIdSet);
+    }
+    return filterSkillsForPicker(skillsCatalog, mentionTrigger.query, selectedSkillIdSet);
+  }, [mentionTrigger, connectorsCatalog, skillsCatalog, selectedConnectorIdSet, selectedSkillIdSet]);
+
+  useEffect(() => {
+    setMentionHighlight(0);
+  }, [mentionTrigger?.kind, mentionTrigger?.query]);
+
+  useEffect(() => {
+    if (!mentionTrigger) return undefined;
+    let cancelled = false;
+    const loadCatalog = async () => {
+      setMentionsLoading(true);
+      try {
+        if (mentionTrigger.kind === "connector" && connectorsCatalog.length === 0) {
+          const res = await api("/api/connectors");
+          if (!cancelled) setConnectorsCatalog(res.connectors || []);
+        }
+        if (mentionTrigger.kind === "skill" && skillsCatalog.length === 0) {
+          const res = await api("/api/skills");
+          if (!cancelled) setSkillsCatalog(res.skills || []);
+        }
+      } catch {
+        /* empty picker is acceptable */
+      } finally {
+        if (!cancelled) setMentionsLoading(false);
+      }
+    };
+    void loadCatalog();
+    return () => { cancelled = true; };
+  }, [mentionTrigger, connectorsCatalog.length, skillsCatalog.length]);
+
+  const closeMentionPicker = useCallback(() => {
+    setMentionTrigger(null);
+  }, []);
+
+  const removeMentionTriggerText = useCallback((trigger) => {
+    if (!trigger) return;
+    setDraft((current) => `${current.slice(0, trigger.replaceStart)}${current.slice(trigger.replaceEnd)}`);
+  }, []);
+
+  const syncMentionTrigger = useCallback((text, cursor) => {
+    const next = detectMentionTrigger(text, cursor, { suppress: mentionSuppressRef.current, mentions: readDraft().mentions });
+    if (next && next.replaceStart === mentionDismissedRef.current) { setMentionTrigger(null); return; }
+    mentionDismissedRef.current = null;
+    setMentionTrigger(next);
+  }, [readDraft]);
+
+  // Choosing a connector puts "@Name" into the sentence where "@query" was and leaves the caret after it, ready to keep typing.
+  const mentionConnectorInline = useCallback((trigger, connector) => {
+    pendingCaretRef.current = insertMention(trigger, { id: connector.id, label: connectorDisplayName(connector) });
+    mentionDismissedRef.current = null;
+    setMentionTrigger(null);
+  }, [insertMention]);
+
+  const pickHighlightedMention = useCallback(() => {
+    if (!mentionTrigger || !mentionPickerItems.length) return false;
+    const item = mentionPickerItems[Math.min(mentionHighlight, mentionPickerItems.length - 1)];
+    if (!item) return false;
+    if (mentionTrigger.kind === "connector") {
+      if (item.status !== "connected") {
+        removeMentionTriggerText(mentionTrigger);
+        closeMentionPicker();
+        onOpenExtensions?.();
+        return true;
+      }
+      mentionConnectorInline(mentionTrigger, item);
+      return true;
+    }
+    setSelectedSkills((prev) => (
+      prev.some((entry) => entry.id === item.id)
+        ? prev
+        : [...prev, { id: item.id, name: item.name }]
+    ));
+    removeMentionTriggerText(mentionTrigger);
+    closeMentionPicker();
+    return true;
+  }, [mentionTrigger, mentionPickerItems, mentionHighlight, onOpenExtensions, closeMentionPicker, removeMentionTriggerText, mentionConnectorInline]);
+
+  function handleComposerChange(event) {
+    const { value, selectionStart } = event.target;
+    setDraft(value);
+    if (!imeComposingRef.current) syncMentionTrigger(value, selectionStart);
+  }
+
+  function handleComposerKeyDown(event) {
+    if (mentionTrigger) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        mentionDismissedRef.current = mentionTrigger.replaceStart;
+        closeMentionPicker();
+        return;
+      }
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setMentionHighlight((index) => (mentionPickerItems.length ? (index + 1) % mentionPickerItems.length : 0));
+        return;
+      }
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setMentionHighlight((index) => (mentionPickerItems.length ? (index - 1 + mentionPickerItems.length) % mentionPickerItems.length : 0));
+        return;
+      }
+      if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        pickHighlightedMention();
+        return;
+      }
+    }
+    // Backspace at the end of a mention, or Delete at its start, removes all of it, as one thing.
+    if ((event.key === "Backspace" || event.key === "Delete") && !event.nativeEvent.isComposing) {
+      const node = event.currentTarget;
+      if (node.selectionStart === node.selectionEnd) {
+        const caret = deleteMention(node.selectionStart, event.key === "Backspace" ? "backward" : "forward");
+        if (caret !== null) {
+          event.preventDefault();
+          pendingCaretRef.current = caret;
+          return;
+        }
+      }
+    }
+    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+      event.preventDefault();
+      void send({ preventDefault() {} });
+    }
+  }
+
   function handlePaste(event) {
+    if (event.clipboardData?.types?.includes("text/plain")) {
+      mentionSuppressRef.current = true;
+      requestAnimationFrame(() => { mentionSuppressRef.current = false; });
+    }
     const files = Array.from(event.clipboardData?.files ?? []);
     if (!files.length) return;
     event.preventDefault();
@@ -2624,15 +3427,19 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     }
   }
 
+  // The selected model is the one source of truth: the picker's check, the model the next message sends, and (because a chosen model
+  // never answers from another tier) the reply's label all read it. A click selects at once; saving it as this conversation's model and
+  // as the remembered default happens behind it, and a save that fails never moves the selection back: the message may already have
+  // gone with it, and the picker must keep saying what was sent.
   async function changeModel(nextModel) {
+    nextModel = canonicalModelKey(nextModel);
     if (modelSaving || busyRef.current || nextModel === model) return;
     if (!modelAllowedForTier(nextModel, tier, creditBalance)) {
-      const access = accessStatus({ reason: "plan", feature: MODELS.find((entry) => entry.value === nextModel)?.label ?? "This model" });
-      setError(access.message);
-      window.dispatchEvent(new CustomEvent("vibhavgpt:access-status", { detail: access }));
+      go("billing");
       return;
     }
-    const previousModel = model;
+    userPickedModelRef.current = true;
+    setRetiredSelection(null);
     setModelSaving(true);
     setModel(nextModel);
     onModelChange?.(nextModel);
@@ -2641,7 +3448,9 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     // fixed default; when Settings is in Last-used mode, preferredModel is
     // null and the remembered model is what the next session restores.
     const payload = { ...quickPreferences, lastUsedModel: nextModel };
-    if (preferredModelRef.current !== undefined) payload.preferredModel = preferredModelRef.current;
+    if (preferredModelRef.current !== undefined) {
+      payload.preferredModel = preferredModelRef.current ? canonicalModelKey(preferredModelRef.current) : null;
+    }
     let conversationSaved = false;
     try {
       if (conversationId) {
@@ -2655,14 +3464,11 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         method: "PATCH",
         body: JSON.stringify(payload),
       });
-    } catch (preferenceError) {
-      if (!conversationSaved) {
-        setModel(previousModel);
-        onModelChange?.(previousModel);
-        setError(preferenceError.message || "We couldn't remember that model.");
-      } else {
-        setError(`This conversation is using ${MODELS.find((entry) => entry.value === nextModel)?.label ?? "the selected model"}. We couldn't update your default model, but the conversation is saved.`);
-      }
+    } catch {
+      const name = [...MODELS, ...THIRD_PARTY_OPTIONS].find((entry) => entry.value === nextModel)?.label ?? nextModel;
+      setError(conversationSaved
+        ? `This conversation is using ${name}. We couldn't update your default model, but the conversation is saved.`
+        : `Your next message will use ${name}. We couldn't save it as your default model just now.`);
     } finally {
       setModelSaving(false);
     }
@@ -2700,23 +3506,140 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     });
   }
 
+  // Explicit stop. A reply keeps running when the page goes away, so closing the connection is not enough: the server is told to stop it,
+  // and only then is the stream closed. A Stop pressed before the server named the reply is sent as soon as it does.
+  async function requestStop(id) {
+    setStopState("stopping");
+    try {
+      await api(`/api/chat/replies/${encodeURIComponent(id)}/stop`, { method: "POST" });
+    } catch (error) {
+      // 404: the reply had already finished, so there is nothing left to stop. Anything else: the server did not stop it, so the reply
+      // keeps running and the page says so, rather than claiming it stopped.
+      if (error?.status !== 404) {
+        stopRequestedRef.current = false;
+        setStopState("failed");
+        setError("Couldn't stop this response. It's still running; try Stop again.");
+        setErrorTone("warning");
+        return false;
+      }
+    }
+    activeRequestRef.current?.abort();
+    attachRef.current?.abort();
+    return true;
+  }
+  function stopReply({ waiting = false } = {}) {
+    if (stopState === "stopping") return;
+    if (waiting) cancelledWaitRef.current = true;
+    stopRequestedRef.current = true;
+    setStopState("stopping");
+    const id = replyIdRef.current;
+    if (id) return void requestStop(id);
+    // Nothing reached the server yet (files still uploading): closing the request is the whole stop.
+    if (!streamStartedRef.current) { activeRequestRef.current?.abort(); attachRef.current?.abort(); }
+  }
+
+  // A chat opened (or reloaded) while its reply is still running follows that reply instead of looking finished. Nothing is sent again.
+  // The run keeps the time it started on the server, so its timer carries on from there instead of starting again at 0.
+  async function attachToRunningReply(id, model, startedAt = null) {
+    if (busyRef.current) return;
+    const runStartedAt = Number.isFinite(Date.parse(startedAt ?? "")) ? Math.min(Date.parse(startedAt), Date.now()) : Date.now();
+    busyRef.current = true;
+    const controller = new AbortController();
+    attachRef.current = controller;
+    replyIdRef.current = id;
+    stopRequestedRef.current = false;
+    trackLiveReply(id, { local: true });
+    setStreamingModel(model ?? sentModel);
+    setBusy(true);
+    setStreamText("");
+    setLiveReasoning("");
+    setLiveThought(null);
+    setLivePhase({ phase: "thinking", startedAt: runStartedAt });
+    const thoughtGuard = createReplyStreamGuard();
+    let visible = "";
+    let reasoningSoFar = "";
+    try {
+      const reply = await attachReplyStream(id, {
+        signal: controller.signal,
+        // Replayed and new status events keep the run's own start time: reopening never resets the timer.
+        onStatus: (phase, details) => { if (mountedRef.current) setLivePhase({ phase, attempt: details?.attempt, maxAttempts: details?.maxAttempts, service: details?.service, tier: details?.tier, startedAt: runStartedAt }); },
+        onDelta: (delta) => {
+          if (!mountedRef.current) return;
+          if (typeof delta.reasoning === "string") { reasoningSoFar += delta.reasoning; setLiveReasoning(reasoningSoFar); return; }
+          if (delta.reasoningReset) { reasoningSoFar = ""; setLiveReasoning(""); return; }
+          if (delta.reset) { visible = ""; thoughtGuard.reset(); setStreamText(""); return; }
+          if (typeof delta.text !== "string") return;
+          const guarded = thoughtGuard.push(delta.text);
+          if (guarded.discardEarlier) { visible = ""; setStreamText(""); }
+          if (!guarded.text) return;
+          visible += guarded.text;
+          setStreamText(visible);
+        },
+      });
+      if (!mountedRef.current) return;
+      if (reply) {
+        if (reply.artifact) setBuildRefresh((value) => value + 1);
+        // The saved reply, once: a reply already in the loaded history is not added again.
+        setMessages((current) => (reply.messageId && current.some((message) => message.id === reply.messageId)) ? current : [
+          ...current,
+          { id: reply.messageId ?? null, clientKey: nextClientKey(), role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, imagePrompt: reply.imagePrompt ?? null, model: reply.modelKey ?? null, fresh: !visible, pendingAction: reply.pendingAction ?? null, reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined, thoughtSeconds: reply.thoughtSeconds ?? null, contextReduced: reply.contextReduced === true },
+        ]);
+      } else {
+        await reloadSavedHistory();
+      }
+    } catch (err) {
+      if (!mountedRef.current) return;
+      if (stopRequestedRef.current) {
+        const partial = interruptedStreamMessage(visible, model ?? sentModel, { stopped: true });
+        if (partial) setMessages((current) => [...current, { ...partial, clientKey: nextClientKey() }]);
+      } else if (err?.name !== "AbortError") {
+        setError(err?.message || "The reply couldn't be followed. Reload the chat to see what was saved.");
+      }
+    } finally {
+      stopRequestedRef.current = false;
+      busyRef.current = false;
+      setStopState("idle");
+      if (attachRef.current === controller) attachRef.current = null;
+      if (replyIdRef.current === id) replyIdRef.current = null;
+      if (mountedRef.current) { setBusy(false); setStreamText(""); setLiveReasoning(""); setLiveThought(null); }
+    }
+  }
+
+  async function reloadSavedHistory() {
+    const id = activeConversationRef.current ?? conversationId;
+    if (!id) return;
+    try {
+      const result = await api(`/api/chat/conversations/${encodeURIComponent(id)}`);
+      if (mountedRef.current) { setMessages((result.history ?? []).map(historyMessage)); setOlderCursor(olderCursorFrom(result)); }
+    } catch { /* the chat keeps what it shows */ }
+  }
+
   // Delivery is separate from send so a failed attempt can be replayed without
   // appending the user's message to the thread a second time.
-  async function deliver(content, selectedAttachments) {
+  async function deliver(content, selectedAttachments, turnMentions = {}) {
+    const turnConnectors = turnMentions.selectedConnectors ?? selectedConnectors;
+    const turnSkills = turnMentions.selectedSkills ?? selectedSkills;
     if (busyRef.current) return;
-    setCodingNudge(mode === "chat" && shouldSuggestNebula(content, sentModel, selectedAttachments.length));
     busyRef.current = true;
     const controller = new AbortController();
     activeRequestRef.current = controller;
+    cancelledWaitRef.current = false;
+    stopRequestedRef.current = false;
+    streamStartedRef.current = false;
+    replyIdRef.current = null;
+    let replyId = null;
     setStreamingModel(sentModel);
     setBusy(true);
     setError("");
+    setAllowanceBlock(null);
     setLiveSources([]);
     setActivity(selectedAttachments.length ? "Thinking" : "Thinking");
     onBackgroundTask?.({ label: "Thinking", detail: selectedAttachments.length ? "Reading your files and preparing a reply." : "Preparing a reply in the background." });
     let uploaded = [];
     let visibleStream = "";
     let previousStream = "";
+    // The reply text, through the same filter the server uses, before any of it is shown or kept.
+    const thoughtGuard = createReplyStreamGuard();
     let currentPhase = selectedAttachments.length ? "attachments" : "thinking";
     let thinkingStartedAt = Date.now();
     let reasoningSoFar = "";
@@ -2738,6 +3661,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       thinkingStartedAt = Date.now();
       setLivePhase({ phase: currentPhase, startedAt: thinkingStartedAt });
       let streamedAny = false;
+      streamStartedRef.current = true;
       const reply = await streamChat(
         {
           message: content,
@@ -2745,6 +3669,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           conversationId,
           mode,
           ...(group && !conversationId ? { groupId: group.id } : {}),
+          ...(temporaryChat && !conversationId && !studyMode ? { temporary: true } : {}),
           ...(recapRef.current ? { memoryRecap: recapRef.current } : {}),
           attachmentIds: uploaded.map((file) => file.id),
           // Send the currently selected mode with this turn as well as saving
@@ -2752,20 +3677,34 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           // the mode and immediately sends their next message.
           responseStyle: mode === "study" ? "friendly" : quickPreferences.responseStyle,
           thinkingEffort: quickPreferences.thinkingEffort,
+          // A marketplace model's thinking level, as chosen when this message was sent (a later change applies to the next message).
+          ...(marketplaceLevel && !studyMode ? { thinkingLevel: marketplaceLevel } : {}),
+          ...(turnConnectors.length ? { selectedConnectors: turnConnectors.map((entry) => entry.id) } : {}),
+          ...(turnSkills.length ? { selectedSkillIds: turnSkills.map((entry) => entry.id) } : {}),
         },
         (phase, details) => {
           if (mountedRef.current && details?.sources) setLiveSources(details.sources);
-          const next = phase === "searching" ? "Searching the web" : phase === "calculating" ? "Calculating" : phase === "writing" ? "Writing" : "Thinking";
+          const next = phase === "searching" ? "Searching the web" : phase === "calculating" ? "Calculating" : phase === "writing" ? "Writing" : phase === "queued" ? "Waiting for a free slot" : "Thinking";
           if (mountedRef.current) setActivity(next);
           if (phase !== currentPhase) {
             currentPhase = phase;
-            if (phase === "thinking") thinkingStartedAt = Date.now();
+            // The counter shows thinking time, or, while every slot is taken, how long the reply has been waiting.
+            if (phase === "thinking" || phase === "queued") thinkingStartedAt = Date.now();
           }
-          if (mountedRef.current) setLivePhase({ phase, attempt: details?.attempt, maxAttempts: details?.maxAttempts, startedAt: thinkingStartedAt });
-          onBackgroundTask?.({ label: next === "Writing" ? "Writing your document" : next, detail: phase === "searching" ? "Checking web sources for up-to-date information." : phase === "calculating" ? "Running the calculation in an isolated sandbox." : phase === "writing" ? "Writing your document. Longer documents take up to a minute." : "Preparing a reply in the background." });
+          if (mountedRef.current) setLivePhase({ phase, attempt: details?.attempt, maxAttempts: details?.maxAttempts, service: details?.service, tier: details?.tier, startedAt: thinkingStartedAt });
+          if (replyId) trackLiveReply(replyId, { label: next === "Thinking" ? "Writing a reply" : next });
+          onBackgroundTask?.({ label: next === "Writing" ? "Writing your document" : next, detail: phase === "searching" ? "Checking web sources for up-to-date information." : phase === "calculating" ? "Running the calculation in an isolated sandbox." : phase === "writing" ? "Writing your document. Longer documents take up to a minute." : phase === "queued" ? "Every slot is in use right now. Your reply starts as soon as one is free." : "Preparing a reply in the background." });
         },
         {
           signal: controller.signal,
+          onReply: (data) => {
+            if (!data?.replyId) return;
+            replyId = data.replyId;
+            if (mountedRef.current) replyIdRef.current = replyId;
+            trackLiveReply(replyId, { conversationId: conversationId ?? null, mode, local: true });
+            // Stop was pressed before the server named the reply: stop it now.
+            if (stopRequestedRef.current) void requestStop(replyId);
+          },
           // A first message's conversation exists before the reply does, so
           // a failed reply's Retry (and the next message) continue it
           // instead of starting another.
@@ -2773,6 +3712,8 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             if (!saved?.conversationId || saved.conversationId === conversationId) return;
             setConversationId(saved.conversationId);
             onConversationSaved?.(saved.conversationId, !mountedRef.current);
+            // A new chat's running reply now belongs to it (an existing chat's was recorded when the reply was named).
+            if (replyId) trackLiveReply(replyId, { conversationId: saved.conversationId });
           },
           onDelta: (delta) => {
             if (!mountedRef.current) return;
@@ -2789,12 +3730,16 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             if (delta.reasoningReset) { reasoningSoFar = ""; setLiveReasoning(""); return; }
             // A withdrawn stream was the model's reasoning: keep no copy of it,
             // so a failed reply can never show it as a partial answer.
-            if (delta.reset) { previousStream = delta.withdraw ? "" : (visibleStream || previousStream); visibleStream = ""; setStreamText(""); return; }
+            if (delta.reset) { previousStream = delta.withdraw ? "" : (visibleStream || previousStream); visibleStream = ""; thoughtGuard.reset(); setStreamText(""); return; }
             if (typeof delta.text !== "string") return;
+            const guarded = thoughtGuard.push(delta.text);
+            // A closing reasoning tag with no opening one: what was shown before it was reasoning. Clear it, and keep no copy.
+            if (guarded.discardEarlier) { visibleStream = ""; previousStream = ""; setStreamText(""); }
+            if (!guarded.text) return;
             if (!streamedAny && reasoningSoFar) setLiveThought(elapsedSeconds(thinkingStartedAt));
             streamedAny = true;
-            visibleStream += delta.text;
-            setStreamText((current) => current + delta.text);
+            visibleStream += guarded.text;
+            setStreamText((current) => current + guarded.text);
           },
         },
       );
@@ -2802,34 +3747,88 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       onBackgroundTask?.({ label: "Almost done", detail: "Saving the completed response to this conversation." });
       await new Promise((resolve) => setTimeout(resolve, 240));
       setConversationId(reply.conversationId);
+      if (reply.artifact) setBuildRefresh((value) => value + 1);
+      if (typeof reply.temporary === "boolean") setTemporaryChat(reply.temporary);
       onConversationSaved?.(reply.conversationId, !mountedRef.current);
       if (mountedRef.current) setMessages((current) => [
         ...current,
         // A reply already read as it streamed isn't typed out a second time.
-        { id: reply.messageId ?? null, clientKey: nextClientKey(), role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, model: reply.modelKey ?? null, fresh: !streamedAny,
-          // No shown thinking (empty, or all rule-checking that was scrubbed):
-          // no "Thought for X s" pill or drawer for this reply.
-          reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined, thoughtSeconds: reasoningSoFar.trim() ? (reply.thoughtSeconds ?? null) : null },
+        { id: reply.messageId ?? null, clientKey: nextClientKey(), role: "assistant", content: reply.reply, sources: reply.sources ?? [], activitySummary: reply.activitySummary ?? [], attachment: reply.attachment ?? null, imagePrompt: reply.imagePrompt ?? null, model: reply.modelKey ?? null, fresh: !streamedAny,
+          pendingAction: reply.pendingAction ?? null,
+          // Thinking text exists only when a route is verified to show a summary
+          // (none is today); otherwise it is empty and the pill has no drawer.
+          reasoning: reasoningSoFar.trim() ? reasoningSoFar : undefined,
+          // How long the model thought, as the server measured it. It does not
+          // depend on any thinking text being shown: with none, the reply keeps
+          // a "Thought for X s" pill that has nothing to expand. No measured
+          // time means no pill.
+          thoughtSeconds: reply.thoughtSeconds ?? null,
+          // Older messages were summarized (or long references shortened) to fit this reply: say so under it.
+          contextReduced: reply.contextReduced === true },
       ]);
       if (mountedRef.current) { setStreamText(""); setLiveReasoning(""); setLiveThought(null); }
       selectedAttachments.forEach((attachment) => URL.revokeObjectURL(attachment.previewUrl));
       if (mountedRef.current) setFailed(null);
     } catch (err) {
-      if (mountedRef.current) {
+      // The files could not be stored (storage full, or a file over the plan's per-file size): nothing reached the model, so the message
+      // and its files go back to the composer, the one storage notice says why, and there is no Retry (retrying cannot fix it).
+      const uploadBlocked = !uploaded.length && ["storage-limit", "upload-plan-limit"].includes(err?.code);
+      if (uploadBlocked) {
+        if (mountedRef.current) {
+          if (turnMentions.userKey) setMessages((current) => current.filter((message) => message.clientKey !== turnMentions.userKey));
+          setDraft((current) => current || content);
+          if (selectedAttachments?.length) setAttachments(selectedAttachments);
+          setFailed(null);
+          // The notice at the top (access status, with the server's own sentence) says it once: no second banner here.
+          setError("");
+        }
+      } else if (stopRequestedRef.current && !cancelledWaitRef.current) {
+        // Stopped on purpose: what was written so far stays on screen, with no error.
+        stopRequestedRef.current = false;
+        if (mountedRef.current) {
+          const partial = interruptedStreamMessage(visibleStream || previousStream, streamingModel ?? sentModel, { stopped: true });
+          if (partial) setMessages((current) => [...current, { ...partial, clientKey: nextClientKey() }]);
+          setFailed(null);
+          setError("");
+        }
+      } else if (cancelledWaitRef.current) {
+        // Cancelled while waiting for a slot: the reply never started, so the message goes back to the composer to edit or resend.
+        cancelledWaitRef.current = false;
+        if (mountedRef.current) {
+          setDraft((current) => current || content);
+          if (selectedAttachments?.length) setAttachments(selectedAttachments);
+          setFailed(null);
+          setError("");
+        }
+      } else if (mountedRef.current) {
         const partial = interruptedStreamMessage(visibleStream || previousStream, streamingModel ?? sentModel);
         if (partial) setMessages((current) => [...current, { ...partial, clientKey: nextClientKey() }]);
-        setError(err.access?.reason === "quota" ? "" : err.message);
+        const block = err.code === "allowance_exceeded" ? allowanceViewFromChatError(err) : null;
+        setAllowanceBlock(block);
+        const isPlanRestriction = err.access?.reason === "plan" || err.code === "free_restricted_to_green_dot" || err.code === "plan-required";
+        setError(err.access?.reason === "quota" || err.access?.reason === "rate" || isPlanRestriction || block ? "" : err.message);
+        setErrorTone(["high_demand", "upstream_busy", "capacity_user_waiting"].includes(err.code) ? "warning" : "error");
+        if (isPlanRestriction) {
+          setDraft(content);
+          if (selectedAttachments?.length) setAttachments(selectedAttachments);
+          setFailed(null);
+        } else {
+          setFailed({ content, attachments: selectedAttachments, selectedConnectors: turnConnectors, selectedSkills: turnSkills });
+        }
       }
-      // Keep the attempt so the banner can offer a retry; without this the
-      // message is stranded in the thread with no reply and no way back.
-      if (mountedRef.current) setFailed({ content, attachments: selectedAttachments });
       await Promise.all(uploaded.map((file) => api(`/api/uploads/${file.id}`, { method: "DELETE" }).catch(() => null)));
     } finally {
       busyRef.current = false;
+      setStopState("idle");
       if (activeRequestRef.current === controller) activeRequestRef.current = null;
+      if (replyId) untrackLiveReply(replyId);
+      if (replyIdRef.current === replyId) replyIdRef.current = null;
+      streamStartedRef.current = false;
       // Refresh after both a successful reservation and an automatic refund so
       // Free users' paid-model availability always reflects the real balance.
       void onUsageChanged?.();
+      // Any open allowance view re-reads the server's figures after a request outcome.
+      if (isAllowanceUiEnabled()) window.dispatchEvent(new CustomEvent("vibhavgpt:allowance-changed"));
       if (mountedRef.current) {
         setBusy(false);
         setActivity("");
@@ -2858,29 +3857,38 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
 
   async function send(event) {
     event.preventDefault();
+    closeMentionPicker();
     const content = draft.trim();
     if (!content && attachments.length === 0) {
       inputRef.current?.focus();
+      return;
+    }
+    if (!sentModel) {
+      setError("Choose a model to send this message.");
+      return;
+    }
+    // Build below Pro: nothing is sent (the server would refuse it too, before any inference or charge).
+    if (buildLocked) {
+      setError("Build with VibhavGPT Tecton is available on Pro or Max.");
       return;
     }
     if (visionModelRequired) {
       setError("Choose a model that supports images to ask about an image.");
       return;
     }
+    // A reply is still coming in: the Send button is Stop response until it ends, and the draft stays in the box, untouched (owner
+    // request, 2026-11-15). Nothing is sent or queued behind the person's back.
+    if (busyRef.current || busy) return;
     const selectedAttachments = attachments;
+    const turnConnectors = selectedConnectors;
+    const turnSkills = selectedSkills;
     if (dictation.listening) dictation.stop();
     setSendPulse((count) => count + 1);
     setDraft("");
     setAttachments([]);
-    // A reply is still coming in: queue this one instead. The stream is left
-    // alone; the queue only moves once the current reply has finished.
-    if (busyRef.current || busy) {
-      queueId.current += 1;
-      setQueue((current) => [...current, { id: queueId.current, content, attachments: selectedAttachments }]);
-      requestAnimationFrame(() => stickToBottom());
-      return;
-    }
-    await startTurn(content, selectedAttachments);
+    setSelectedSkills([]);
+    closeMentionPicker();
+    await startTurn(content, selectedAttachments, { selectedConnectors: turnConnectors, selectedSkills: turnSkills });
   }
 
   // A follow-up sent from a widget in a reply (a quiz's "Ask VibhavGPT to
@@ -2904,12 +3912,13 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     api(`/api/chat/conversations/${conversationId}/messages/${messageId}/study-results`, { method: "POST", body: JSON.stringify(result) }).catch(() => {});
   };
 
-  function startTurn(content, selectedAttachments) {
+  function startTurn(content, selectedAttachments, turnMentions = {}) {
     setFailed(null);
+    const userKey = nextClientKey();
     setMessages((current) => [
       ...current,
       {
-        clientKey: nextClientKey(),
+        clientKey: userKey,
         role: "user",
         content: content || "Attached file(s)",
         attachments: selectedAttachments.map((attachment) => ({
@@ -2918,7 +3927,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         })),
       },
     ]);
-    return deliver(content, selectedAttachments);
+    return deliver(content, selectedAttachments, { ...turnMentions, userKey });
   }
 
   function removeQueued(id) {
@@ -2936,7 +3945,10 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
     if (busy || busyRef.current || failed || !queue.length) return;
     const [next, ...rest] = queue;
     setQueue(rest);
-    void startTurn(next.content, next.attachments);
+    void startTurn(next.content, next.attachments, {
+      selectedConnectors: next.selectedConnectors ?? [],
+      selectedSkills: next.selectedSkills ?? [],
+    });
   // startTurn reads current state; the queue moves only on these changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy, queue, failed]);
@@ -2964,28 +3976,119 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
   }
 
   const empty = !loadingConversation && messages.length === 0;
+
+  // Temporary chat. One notice, shown on the new-chat screen once it is on and at the top of the thread while it lasts.
+  const temporaryNotice = (
+    <p className="temporary-banner" role="note"><HatGlasses size={14} strokeWidth={1.8} aria-hidden="true" /> Temporary chat. Memory isn't used or saved, it isn't in your chat list, and it's deleted after 24 hours.</p>
+  );
+  useEffect(() => {
+    setHeaderSlot(document.getElementById(narrow ? "chat-header-actions-mobile" : "chat-header-actions"));
+  }, [narrow]);
+  const inThread = Boolean(conversationId) || messages.length > 0;
+  function temporaryButtonClick() {
+    if (inThread && temporaryChat) setLeaveTemporaryOpen(true);
+    else if (inThread) onStartTemporaryChat?.();
+    else setTemporaryChat((value) => !value);
+  }
+  const temporaryButton = !studyMode && headerSlot ? createPortal(
+    <IconButton
+      className="temporary-chat-button"
+      label="Temporary chat"
+      title="Temporary chat — no memory used or saved, not kept."
+      active={temporaryChat}
+      aria-pressed={temporaryChat}
+      disabled={busy}
+      onClick={temporaryButtonClick}
+    >
+      <HatGlasses size={20} strokeWidth={1.8} aria-hidden="true" />
+    </IconButton>,
+    headerSlot,
+  ) : null;
   const effortApplies = tier !== "free" && THINKING_MODELS.includes(sentModel);
+  // A marketplace model's thinking levels, exactly as its maker documents them (none for a model without levels).
+  // Every model whose thinking can be adjusted shows the same three levels; each maps to that model's own (thinking-levels.js).
+  const levelOptions = !studyMode && !buildMode && model && marketplaceThinking(model)?.levels?.length > 1 ? THINKING_CHOICES : null;
+  const houseLevel = toUnified(quickPreferences.thinkingEffort) ?? DEFAULT_UNIFIED_LEVEL;
+
+  // Suggestions on a new chat. Each one only fills the box (nothing is sent), as the Study buttons always did.
+  // Study home: the tools sit below the composer and the Chat/Study control, in the same flow on phone and desktop.
+  // Each one only fills the box (nothing is sent). Writing tools opens its panel right here, under the chips.
+  const startRows = empty && !loadingConversation && studyMode ? (
+    <>
+      <div className="study-starters" role="group" aria-label="Study tools">
+        {STUDY_STARTERS.map((label) => <button type="button" className="btn btn--secondary" key={label} onClick={() => { setDraft(label); inputRef.current?.focus(); }}>{(() => { const Icon = STUDY_STARTER_ICON[label] ?? Sparkles; return <Icon size={16} strokeWidth={1.7} aria-hidden="true" />; })()}{label}</button>)}
+        {onOpenWritingTools && <button type="button" className="btn btn--secondary study-starters__tool" aria-expanded={Boolean(toolsPanel)} onClick={() => (toolsPanel ? onCloseWritingTools?.() : onOpenWritingTools("detector"))}><PenLine size={16} strokeWidth={1.7} aria-hidden="true" />Writing tools</button>}
+      </div>
+      {toolsPanel}
+    </>
+  ) : null;
 
   // Composer parts, shared by the desktop bar and the phone pill so the two
   // layouts cannot drift apart in behaviour, only in arrangement.
-  const composerInput = (
-    <textarea
-      ref={inputRef}
-      className="composer__input"
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onPaste={handlePaste}
-      onKeyDown={(event) => {
-        // Enter sends; Shift+Enter keeps the native newline.
-        if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-          event.preventDefault();
-          void send({ preventDefault() {} });
-        }
-      }}
-      placeholder={narrow ? "Ask anything" : studyMode ? "Message VibhavGPT…" : `Message ${modelInfo.full}…`}
-      aria-label={narrow ? (studyMode ? "Message VibhavGPT" : `Message ${modelInfo.full}`) : undefined}
-      rows="1"
+  const mentionChips = (
+    <ComposerMentionChips
+      skills={selectedSkills}
+      onRemoveSkill={(id) => setSelectedSkills((current) => current.filter((entry) => entry.id !== id))}
     />
+  );
+  const composerInput = (
+    <div className="composer__input-wrap">
+      {mentionChips}
+      {mentionTrigger && (
+        <ComposerMentionsPopover
+          kind={mentionTrigger.kind}
+          query={mentionTrigger.query}
+          connectors={connectorsCatalog}
+          skills={skillsCatalog}
+          selectedConnectorIds={selectedConnectorIdSet}
+          selectedSkillIds={selectedSkillIdSet}
+          highlightIndex={mentionHighlight}
+          onHighlight={setMentionHighlight}
+          loading={mentionsLoading}
+          onClose={closeMentionPicker}
+          onConnectConnector={() => {
+            removeMentionTriggerText(mentionTrigger);
+            closeMentionPicker();
+            onOpenExtensions?.();
+          }}
+          onSelectConnector={(connector) => mentionConnectorInline(mentionTrigger, connector)}
+          onSelectSkill={(skill) => {
+            setSelectedSkills((prev) => (
+              prev.some((entry) => entry.id === skill.id)
+                ? prev
+                : [...prev, { id: skill.id, name: skill.name }]
+            ));
+            removeMentionTriggerText(mentionTrigger);
+            closeMentionPicker();
+          }}
+        />
+      )}
+      {mentions.length > 0 && <MentionMirror inputRef={inputRef} text={draft} mentions={mentions} />}
+      {selectedConnectors.length > 0 && <span id="composer-mention-note" className="sr-only">Connectors mentioned: {selectedConnectors.map((entry) => entry.name).join(", ")}</span>}
+      <textarea
+        ref={inputRef}
+        className="composer__input"
+        aria-describedby={selectedConnectors.length > 0 ? "composer-mention-note" : undefined}
+        value={draft}
+        onChange={handleComposerChange}
+        onPaste={handlePaste}
+        onCompositionStart={() => { imeComposingRef.current = true; }}
+        onCompositionEnd={(event) => {
+          imeComposingRef.current = false;
+          syncMentionTrigger(event.target.value, event.target.selectionStart);
+        }}
+        onFocus={() => {
+          if (!empty || !studyMode) return;
+          inputRef.current?.closest(".composer")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+        }}
+        onKeyDown={handleComposerKeyDown}
+        onClick={(event) => syncMentionTrigger(event.currentTarget.value, event.currentTarget.selectionStart)}
+        onKeyUp={(event) => syncMentionTrigger(event.currentTarget.value, event.currentTarget.selectionStart)}
+        placeholder="Ask VibhavGPT"
+        aria-label={studyMode ? "Message VibhavGPT" : buildMode ? "Message VibhavGPT Tecton" : `Message ${modelInfo.full}`}
+        rows="1"
+      />
+    </div>
   );
   const attachmentTray = attachments.length > 0 && (
     <div className="tray" aria-label="Files attached to your next message">
@@ -3024,22 +4127,26 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
         </button>
       )}
     >
-      <MenuLabel>Add to message</MenuLabel>
+      {/* Grouped (Slice 6): what to attach, a divider, (Study) the writing tools, a divider, how the reply is written as one named group,
+          a divider, and Custom (which opens Settings). Same rows, same actions. */}
       <MenuItem icon={<ImageIcon size={16} />} description="Images from your device" onSelect={() => imageInputRef.current?.click()}>Photos</MenuItem>
       <MenuItem icon={<FileText size={16} />} description="PDF, Word, text, CSV or JSON" onSelect={() => fileInputRef.current?.click()}>Files</MenuItem>
       {onOpenWritingTools && <>
-      <MenuSeparator />
-      <MenuLabel>Writing tools</MenuLabel>
-      <MenuItem icon={<ScanSearch size={16} />} description="Check text for AI writing patterns" onSelect={() => onOpenWritingTools("detector")}>AI Detector</MenuItem>
-      <MenuItem icon={<Wand2 size={16} />} description="Rewrite robotic text into natural human prose" onSelect={() => onOpenWritingTools("humanizer")}>AI Humanizer</MenuItem>
+        <MenuSeparator />
+        <MenuGroup label="Writing tools">
+          <MenuItem icon={<ScanSearch size={16} />} description="Check text for AI writing patterns" onSelect={() => onOpenWritingTools("detector")}>AI Detector</MenuItem>
+          <MenuItem icon={<Wand2 size={16} />} description="Rewrite robotic text into natural human prose" onSelect={() => onOpenWritingTools("humanizer")}>AI Humanizer</MenuItem>
+        </MenuGroup>
       </>}
       {mode !== "study" && <>
-      <MenuSeparator />
-      <MenuLabel>Response mode</MenuLabel>
-      <MenuItem icon={<Sparkles size={16} />} description="Short, direct answers" selected={quickPreferences.responseStyle === "concise"} onSelect={() => changeResponseStyle("concise")} disabled={busy || !preferencesLoaded}>Concise</MenuItem>
-      <MenuItem icon={<FileText size={16} />} description="Thorough context and examples" selected={quickPreferences.responseStyle === "detailed"} onSelect={() => changeResponseStyle("detailed")} disabled={busy || !preferencesLoaded}>Detailed</MenuItem>
-      <MenuItem icon={<Brain size={16} />} description="Step by step, beginner-friendly" selected={quickPreferences.responseStyle === "friendly"} onSelect={() => changeResponseStyle("friendly")} disabled={busy || !preferencesLoaded}>Learning</MenuItem>
-      <MenuItem icon={<SettingsIcon size={16} />} description="Your own instructions in Settings" trailing={<ChevronRight className="ui-menu__chevron" size={15} aria-hidden="true" />} onSelect={onOpenSettings}>Custom</MenuItem>
+        <MenuSeparator />
+        <MenuGroup label="Response mode">
+          <MenuItem icon={<AlignLeft size={16} />} description="Short, direct answers" selected={quickPreferences.responseStyle === "concise"} onSelect={() => changeResponseStyle("concise")} disabled={busy || !preferencesLoaded}>Concise</MenuItem>
+          <MenuItem icon={<AlignJustify size={16} />} description="Thorough context and examples" selected={quickPreferences.responseStyle === "detailed"} onSelect={() => changeResponseStyle("detailed")} disabled={busy || !preferencesLoaded}>Detailed</MenuItem>
+          <MenuItem icon={<GraduationCap size={16} />} description="Step by step, beginner-friendly" selected={quickPreferences.responseStyle === "friendly"} onSelect={() => changeResponseStyle("friendly")} disabled={busy || !preferencesLoaded}>Learning</MenuItem>
+        </MenuGroup>
+        <MenuSeparator />
+        <MenuItem icon={<SettingsIcon size={16} />} description="Your own instructions in Settings" trailing={<span className="ui-menu__aside">Settings</span>} onSelect={onOpenSettings}>Custom</MenuItem>
       </>}
     </Menu>
   );
@@ -3081,7 +4188,7 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       type="button"
       className="composer__mic"
       aria-label={dictation.listening ? "Stop dictation" : "Dictate a message"}
-      title={dictation.listening ? "Stop dictation" : "Dictate a message"}
+      title={dictation.listening ? "Stop dictation" : "Dictate"}
       aria-pressed={dictation.listening}
       onClick={() => {
         if (dictation.listening) {
@@ -3097,8 +4204,23 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       <Mic size={18} strokeWidth={2} />
     </button>
   );
-  const sendButton = (
-    <button className="composer__send" aria-label={busy ? "Add to queue" : "Send message"} title={busy ? "Add to queue" : "Send message"} disabled={!draft.trim() && !attachments.length}>
+  // While this conversation's reply runs, Send is Stop response, in the same place: it stops that exact reply on the server (requestStop),
+  // or, while it is still waiting for a free slot, cancels the wait. It is never shown for another conversation's reply.
+  const sendButton = busy ? (
+    <button
+      type="button"
+      className="composer__send composer__send--stop"
+      aria-label={stopState === "stopping" ? "Stopping response" : "Stop response"}
+      title={stopState === "stopping" ? "Stopping…" : "Stop response"}
+      data-state={stopState}
+      aria-busy={stopState === "stopping" || undefined}
+      disabled={stopState === "stopping"}
+      onClick={() => stopReply({ waiting: livePhase.phase === "queued" && !streamText })}
+    >
+      <Square size={14} strokeWidth={0} fill="currentColor" aria-hidden="true" />
+    </button>
+  ) : (
+    <button className="composer__send" aria-label="Send message" title="Send message" disabled={!draft.trim() && !attachments.length}>
       <ArrowUp size={18} strokeWidth={2.4} />
     </button>
   );
@@ -3115,18 +4237,29 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           <div className="chat__loading"><TypingDots label="Loading conversation" /></div>
         ) : empty ? (
           <div className="opening">
-            <div className="opening__planet" aria-hidden="true"><img src={mode === "study" ? "/planets/mars.webp" : "/planets/earth.webp"} alt="" /></div>
+            {buildMode ? (
+              <>
+                <h1 className="opening__title"><RevealWords text="What are we building?" /></h1>
+                <p className="opening__lede">Build is VibhavGPT's coding model for prototypes, powered by VibhavGPT Tecton. Describe the app, page or tool, and get working code.</p>
+                {buildLocked && (
+                  <div className="build-gate" role="note" data-locked="true">
+                    <p><strong>Build is included with Pro and Max.</strong> Upgrade to prototype with VibhavGPT Tecton.</p>
+                    <button type="button" className="btn btn--primary" onClick={() => goProp?.("billing")}>See plans</button>
+                  </div>
+                )}
+              </>
+            ) : <>
             <h1 className="opening__title">
               <RevealWords text={mode !== "study" && !userName ? NAMELESS_GREETING : greeting} />
               {mode !== "study" && userName ? <em>, {userName}</em> : null}
             </h1>
-            {mode === "study" && <div className="study-starters" aria-label="Study suggestions">
-              {STUDY_STARTERS.map((label) => <button type="button" className="btn btn--secondary" key={label} onClick={() => { setDraft(label); inputRef.current?.focus(); }}>{label}</button>)}
-              {onOpenWritingTools && <button type="button" className="btn btn--secondary study-starters__tool" onClick={onOpenWritingTools}><PenLine size={14} strokeWidth={2} />Writing tools</button>}
-            </div>}
+            <p className="opening__lede">{mode === "study" ? "Paste your notes or name a topic below, or start from one of the tools under Chat and Study." : "Type a question below, or use + to attach a file."}</p>
+            </>}
+            {!studyMode && temporaryChat && temporaryNotice}
           </div>
         ) : (
           <div className="chat__thread">
+            {temporaryChat && temporaryNotice}
             {olderCursor ? (
               <div className="load-earlier">
                 {olderError && <p className="load-earlier__error" role="alert">{olderError}</p>}
@@ -3160,25 +4293,38 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
               ) : (
                 <article className="turn">
                   <div className="turn__byline">
-                    <span className="turn__mark"><img src={BRAND_ICON} alt="" /></span>
+                    <ReplyMark model={studyMode ? null : message.model} />
                     {studyMode ? "VibhavGPT" : modelLabel(message.model)}
                   </div>
                   <div className="bubble bubble--assistant bubble--wide">
                     <ReasoningTrace text={message.reasoning ?? ""} seconds={message.thoughtSeconds ?? null} />
                     <AssistantBody
                       text={message.content}
+                      sources={message.sources ?? []}
                       animate={Boolean(message.fresh) && index === messages.length - 1}
                       onTick={stickToBottom}
                       onAsk={askFromWidget}
                       onStudyResult={message.id && conversationId ? (result) => recordStudyResult(message.id, result) : null}
                     />
-                    {message.incomplete && <p className="response-interrupted" role="status">Response interrupted. This partial answer is not saved; retry for a complete response.</p>}
+                    {message.incomplete && <p className="response-interrupted" role="status">{message.stopped ? "You stopped this response. This partial answer is not saved." : "Response interrupted. This partial answer is not saved; retry for a complete response."}</p>}
+                    {message.pendingAction && (
+                      <ActionApprovalCard
+                        pendingAction={message.pendingAction}
+                        onResolved={() => onUsageChanged?.()}
+                      />
+                    )}
                     <SourcesDisclosure sources={message.sources ?? []} steps={message.activitySummary ?? []} />
+                    {message.contextReduced && (
+                      <p className="turn__context-note" role="note">This conversation is long, so earlier messages were summarized to fit. Your instructions and latest message were sent in full; restate any earlier requirement that matters.</p>
+                    )}
                     {message.attachment && (
                       <PrivateFileLink className="generated-attachment" href={message.attachment.downloadUrl} name={message.attachment.name}>
                         {message.attachment.kind === "generated-image" ? <PrivateImage lazy loading="lazy" src={message.attachment.previewUrl ?? message.attachment.downloadUrl} alt={message.attachment.name} /> : <FileText size={22} />}
                         <span><strong>{message.attachment.name}</strong><small>Download file</small></span>
                       </PrivateFileLink>
+                    )}
+                    {message.attachment?.kind === "generated-image" && Boolean(message.imagePrompt) && (
+                      <ImagePromptDisclosure prompt={message.imagePrompt} />
                     )}
                   </div>
                   <div className="turn__tools">
@@ -3191,18 +4337,21 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             {busy && (
               <article className="turn">
                 <div className="turn__byline">
-                  <span className="turn__mark"><img src={BRAND_ICON} alt="" /></span>
+                  <ReplyMark model={studyMode ? null : streamingModel ?? sentModel} />
                   {studyMode ? "VibhavGPT" : modelLabel(streamingModel ?? sentModel)}
                 </div>
                 <div className={`bubble bubble--assistant${streamText ? " bubble--wide" : ""}`}>
                   {liveReasoning && streamText && <ReasoningTrace text={liveReasoning} seconds={liveThought} />}
                   {streamText
-                    ? <AssistantBody text={streamText} animate={false} streaming />
+                    ? <AssistantBody text={buildMode ? visibleBuildStream(streamText) : streamText} animate={false} streaming sources={liveSources} />
                     : <ThinkingTool state="thinking" label={<LiveStatusLabel {...livePhase} />} sources={liveSources} />}
+                  {stopState === "stopping" && <p className="chat__stopping" role="status">Stopping…</p>}
                   {liveReasoning && !streamText && <ReasoningTrace text={liveReasoning} live />}
                 </div>
               </article>
             )}
+            {/* The project card comes after the conversation: the person's prompt, then the reply, then the files it made. */}
+            {buildMode && conversationId && <BuildProject conversationId={conversationId} refreshKey={buildRefresh} />}
             {queue.length > 0 && (
               <ol className="chat-queue" aria-label="Queued messages">
                 {queue.map((item, position) => (
@@ -3234,37 +4383,50 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
       </div>
 
       <div className="composer-wrap">
-        {mode === "chat" && codingNudge && sentModel !== "nebula" && sentModel !== "ultra" && (
-          <div className="coding-nudge" role="status">
-            <ModelOrb model="nebula" size="sm" />
-            <span className="coding-nudge__copy">{CODING_NUDGE_COPY}</span>
-            <button type="button" className="btn btn--primary coding-nudge__switch" disabled={busy || modelSaving} onClick={() => changeModel("nebula")}>Switch to Nebula</button>
-            <IconButton className="coding-nudge__dismiss" label="Dismiss model suggestion" onClick={() => setCodingNudge(false)}><X size={14} /></IconButton>
-          </div>
-        )}
         {materials.length > 0 && <div className="chat-materials" aria-label="Conversation materials">
           {materials.map((file) => <PrivateFileLink key={file.id} href={file.downloadUrl} name={file.name} className="btn btn--quiet"><FileText size={14} />{file.name}</PrivateFileLink>)}
         </div>}
-        {error && (
-          <div className="banner banner--error" role="alert">
-            <span>{error}</span>
-            <div className="banner__actions">
-              <button type="button" className="btn btn--ghost" onClick={() => { setError(""); setFailed(null); }}>Dismiss</button>
+        {allowanceBlock && (
+          <AllowanceExhaustedNotice view={allowanceBlock} compact onChooseFreeModel={(choice) => changeModel(choice.modelKey)}>
+            <div className="allowance-exhausted__actions">
+              <button type="button" className="btn btn--ghost" onClick={() => { setAllowanceBlock(null); setFailed(null); }}>Dismiss</button>
               {failed && (
-                <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => deliver(failed.content, failed.attachments)}>
-                  <RotateCw size={14} strokeWidth={2} /> Retry
+                <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => deliver(failed.content, failed.attachments, { selectedConnectors: failed.selectedConnectors ?? [], selectedSkills: failed.selectedSkills ?? [] })}>
+                  <RotateCw size={14} strokeWidth={2} /> Send again with {MODELS.find((entry) => entry.value === model)?.label ?? "the selected model"}
                 </button>
               )}
             </div>
-          </div>
+          </AllowanceExhaustedNotice>
+        )}
+        {error && (
+          <Banner
+            tone={errorTone}
+            title={errorTone === "warning" ? "High demand" : "Couldn't reply"}
+            className="chat-banner"
+            onDismiss={() => { setError(""); setFailed(null); }}
+            action={failed && (
+              <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => deliver(failed.content, failed.attachments, { selectedConnectors: failed.selectedConnectors ?? [], selectedSkills: failed.selectedSkills ?? [] })}>
+                <RotateCw size={14} strokeWidth={2} /> Retry
+              </button>
+            )}
+          >
+            {error}
+          </Banner>
+        )}
+        {(() => {
+          const replacement = conversationReplacement ?? modelReplacement;
+          if (!replacement || model !== replacement.to) return null;
+          return (
+            <Banner tone="info" title={`${replacement.fromName} is now ${replacement.toName}.`} onDismiss={() => { setConversationReplacement(null); onDismissModelReplacement?.(); }} dismissLabel="Dismiss model update notice">
+              Your next message uses {replacement.toName}. Earlier replies keep the name of the model that wrote them.
+            </Banner>
+          );
+        })()}
+        {retiredSelection && !model && (
+          <Banner tone="info" title={`VibhavGPT ${RETIRED_HOUSE_NAMES[retiredSelection] ?? "That model"} has been retired.`} help="This model is no longer offered, so nothing is sent until you choose another. Your conversation and the replies it already wrote are kept, with their original names.">Choose an available model to continue. Your conversation is kept.</Banner>
         )}
         {visionModelRequired && (
-          <div className="banner" role="status">
-            <span>Choose a model that supports images.</span>
-            <div className="banner__actions">
-              <button type="button" className="btn btn--primary" onClick={() => changeModel("nova")}>Switch to Nova</button>
-            </div>
-          </div>
+          <Banner tone="info" title="Choose a model that supports images." help="The selected model reads text only, so it can't see the image you attached. Switch to a model that reads images, or remove the image to send just your text." action={imageModelForPlan ? <button type="button" className="btn btn--primary" onClick={() => changeModel(imageModelForPlan.value)}>Switch to {imageModelForPlan.label}</button> : null} />
         )}
 
         {narrow ? (
@@ -3294,35 +4456,47 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
                 {effortApplies && (
                   <Select
                     size="sm"
-                    className="composer__effort"
-                    label="Thinking effort for your next response"
-                    value={quickPreferences.thinkingEffort}
+                    className="composer__effort composer__level"
+                    label="Thinking level for your next response"
+                    value={houseLevel}
                     onChange={changeThinkingEffort}
                     disabled={busy || !preferencesLoaded}
                     placement="top"
                     options={THINKING_OPTIONS}
                   />
                 )}
-                {!studyMode && <Select
-                  size="sm"
-                  className="composer__model"
-                  listClassName="model-list"
-                  label="Model for your next message"
-                  value={model}
-                  onChange={changeModel}
-                  onDisabledChange={(option) => void changeModel(option.value)}
-                  disabled={busy || modelSaving}
-                  placement="top"
-                  align="end"
-                  options={modelOptions}
-                  renderValue={(option) => <><ModelOrb model={option.value} size="sm" /><span>{option.label}</span></>}
-                  renderOption={(option, { selected }) => <ModelRow entry={option} allowed={!option.disabled} selected={selected} />}
-                />}
+                {levelOptions && (
+                  <Select
+                    size="sm"
+                    className="composer__effort composer__level"
+                    label="Thinking level for your next response"
+                    value={marketplaceLevel}
+                    onChange={(value) => changeThinkingLevel(model, value)}
+                    disabled={busy}
+                    placement="top"
+                    options={levelOptions}
+                  />
+                )}
+                {!studyMode && !buildMode && <ModelTrigger entry={selectedEntry} onOpen={() => setPickerOpen(true)} disabled={busy || modelSaving} />}
                 {micButton}
                 {sendButton}
               </div>
             </div>
           </form>
+        )}
+        {/* On a new chat, one line of real context under the box: the model
+            the next message goes to, what it is for, and how to send. */}
+        {empty && !loadingConversation && (
+          <p className="composer-context">
+            <span><strong>{MODELS.find((entry) => entry.value === model)?.label ?? "Lumen"}</strong> {MODELS.find((entry) => entry.value === model)?.description}</span>
+            {!narrow && <span className="composer-context__keys"><kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for a new line</span>}
+          </p>
+        )}
+        {empty && !loadingConversation && (
+          <div className="start-below">
+            {tabsBelow && <div className="start-below__tabs">{tabsBelow}</div>}
+            {startRows}
+          </div>
         )}
       </div>
       <BottomSheet open={narrow && sheet === "add"} onClose={closeSheet} title="Add to message">
@@ -3351,15 +4525,22 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
             </button>
           </div></>}
           {mode !== "study" && <><div className="add-sheet__list">
-            <button type="button" className="add-sheet__row" disabled={busy} onClick={() => setSheet("model")}>
-              <Sparkles size={19} strokeWidth={1.9} />
+            <button type="button" className="add-sheet__row" disabled={busy} onClick={() => { closeSheet(); setPickerOpen(true); }}>
+              <SlidersHorizontal size={19} strokeWidth={1.9} />
               <span className="add-sheet__copy">Model<small>{modelInfo.label}</small></span>
               <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
             </button>
+            {levelOptions && (
+              <button type="button" className="add-sheet__row" disabled={busy} onClick={() => setSheet("level")}>
+                <Brain size={19} strokeWidth={1.9} />
+                <span className="add-sheet__copy">Thinking level<small>{unifiedLabel(marketplaceLevel)}</small></span>
+                <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+            )}
             {effortApplies && (
               <button type="button" className="add-sheet__row" disabled={busy || !preferencesLoaded} onClick={() => setSheet("effort")}>
                 <Brain size={19} strokeWidth={1.9} />
-                <span className="add-sheet__copy">Thinking effort<small>{THINKING_OPTIONS.find((option) => option.value === quickPreferences.thinkingEffort)?.label}</small></span>
+                <span className="add-sheet__copy">Thinking level<small>{unifiedLabel(houseLevel)}</small></span>
                 <ChevronRight size={18} strokeWidth={2} aria-hidden="true" />
               </button>
             )}
@@ -3382,31 +4563,31 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           </>}
         </div>
       </BottomSheet>
-      <BottomSheet open={narrow && sheet === "model"} onClose={closeSheet} title="Choose a model">
-        <div className="model-sheet" role="radiogroup" aria-label="Model">
-          {MODELS.map((entry) => {
-            const allowed = modelAllowedForTier(entry.value, tier, creditBalance);
-            const selected = entry.value === model;
-            return (
-              <button
-                key={entry.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                className="model-sheet__option"
-                aria-disabled={!allowed || busy || modelSaving || undefined}
-                onClick={() => { if (busy || modelSaving) return; void changeModel(entry.value); closeSheet(); }}
-              >
-                <ModelRow entry={entry} allowed={allowed} selected={selected} />
-              </button>
-            );
-          })}
+      <ModelPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        entries={pickerModels}
+        selected={model}
+        allowedFor={(value) => modelAllowedForTier(value, tier, creditBalance)}
+        onSelect={(value) => void changeModel(value)}
+        onUpgrade={() => { setPickerOpen(false); go("billing"); }}
+        disabled={busy || modelSaving}
+      />
+      <BottomSheet open={narrow && sheet === "level" && Boolean(levelOptions)} onClose={closeSheet} title="Thinking level">
+        <div className="model-sheet" role="radiogroup" aria-label="Thinking level for your next response">
+          {(levelOptions ?? []).map((option) => (
+            <button key={option.value} type="button" role="radio" aria-checked={marketplaceLevel === option.value} className="model-sheet__option" disabled={busy} onClick={() => { changeThinkingLevel(model, option.value); closeSheet(); }}>
+              <span className="model-sheet__icon" aria-hidden="true"><Brain size={16} strokeWidth={1.9} /></span>
+              <span className="model-sheet__copy"><span className="model-sheet__name">{option.label}</span></span>
+              {marketplaceLevel === option.value && <Check className="model-sheet__check" size={18} strokeWidth={2.6} aria-hidden="true" />}
+            </button>
+          ))}
         </div>
       </BottomSheet>
-      <BottomSheet open={narrow && sheet === "effort"} onClose={closeSheet} title="Thinking effort">
-        <div className="model-sheet" role="radiogroup" aria-label="Thinking effort for your next response">
+      <BottomSheet open={narrow && sheet === "effort"} onClose={closeSheet} title="Thinking level">
+        <div className="model-sheet" role="radiogroup" aria-label="Thinking level for your next response">
           {THINKING_OPTIONS.map((option) => {
-            const selected = quickPreferences.thinkingEffort === option.value;
+            const selected = houseLevel === option.value;
             return (
               <button
                 key={option.value}
@@ -3428,6 +4609,19 @@ function Chat({ userName, tier = "free", creditBalance = 0, initialConversationI
           })}
         </div>
       </BottomSheet>
+      {temporaryButton}
+      <Modal
+        open={leaveTemporaryOpen}
+        onClose={() => setLeaveTemporaryOpen(false)}
+        eyebrow="Temporary chat"
+        title="Leave this temporary chat?"
+        description="It isn't saved to your chat list and is deleted within 24 hours. Your next chat can use and save memory as usual."
+      >
+        <div className="ui-modal__actions">
+          <button type="button" className="btn btn--ghost" onClick={() => setLeaveTemporaryOpen(false)}>Stay here</button>
+          <button type="button" className="btn btn--primary" onClick={() => { setLeaveTemporaryOpen(false); onExitTemporaryChat?.(); }}>Start a normal chat</button>
+        </div>
+      </Modal>
     </section>
   );
 }
@@ -3461,30 +4655,31 @@ function ClearMemoryDialog({ open, count, onClose, onCleared }) {
   );
 }
 
-// Settings: whether VibhavGPT uses and saves memory at all, and clear-all.
-function MemorySettingsCard() {
-  const [state, setState] = useState({ loading: true, enabled: true, count: 0 });
+// Settings: using saved memories and saving new ones are separate switches; clear-all. Turning either off deletes nothing.
+// Settings > Media: the VibhavGPT mark on generated images (owner policy, 2026-11-16; enforced on the server in
+// src/generation/watermark.js). On the Free plan it is always on, so the switch is shown on and locked. On paid plans it is off unless
+// turned on here. It applies wherever a picture is opened or downloaded, including ones made before; the stored originals don't change.
+function MediaSettingsCard() {
+  const [state, setState] = useState({ loading: true, enabled: false, locked: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [clearOpen, setClearOpen] = useState(false);
-  const load = useCallback(async () => {
-    try {
-      const result = await api("/api/memory");
-      setState({ loading: false, enabled: result.enabled !== false, count: result.facts?.length ?? 0 });
-    } catch {
-      setState((current) => ({ ...current, loading: false }));
-    }
+  const read = (preferences) => ({ loading: false, enabled: preferences?.imageWatermark?.enabled === true, locked: preferences?.imageWatermark?.locked === true });
+  useEffect(() => {
+    let cancelled = false;
+    api("/api/me/preferences", { cache: "no-store" })
+      .then(({ preferences }) => { if (!cancelled) setState(read(preferences)); })
+      .catch(() => { if (!cancelled) { setState((current) => ({ ...current, loading: false })); setError("Your media settings could not be loaded."); } });
+    return () => { cancelled = true; };
   }, []);
-  useEffect(() => { void load(); }, [load]);
-  async function toggle(value) {
+  async function choose(value) {
     const enabled = value === "on";
-    if (enabled === state.enabled) return;
-    setSaving(true);
-    setError("");
+    if (state.locked || enabled === state.enabled) return;
     const previous = state.enabled;
+    setSaving(true); setError("");
     setState((current) => ({ ...current, enabled }));
     try {
-      await api("/api/memory/settings", { method: "PUT", body: JSON.stringify({ enabled }) });
+      const { preferences } = await api("/api/me/preferences", { method: "PATCH", body: JSON.stringify({ imageWatermark: enabled }) });
+      setState(read(preferences));
     } catch (err) {
       setState((current) => ({ ...current, enabled: previous }));
       setError(err.message || "That setting couldn't be saved. Try again.");
@@ -3492,17 +4687,64 @@ function MemorySettingsCard() {
       setSaving(false);
     }
   }
-  const countLabel = state.loading ? "Checking saved memory…" : state.count === 0 ? "No saved memories" : `${state.count} saved ${state.count === 1 ? "memory" : "memories"}`;
   return (
     <div className="settings-stack">
-      <SettingsGroup title="How memory works" description="When memory is on, VibhavGPT remembers lasting details you share and uses them in later chats. When it's off, nothing is saved or used, and your saved memories stay until you clear them.">
-        <SettingsRow label="Remember details" description="Use and save lasting details from your chats.">
+      <SettingsGroup title="Image watermark" description="A small black-and-white VibhavGPT mark in the bottom-right corner of images made for you, on screen and in downloads.">
+        <SettingsRow label="Add the VibhavGPT mark" description={state.locked ? "Images on the Free plan always carry the mark. Paid plans can turn it off." : "Off unless you turn it on. Applies to all your images, including ones already made, whenever they're opened or downloaded."}>
           <Segmented
-            label="Memory"
+            label="Watermark"
             value={state.enabled ? "on" : "off"}
-            onChange={(value) => void toggle(value)}
+            onChange={(value) => void choose(value)}
+            disabled={state.loading || saving || state.locked}
             options={[{ value: "on", label: "On" }, { value: "off", label: "Off" }]}
           />
+        </SettingsRow>
+        {error && <p className="note note--error" role="alert">{error}</p>}
+      </SettingsGroup>
+    </div>
+  );
+}
+
+function MemorySettingsCard() {
+  const [state, setState] = useState({ loading: true, use: true, save: true, count: 0 });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [clearOpen, setClearOpen] = useState(false);
+  const load = useCallback(async () => {
+    try {
+      const result = await api("/api/memory");
+      setState({ loading: false, use: (result.useEnabled ?? result.enabled) !== false, save: (result.saveEnabled ?? result.enabled) !== false, count: result.facts?.length ?? 0 });
+    } catch {
+      setState((current) => ({ ...current, loading: false }));
+    }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function toggle(key, value) {
+    const next = value === "on";
+    if (next === state[key]) return;
+    setSaving(true);
+    setError("");
+    const previous = state[key];
+    setState((current) => ({ ...current, [key]: next }));
+    try {
+      await api("/api/memory/settings", { method: "PUT", body: JSON.stringify({ [key]: next }) });
+    } catch (err) {
+      setState((current) => ({ ...current, [key]: previous }));
+      setError(err.message || "That setting couldn't be saved. Try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  const countLabel = state.loading ? "Checking saved memory…" : state.count === 0 ? "No saved memories" : `${state.count} saved ${state.count === 1 ? "memory" : "memories"}`;
+  const onOff = [{ value: "on", label: "On" }, { value: "off", label: "Off" }];
+  return (
+    <div className="settings-stack">
+      <SettingsGroup title="How memory works" description="Using memories and saving new ones are separate. Turning either off deletes nothing: your saved memories stay until you delete or clear them. A project's memories are used only in that project's chats, and temporary chats never use or save memory.">
+        <SettingsRow label="Use memory when answering" description="Include your saved memories in your chats. Off: none are read or sent with your messages.">
+          <Segmented label="Use memory when answering" value={state.use ? "on" : "off"} onChange={(value) => void toggle("use", value)} options={onOff} />
+        </SettingsRow>
+        <SettingsRow label="Save new memories" description="Let VibhavGPT save lasting details you share, and things you ask it to remember. Off: nothing new is saved.">
+          <Segmented label="Save new memories" value={state.save ? "on" : "off"} onChange={(value) => void toggle("save", value)} options={onOff} />
         </SettingsRow>
         <SettingsRow label="Saved memories" description={countLabel}>
           <button type="button" className="btn btn--danger" disabled={state.loading || saving || state.count === 0} onClick={() => setClearOpen(true)}>
@@ -3514,6 +4756,21 @@ function MemorySettingsCard() {
       <ClearMemoryDialog open={clearOpen} count={state.count} onClose={() => setClearOpen(false)} onCleared={() => { setClearOpen(false); void load(); }} />
     </div>
   );
+}
+
+// Where a memory came from, in words. Rows saved before provenance existed say only what is known.
+const MEMORY_ORIGIN_LABEL = {
+  explicit: "You asked VibhavGPT to remember this",
+  inferred: "VibhavGPT saved this from a chat",
+  manual: "Added by you",
+  import: "Imported by you",
+};
+function memoryOrigin(fact) {
+  return MEMORY_ORIGIN_LABEL[fact.origin] ?? (fact.source === "assistant" ? "Saved in a chat" : "Saved earlier");
+}
+function memoryDay(value) {
+  const date = value ? new Date(value) : null;
+  return !date || Number.isNaN(date.getTime()) ? null : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
 function importSummary(result) {
@@ -3600,9 +4857,10 @@ function groupMemoryFacts(facts) {
   return sections.filter((section) => section.groups.length);
 }
 
-function Memory({ onMemoriesAdded }) {
+function Memory({ onMemoriesAdded, onOpenConversation }) {
   const [facts, setFacts] = useState([]);
   const [memoryEnabled, setMemoryEnabled] = useState(null);
+  const [saveEnabled, setSaveEnabled] = useState(null);
   const [clearOpen, setClearOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState();
@@ -3628,7 +4886,8 @@ function Memory({ onMemoriesAdded }) {
   const load = useCallback(async () => {
     try {
       const result = await api("/api/memory");
-      setMemoryEnabled(result.enabled !== false);
+      setMemoryEnabled((result.useEnabled ?? result.enabled) !== false);
+      setSaveEnabled((result.saveEnabled ?? result.enabled) !== false);
       setFacts(result.facts);
     } catch (err) {
       setError(err.message);
@@ -3644,6 +4903,16 @@ function Memory({ onMemoriesAdded }) {
       const result = await api(`/api/memory/${id}`, { method: "PATCH", body: JSON.stringify({ content: text }) });
       setFacts((current) => current.map((fact) => (fact.id === id ? result.fact : fact)));
       setEditing();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  // The only way a project's memory is used outside that project.
+  async function makePersonal(id) {
+    try {
+      const result = await api(`/api/memory/${id}`, { method: "PATCH", body: JSON.stringify({ scope: "personal" }) });
+      setFacts((current) => current.map((fact) => (fact.id === id ? { ...fact, ...result.fact, projectName: null } : fact)));
     } catch (err) {
       setError(err.message);
     }
@@ -3719,8 +4988,7 @@ function Memory({ onMemoriesAdded }) {
   return (
     <main className="page">
       <header className="page__header">
-        <p className="ui-eyebrow">Memory</p>
-        <h1 className="page__title"><RevealWords text="What VibhavGPT keeps about you" /></h1>
+        <h1 className="page__title">Memory</h1>
         <p className="page__lede">
           Facts are saved only when they'd help a future conversation. Edit or remove any of them, any time.
         </p>
@@ -3737,8 +5005,14 @@ function Memory({ onMemoriesAdded }) {
       />
 
       {error && <p className="note note--error" role="alert">{error}</p>}
-      {memoryEnabled === false && (
-        <p className="note note--info">Memory is off. VibhavGPT isn't using or saving memories in your chats. Turn it back on in Settings.</p>
+      {memoryEnabled === false && saveEnabled === false && (
+        <p className="note note--info">Memory is off. VibhavGPT isn't using or saving memories in your chats. Your saved memories are kept. Turn it back on in Settings.</p>
+      )}
+      {memoryEnabled === false && saveEnabled !== false && (
+        <p className="note note--info">Using memory is off: these memories aren't included in your chats, but new ones can still be saved. Nothing here was deleted.</p>
+      )}
+      {memoryEnabled !== false && saveEnabled === false && (
+        <p className="note note--info">Saving new memories is off: these are still used in your chats, but nothing new is saved.</p>
       )}
       {view === "memory" && facts.length > 0 && (
         <div className="memory-clear">
@@ -3753,7 +5027,7 @@ function Memory({ onMemoriesAdded }) {
         {view === "import" ? (
           <>
             <article className="card">
-              <h2>Bring your context with you</h2>
+              <h2>Import memories from another assistant</h2>
               <p>Ask another assistant to export a summary, then paste it here. Imports only add: nothing you already have is touched.</p>
               <div className="card__body">
                 <Field label="Copy this prompt">
@@ -3879,8 +5153,17 @@ function Memory({ onMemoriesAdded }) {
                               ) : (
                                 <>
                                   <p>{memoryText(fact.content)}</p>
+                                  <p className="memory-fact__meta">
+                                    <span className="memory-fact__scope" data-scope={fact.scope === "project" ? "project" : "personal"}>{fact.scope === "project" ? `Project: ${fact.projectName ?? "a project"}` : "Personal"}</span>
+                                    <span>{memoryOrigin(fact)}</span>
+                                    {fact.sourceConversationId && onOpenConversation && (
+                                      <button type="button" className="memory-fact__source" onClick={() => onOpenConversation(fact.sourceConversationId, "chat")}>Open the chat</button>
+                                    )}
+                                    {memoryDay(fact.createdAt) && <span>Saved {memoryDay(fact.createdAt)}{memoryDay(fact.updatedAt) && memoryDay(fact.updatedAt) !== memoryDay(fact.createdAt) ? `, updated ${memoryDay(fact.updatedAt)}` : ""}</span>}
+                                  </p>
                                   <div className="fact__actions">
                                     <button className="btn btn--quiet" onClick={() => { setEditing(fact.id); setText(fact.content); }}>Edit</button>
+                                    {fact.scope === "project" && <button className="btn btn--quiet" onClick={() => makePersonal(fact.id)}>Make personal</button>}
                                     <button className="btn btn--quiet" style={{ color: "var(--danger)" }} onClick={() => remove(fact.id)}>Delete</button>
                                   </div>
                                 </>
@@ -3910,11 +5193,25 @@ const RESPONSE_STYLES = [
   { value: "friendly", label: "Friendly", description: "Warm and beginner-friendly." },
 ];
 
+// The sidebar items a person can hide (the ids match SIDEBAR_ITEM_IDS in src/profile/preferences.js).
+const SIDEBAR_ITEMS = [
+  { id: "projects", label: "Projects", description: "Your projects, above your chats." },
+  { id: "library", label: "Library", description: "Files and images from your chats." },
+  { id: "memory", label: "Memory", description: "What VibhavGPT remembers about you." },
+  { id: "billing", label: "Plan", description: "Your plan and billing." },
+  { id: "extensions", label: "Extensions", description: "Connectors and skills." },
+  { id: "apps", label: "Apps", description: "The Android and Windows apps." },
+  { id: "sources", label: "Sources", description: "The public source code." },
+  { id: "merch", label: "Merch Store", description: "VibhavGPT merchandise." },
+];
+
 function Settings({
-  section = "account", onSectionChange, user, appearance, tier = "free", creditBalance = 0, onDeleted, onLegal, onOpenUsage, onOpenBilling = () => {},
-  onboarding = defaultOnboarding(), onSaveOnboarding = async () => {}, onRerunOnboarding = () => {},
+  section = "profile", onSectionChange, onBack = () => {}, user, appearance, tier = "free", creditBalance = 0, onDeleted, onLegal, onOpenUsage, onOpenBilling = () => {},
+  onboarding = defaultOnboarding(), onSaveOnboarding = async () => {}, onRerunOnboarding = () => {}, onUserChange = async () => {},
+  sidebarHidden = [], onSidebarHiddenChange = () => {},
 }) {
-  const { accentId, setAccentId, themeId, setThemeId, resolved } = appearance;
+  const { accentId, setAccentId, themeIds = { chat: appearance.themeId, study: appearance.themeId }, setSurfaceTheme = (_which, value) => appearance.setThemeId?.(value), systemTheme = appearance.resolved, effects = "glass", setEffects = () => {}, topography = "on", setTopography = () => {}, studyTopography = "on", setStudyTopography = () => {}, motion = "system", setMotion = () => {} } = appearance;
+  const creditsMode = useCreditsMode();
   const names = workspaceNames(user, onboarding);
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
@@ -3932,7 +5229,7 @@ function Settings({
   const [preferencesBusy, setPreferencesBusy] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
   const [preferredModel, setPreferredModel] = useState("");
-  const [thinkingEffort, setThinkingEffort] = useState("normal");
+  const [thinkingEffort, setThinkingEffort] = useState("low");
   const [personality, setPersonality] = useState(() => ({ ...onboarding.personality }));
   const [personalityBusy, setPersonalityBusy] = useState(false);
   const [personalitySaved, setPersonalitySaved] = useState(false);
@@ -3946,7 +5243,7 @@ function Settings({
         // below, so the editable field holds only what the user typed here.
         setCustomInstructions(stripManagedInstructions(preferences.customInstructions ?? ""));
         setPreferredModel(preferences.preferredModel ?? "");
-        setThinkingEffort(preferences.thinkingEffort ?? "normal");
+        setThinkingEffort(preferences.thinkingEffort ?? "low");
       })
       .catch(() => null);
   }, []);
@@ -3970,7 +5267,7 @@ function Settings({
       setResponseStyle(saved.responseStyle);
       setCustomInstructions(stripManagedInstructions(saved.customInstructions));
       setPreferredModel(saved.preferredModel ?? "");
-      setThinkingEffort(saved.thinkingEffort ?? "normal");
+      setThinkingEffort(saved.thinkingEffort ?? "low");
       setPreferencesSaved(true);
     } catch (err) {
       setError(err.message);
@@ -4043,67 +5340,76 @@ function Settings({
             icon tiles. Each tile opens that section's own page. */}
         <header className="settings__top">
           <h1 className="settings__title">Settings</h1>
-          <SettingsIndex current={section} onChange={onSectionChange} />
+          <SettingsIndex current={section} onChange={onSectionChange} onBack={onBack} />
         </header>
 
         <div className="settings__sections">
-          <div className="settings__content" id={`settings-${section === "your-data" ? "data" : section === "delete-account" ? "delete" : section}`}>
-            <SettingsSectionHeader icon={meta.icon} title={meta.title} tone={meta.tone}>
-              {section === "personality" ? `${personalityHeadline(personality)} These are the answers from your setup. Change any of them here, or run the whole thing again.` : meta.description}
+          <div className="settings__content" id={`settings-${section === "your-data" || section === "data-controls" ? "data" : section === "delete-account" ? "delete" : section}`}>
+            <SettingsSectionHeader title={meta.title} tone={meta.tone}>
+              {section === "personality" || section === "personalization" ? `${personalityHeadline(personality)} These are the answers from your setup. Change any of them here, or run the whole thing again.` : meta.description}
             </SettingsSectionHeader>
 
             {error && <p className="note note--error" role="alert">{error}</p>}
 
-            {section === "account" && (
+            {(section === "account" || section === "profile") && (
               <div className="settings-stack">
-                <SettingsGroup title="Profile">
-                  <SettingsRow label="Name"><span className="settings-value">{names.settingsName}</span></SettingsRow>
+                <SettingsGroup title="Profile" id="profile-picture">
+                  <SettingsRow label="Picture" stacked><ProfilePicture user={user} displayName={names.displayName} onChanged={onUserChange} /></SettingsRow>
+                  <SettingsRow label="Name" id="profile-name"><span className="settings-value">{names.settingsName}</span></SettingsRow>
                   <SettingsRow label="Email"><span className="settings-value">{user.email}</span></SettingsRow>
                 </SettingsGroup>
+                <SettingsGroup title="Saved avatars" id="saved-avatars">
+                  <SettingsRow stacked><SavedAvatars onProfilePictureChanged={onUserChange} /></SettingsRow>
+                </SettingsGroup>
                 <SettingsGroup title="Plan usage">
-                  <SettingsRow label="Usage and limits" description="See how much of your plan's allowance you have used this period.">
-                    <a href="/app/usage" className="btn btn--secondary" onClick={(event) => {
+                  <SettingsRow label="Usage and limits" description={usageSettingsDescription(creditsMode)}>
+                    <a href="/app/settings/usage" className="btn btn--secondary" onClick={(event) => {
                       if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                      event.preventDefault(); onOpenUsage();
+                      event.preventDefault(); onSectionChange("usage");
                     }}>
                       <BarChart3 size={16} /> View usage & limits
                     </a>
                   </SettingsRow>
                 </SettingsGroup>
-                <DesktopUpdateSettings />
+                <div id="desktop-updates"><DesktopUpdateSettings /></div>
               </div>
             )}
 
             {section === "appearance" && (
               <div className="settings-stack">
-                <SettingsGroup title="Theme" description="Both choices apply instantly and are remembered on this device.">
-                  <SettingsRow stacked>
-                    <div className="theme-picker" role="radiogroup" aria-label="Theme">
-                      {THEMES.map((option) => (
-                        <button
-                          key={option.id}
-                          type="button"
-                          role="radio"
-                          className="theme-option"
-                          // "system" has no fixed look, so it previews whichever sky
-                          // is currently resolved rather than a third invented one.
-                          data-preview={option.id === "system" ? resolved : option.id}
-                          aria-checked={themeId === option.id}
-                          onClick={() => setThemeId(option.id)}
-                        >
-                          <span className="theme-option__art" aria-hidden="true">
-                            <span className="theme-option__planet" />
-                          </span>
-                          <span className="theme-option__copy">
-                            <strong>{option.label}</strong>
-                            <small>{option.description}</small>
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </SettingsRow>
-                </SettingsGroup>
-                <SettingsGroup title="Accent" description="The light that runs through the app.">
+                {[
+                  { which: "chat", title: "Chat background", description: "The sky behind Chat, Image and everything outside Study. Remembered on this device.", id: "theme-picker" },
+                  { which: "study", title: "Study background", description: "The sky behind Study. It can differ from Chat. Remembered on this device.", id: "study-theme-picker" },
+                ].map((surface) => (
+                  <SettingsGroup key={surface.which} title={surface.title} description={surface.description} id={surface.id}>
+                    <SettingsRow stacked>
+                      <div className="theme-picker" role="radiogroup" aria-label={surface.title}>
+                        {THEMES.map((option) => (
+                          <button
+                            key={option.id}
+                            type="button"
+                            role="radio"
+                            className="theme-option"
+                            // "system" has no fixed look, so it previews whichever sky
+                            // the device resolves to rather than a third invented one.
+                            data-preview={option.id === "system" ? systemTheme : option.id}
+                            aria-checked={themeIds[surface.which] === option.id}
+                            onClick={() => setSurfaceTheme(surface.which, option.id)}
+                          >
+                            <span className="theme-option__art" aria-hidden="true">
+                              <span className="theme-option__planet" />
+                            </span>
+                            <span className="theme-option__copy">
+                              <strong>{option.label}</strong>
+                              <small>{option.description}</small>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </SettingsRow>
+                  </SettingsGroup>
+                ))}
+                <SettingsGroup title="Accent" description="The colour used for buttons and highlights." id="accent-picker">
                   <SettingsRow stacked>
                     <div className="swatches" role="group" aria-label="Accent colour">
                       {ACCENTS.map((option) => (
@@ -4124,17 +5430,65 @@ function Settings({
                     </div>
                   </SettingsRow>
                 </SettingsGroup>
+                <SettingsGroup title="Surfaces" description="The message box, menus and sheets sit over your chat." id="surfaces-material">
+                  <SettingsRow label="Material" description="Solid replaces the translucent glass with opaque panels. Reduced transparency or increased contrast on your device does this automatically.">
+                    <Segmented
+                      label="Material"
+                      value={effects}
+                      onChange={setEffects}
+                      options={[{ value: "glass", label: "Glass" }, { value: "solid", label: "Solid" }]}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Chat background" description="Soft contour lines behind your conversation. They sit over your sky. They are off to save data on slower devices.">
+                    <Segmented
+                      label="Chat background"
+                      value={topography}
+                      onChange={setTopography}
+                      options={[{ value: "on", label: "Contours" }, { value: "off", label: "Plain" }]}
+                    />
+                  </SettingsRow>
+                  <SettingsRow label="Study contours" description="The same contour lines behind Study, chosen separately from Chat.">
+                    <Segmented
+                      label="Study contours"
+                      value={studyTopography}
+                      onChange={setStudyTopography}
+                      options={[{ value: "on", label: "Contours" }, { value: "off", label: "Plain" }]}
+                    />
+                  </SettingsRow>
+                </SettingsGroup>
+                <SettingsGroup title="Sidebar" description="Choose what the sidebar shows. New chat, search and your account always stay. Saved to your account." id="sidebar-items">
+                  {SIDEBAR_ITEMS.map((item) => (
+                    <SettingsRow key={item.id} label={item.label} description={item.description}>
+                      <Segmented
+                        label={`${item.label} in the sidebar`}
+                        value={sidebarHidden.includes(item.id) ? "hide" : "show"}
+                        onChange={(value) => onSidebarHiddenChange(value === "hide" ? [...new Set([...sidebarHidden, item.id])] : sidebarHidden.filter((id) => id !== item.id))}
+                        options={[{ value: "show", label: "Show" }, { value: "hide", label: "Hide" }]}
+                      />
+                    </SettingsRow>
+                  ))}
+                </SettingsGroup>
+                <SettingsGroup title="Motion" description="For comfort, including motion sensitivity." id="motion">
+                  <SettingsRow label="Reduce motion" description="Stop animated backgrounds and reduce movement. Backgrounds stay, standing still.">
+                    <Segmented
+                      label="Reduce motion"
+                      value={motion}
+                      onChange={setMotion}
+                      options={[{ value: "system", label: "Match device" }, { value: "reduce", label: "Reduce" }, { value: "full", label: "Allow" }]}
+                    />
+                  </SettingsRow>
+                </SettingsGroup>
               </div>
             )}
 
-            {section === "replies" && (
+            {(section === "replies" || section === "general") && (
               <div className="settings-stack">
-                <SettingsGroup title="Response style">
+                <SettingsGroup title="Response style" id="response-style">
                   <SettingsRow stacked>
                     <ChoiceCards label="Response style" value={responseStyle} onChange={setResponseStyle} options={RESPONSE_STYLES} />
                   </SettingsRow>
                 </SettingsGroup>
-                <SettingsGroup title="Personal instructions" description="Anything VibhavGPT should always keep in mind when it answers you.">
+                <SettingsGroup title="Personal instructions" description="Anything VibhavGPT should always keep in mind when it answers you." id="custom-instructions">
                   <SettingsRow stacked>
                     <Field label="Personal instructions" hint={`${customInstructions.length}/4000`} className="settings-field--bare">
                       <textarea
@@ -4149,6 +5503,7 @@ function Settings({
                 </SettingsGroup>
                 <SettingsGroup
                   title="Defaults for new chats"
+                  id="preferred-default-model"
                   footer={<>
                     <span className="settings-saved" role="status">{preferencesSaved && <><Check size={15} strokeWidth={2.4} aria-hidden="true" />Saved</>}</span>
                     <button className="btn btn--primary" disabled={preferencesBusy} onClick={savePreferences}>
@@ -4188,10 +5543,10 @@ function Settings({
                     />
                   </SettingsRow>
                   {tier !== "free" && (
-                    <SettingsRow label="Default thinking effort" description="You can override this beside the model picker for any response.">
+                    <SettingsRow label="Default thinking level" description="Low, Medium or High. You can override this beside the model picker for any response." id="thinking-effort">
                       <SettingsSelect
-                        label="Default thinking effort"
-                        value={thinkingEffort}
+                        label="Default thinking level"
+                        value={toUnified(thinkingEffort) ?? DEFAULT_UNIFIED_LEVEL}
                         onChange={setThinkingEffort}
                         align="end"
                         options={THINKING_OPTIONS}
@@ -4202,10 +5557,11 @@ function Settings({
               </div>
             )}
 
-            {section === "personality" && (
+            {(section === "personality" || section === "personalization") && (
               <div className="settings-stack">
                 <SettingsGroup
                   title="How VibhavGPT talks to you"
+                  id="personality-sliders"
                   footer={<>
                     <span className="settings-saved" role="status">
                       {personalitySaved && <><Check size={15} strokeWidth={2.4} aria-hidden="true" />Saved</>}
@@ -4251,7 +5607,7 @@ function Settings({
                     </div>
                   </SettingsRow>
                 </SettingsGroup>
-                <SettingsGroup title="Your setup answers" description="From the questions you answered when you joined.">
+                <SettingsGroup title="Your setup answers" description="From the questions you answered when you joined." id="setup-answers">
                   <SettingsRow label="Using it for">
                     <span className="settings-value">{onboarding.role.length
                       ? ROLE_OPTIONS.filter((option) => onboarding.role.includes(option.value)).map((option) => option.label).join(", ")
@@ -4268,28 +5624,60 @@ function Settings({
                     </button>
                   </SettingsRow>
                 </SettingsGroup>
+                <div id="memory-settings"><MemorySettingsCard /></div>
               </div>
             )}
 
-            {section === "memory" && <MemorySettingsCard />}
+            {section === "memory" && <div id="memory-settings"><MemorySettingsCard /></div>}
+            {section === "media" && <div id="image-watermark"><MediaSettingsCard /></div>}
+            {section === "location" && <div className="settings-stack" id="location-settings"><SettingsGroup title="Your location"><SettingsRow stacked><LocationSettings /></SettingsRow></SettingsGroup></div>}
 
-            {section === "security" && <SecurityPanel user={user} />}
+            {section === "security" && <div id="security-passkeys"><SecurityPanel user={user} /></div>}
 
-            {section === "your-data" && (
+            {section === "connectors" && (
+              <div className="settings-stack" id="connectors-settings">
+                <ConnectorsSettings />
+              </div>
+            )}
+
+            {section === "usage" && (
+              <div className="settings-stack" id="usage-dashboard">
+                <UsageDashboard userId={user?.id} onOpenSettings={() => onSectionChange("profile")} onLegal={onLegal} />
+              </div>
+            )}
+
+            {section === "billing" && (
+              <div className="settings-stack" id="billing-plans">
+                <Billing tier={tier} userId={user?.id} onEntitlementChanged={() => {}} />
+              </div>
+            )}
+
+            {(section === "your-data" || section === "data-controls") && (
               <div className="settings-stack">
-                <SettingsGroup title="Export">
+                <SettingsGroup title="Export" id="export-data">
                   <SettingsRow label="Download your data" description={exported ? "Your export has been downloaded." : "A copy of your account, conversations, memory, usage, and subscription records."}>
                     <button className="btn btn--secondary" disabled={exporting} onClick={exportData}>
                       <Download size={15} /> {exporting ? "Preparing export…" : "Export my data"}
                     </button>
                   </SettingsRow>
                 </SettingsGroup>
+                <SettingsGroup tone="danger" title="Delete your account" id="delete-account-setting">
+                  <SettingsRow
+                    label="Permanently delete"
+                    description={<>Permanently delete your VibhavGPT account and active account data. Restricted recovery backups expire within 12 months; billing providers may retain transaction records. <a href="https://vibhavgpt.com/account-deletion" target="_blank" rel="noreferrer">Learn about account deletion</a></>}
+                  >
+                    <button className="btn btn--danger" onClick={openDeleteDialog}>
+                      <Trash2 size={15} /> Delete account
+                    </button>
+                  </SettingsRow>
+                </SettingsGroup>
+                {!deleteOpen && <p className="settings-notice">{DELETION_PLAN_NOTICE}</p>}
               </div>
             )}
 
             {section === "delete-account" && (
               <div className="settings-stack">
-                <SettingsGroup tone="danger" title="Delete your account">
+                <SettingsGroup tone="danger" title="Delete your account" id="delete-account-setting">
                   <SettingsRow
                     label="Permanently delete"
                     description={<>Permanently delete your VibhavGPT account and active account data. Restricted recovery backups expire within 12 months; billing providers may retain transaction records. <a href="https://vibhavgpt.com/account-deletion" target="_blank" rel="noreferrer">Learn about account deletion</a></>}
@@ -4304,7 +5692,7 @@ function Settings({
               </div>
             )}
           </div>
-          <SettingsFooter onLegal={onLegal} />
+          <SiteFooter className="site-footer--in-app" />
         </div>
       </div>
 
@@ -4349,34 +5737,79 @@ function Settings({
 // its icon, and the heading and line of help at the top of its page. The
 // routes themselves live in settings-routes.js.
 const SETTINGS_META = {
-  account: { group: "You", icon: UserRound, title: "Account", description: "Your profile and how much of your plan you have used." },
-  personality: { group: "You", icon: SlidersHorizontal, title: "Personality", description: "" },
-  appearance: { group: "Experience", icon: Palette, title: "Appearance", description: "Pick the sky, then the light that runs through it." },
-  replies: { group: "Experience", icon: MessageSquareText, title: "Replies", description: "How replies are written. This shapes every conversation until you change it." },
-  memory: { group: "Experience", icon: Brain, title: "Memory", description: "What VibhavGPT remembers between chats." },
-  security: { group: "Privacy and security", icon: ShieldCheck, title: "Security", description: "Passkeys and two-step verification for signing in." },
-  "your-data": { group: "Privacy and security", icon: Download, title: "Your data", description: "Take a copy of everything in your account." },
-  "delete-account": { group: "Privacy and security", icon: Trash2, title: "Delete account", description: "Permanently remove your account and everything in it.", tone: "danger" },
+  general: { group: "Personal", icon: SettingsIcon, title: "General", description: "How replies are written and defaults for new chats." },
+  appearance: { group: "Personal", icon: Palette, title: "Appearance", description: "Choose a theme, accent colour and surfaces." },
+  profile: { group: "Personal", icon: UserRound, title: "Profile", description: "Your picture, name, email and saved avatars." },
+  personalization: { group: "Personal", icon: SlidersHorizontal, title: "Personalization", description: "How VibhavGPT talks to you, setup answers and memory." },
+  location: { group: "Personal", icon: MapPin, title: "Location", description: "Optional. Lets answers use your city, and nothing more." },
+  media: { group: "Personal", icon: ImageIcon, title: "Media", description: "The VibhavGPT mark on images made for you." },
+  security: { group: "Security & Access", icon: ShieldCheck, title: "Security", description: "Passkeys and two-step verification for signing in." },
+  connectors: { group: "Security & Access", icon: Plug, title: "Connectors", description: "Productivity tools, code repositories and external plugins with human approval." },
+  "data-controls": { group: "Security & Access", icon: Download, title: "Data controls", description: "Download your data or delete your account." },
+  usage: { group: "Billing & Usage", icon: BarChart3, title: "Usage", description: "How much of your plan allowance you have used." },
+  billing: { group: "Billing & Usage", icon: CreditCard, title: "Billing", description: "Your plan, subscriptions and payment methods." },
+  // Backward-compatible keys:
+  account: { group: "Personal", icon: UserRound, title: "Profile", description: "Your picture, name, email and saved avatars." },
+  replies: { group: "Personal", icon: MessageSquareText, title: "General", description: "How replies are written and defaults for new chats." },
+  personality: { group: "Personal", icon: SlidersHorizontal, title: "Personalization", description: "How VibhavGPT talks to you and setup answers." },
+  memory: { group: "Personal", icon: Brain, title: "Memory", description: "What VibhavGPT remembers between chats." },
+  "your-data": { group: "Security & Access", icon: Download, title: "Data controls", description: "Take a copy of everything in your account." },
+  "delete-account": { group: "Security & Access", icon: Trash2, title: "Delete account", description: "Permanently remove your account and everything in it.", tone: "danger" },
 };
-const SETTINGS_GROUPS = ["You", "Experience", "Privacy and security"];
+const SETTINGS_GROUPS = ["Personal", "Security & Access", "Billing & Usage"];
 
-function SettingsSectionHeader({ icon: Icon, title, tone, children }) {
+const SETTINGS_SEARCH_INDEX = [
+  { id: "response-style", section: "general", label: "Response style", group: "Personal", description: "How VibhavGPT responds: balanced, concise, detailed or learning" },
+  { id: "custom-instructions", section: "general", label: "Personal instructions", group: "Personal", description: "Custom instructions VibhavGPT should always keep in mind" },
+  { id: "preferred-default-model", section: "general", label: "Preferred default model", group: "Personal", description: "Default starting model for new chats" },
+  { id: "thinking-effort", section: "general", label: "Default thinking effort", group: "Personal", description: "Default reasoning effort for responses" },
+  { id: "theme-picker", section: "appearance", label: "Chat background", group: "Personal", description: "Light, dark, or system sky behind Chat" },
+  { id: "study-theme-picker", section: "appearance", label: "Study background", group: "Personal", description: "Light, dark, or system sky behind Study" },
+  { id: "accent-picker", section: "appearance", label: "Accent colour", group: "Personal", description: "Button and highlight colour swatches" },
+  { id: "surfaces-material", section: "appearance", label: "Surfaces & Material", group: "Personal", description: "Glass or solid panel transparency" },
+  { id: "motion", section: "appearance", label: "Reduce motion", group: "Personal", description: "Stop animated backgrounds and reduce movement (motion sickness)" },
+  { id: "profile-picture", section: "profile", label: "Profile picture", group: "Personal", description: "Avatar and profile picture upload" },
+  { id: "profile-name", section: "profile", label: "Display name", group: "Personal", description: "Your account name and email" },
+  { id: "saved-avatars", section: "profile", label: "Saved avatars", group: "Personal", description: "Avatars saved for image generation references" },
+  { id: "desktop-updates", section: "profile", label: "Desktop app updates", group: "Personal", description: "Windows desktop application updates and version" },
+  { id: "personality-sliders", section: "personalization", label: "Personality sliders", group: "Personal", description: "How VibhavGPT talks to you: warmth, technical level, directness" },
+  { id: "setup-answers", section: "personalization", label: "Setup answers", group: "Personal", description: "Onboarding answers, role, units, and preferences" },
+  { id: "memory-settings", section: "personalization", label: "Memory & details", group: "Personal", description: "Remember details across chats and clear saved memories" },
+  { id: "location-settings", section: "location", label: "Location", group: "Personal", description: "City location for local weather and relevant answers" },
+  { id: "image-watermark", section: "media", label: "Image watermark", group: "Personal", description: "The VibhavGPT mark on generated images" },
+  { id: "security-passkeys", section: "security", label: "Passkeys & 2FA", group: "Security & Access", description: "Biometric passkeys and two-step verification" },
+  { id: "connectors-settings", section: "connectors", label: "Connectors & Plugins", group: "Security & Access", description: "GitHub, Google Workspace, weather and external plugin integrations" },
+  { id: "export-data", section: "data-controls", label: "Export data", group: "Security & Access", description: "Download a copy of your account data and chats" },
+  { id: "delete-account-setting", section: "data-controls", label: "Delete account", group: "Security & Access", description: "Permanently delete account and associated data" },
+  // The description follows the active credits wording where it is shown (see SettingsIndex).
+  { id: "usage-dashboard", section: "usage", label: "Usage & limits", group: "Billing & Usage", description: USAGE_NAV_DESCRIPTION_LEGACY },
+  { id: "billing-plans", section: "billing", label: "Plan & Billing", group: "Billing & Usage", description: "Subscription tier, Free, Plus, Pro, and Stripe billing" },
+];
+
+function canonicalSectionSlug(slug) {
+  if (slug === "account") return "profile";
+  if (slug === "replies") return "general";
+  if (slug === "personality" || slug === "memory") return "personalization";
+  if (slug === "your-data" || slug === "delete-account") return "data-controls";
+  return slug;
+}
+
+// The section's name and its line of help. The navigation beside it carries
+// the section's icon, so the heading is type alone.
+function SettingsSectionHeader({ title, tone, children }) {
   return (
     <header className="settings-section__head" data-tone={tone}>
-      <span className="settings-section__icon" aria-hidden="true"><Icon size={18} strokeWidth={1.9} /></span>
-      <div>
-        <h2>{title}</h2>
-        {children && <p>{children}</p>}
-      </div>
+      <h2>{title}</h2>
+      {children && <p>{children}</p>}
     </header>
   );
 }
 
 // A titled panel of rows. The title and help sit above the panel; a footer
 // holds the action that saves what the panel contains.
-function SettingsGroup({ title, description, tone, footer, children }) {
+function SettingsGroup({ id, title, description, tone, footer, children }) {
   return (
-    <section className="settings-group" data-tone={tone}>
+    <section className="settings-group" id={id} data-tone={tone}>
       {(title || description) && (
         <header className="settings-group__head">
           {title && <h3>{title}</h3>}
@@ -4439,31 +5872,41 @@ function DesktopUpdateBanner() {
   const [dismissed, setDismissed] = useState(null);
   if (!store.available || state.status !== "downloaded" || dismissed === (state.version ?? "")) return null;
   return (
-    <div className="banner direct-update" role="status">
-      <span><strong>{state.version ? `VibhavGPT ${state.version} is ready.` : "An update is ready."}</strong> Restart to install it, or it installs the next time you quit.</span>
-      <button className="btn btn--secondary" type="button" onClick={store.install}>Install & Restart</button>
-      <button className="btn btn--quiet" type="button" aria-label="Dismiss update notice" onClick={() => setDismissed(state.version ?? "")}>Later</button>
-    </div>
+    <Banner
+      tone="info"
+      title={state.version ? `VibhavGPT ${state.version} is ready.` : "An update is ready."}
+      className="direct-update"
+      onDismiss={() => setDismissed(state.version ?? "")}
+      dismissLabel="Install later"
+      help="The new version of the VibhavGPT app has already downloaded. Restarting installs it; if you'd rather not now, it installs the next time you quit. Your chats are saved to your account."
+      action={<button className="btn btn--secondary" type="button" onClick={store.install}>Install & Restart</button>}
+    >
+      Restart to install it, or it installs the next time you quit.
+    </Banner>
   );
-}
-
-function SettingsFooter({ onLegal }) {
-  return <footer className="settings__footer">
-    <p className="settings__legal">
-      <LegalLink page="terms" onOpen={onLegal}>Terms of Service</LegalLink>
-      <LegalLink page="privacy" onOpen={onLegal}>Privacy Policy</LegalLink>
-      <LegalLink page="guarantee" onOpen={onLegal}>The VibhavGPT Guarantee</LegalLink>
-      <a className="link" href={SOURCE_REPO_URL} target="_blank" rel="noopener noreferrer">Source code</a>
-    </p>
-    <p className="settings__attribution">Made by Vibhav Thoota</p>
-  </footer>;
 }
 
 // URL-backed navigation keeps every section available as its own page: a
 // dock of icon tiles in three clusters. Where it scrolls sideways (phones),
 // the current tile is kept in view.
-function SettingsIndex({ current, onChange }) {
+function SettingsIndex({ current, onChange, onBack }) {
   const navigationRef = useRef(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const creditsMode = useCreditsMode();
+
+  const filteredResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return SETTINGS_SEARCH_INDEX
+      .map((item) => (item.id === "usage-dashboard" ? { ...item, description: usageNavDescription(creditsMode) } : item))
+      .filter((item) =>
+        item.label.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.section.toLowerCase().includes(q) ||
+        item.group.toLowerCase().includes(q)
+      );
+  }, [searchQuery, creditsMode]);
+
   useEffect(() => {
     const navigation = navigationRef.current;
     const link = navigation?.querySelector('[aria-current="page"]');
@@ -4474,39 +5917,115 @@ function SettingsIndex({ current, onChange }) {
       : selected.right > bounds.right ? selected.right - bounds.right : 0;
     if (delta) navigation.scrollBy({ left: delta, behavior: "auto" });
   }, [current]);
+
+  const canonical = canonicalSectionSlug(current);
+
   return (
-    <nav ref={navigationRef} className="settings-dock" aria-label="Settings sections">
-      {SETTINGS_GROUPS.map((group) => (
-        <div className="settings-dock__group" key={group} role="group" aria-label={group}>
-          <span className="settings-dock__label" aria-hidden="true">{group}</span>
-          <div className="settings-dock__items">
-            {SETTINGS_SECTIONS.filter((section) => (SETTINGS_META[section.slug]?.group ?? "You") === group).map((section) => {
-              const Icon = SETTINGS_META[section.slug]?.icon ?? SettingsIcon;
-              return (
-                <a key={section.slug} href={settingsPath(section.slug)}
-                  className="settings-dock__item"
-                  aria-current={current === section.slug ? "page" : undefined}
-                  data-tone={section.slug === "delete-account" ? "danger" : undefined}
-                  onClick={(event) => {
-                    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                    event.preventDefault();
-                    onChange(section.slug);
-                  }}>
-                  <span className="settings-dock__icon" aria-hidden="true"><Icon size={19} strokeWidth={1.8} /></span>
-                  <span className="settings-dock__name">{section.label}</span>
-                </a>
-              );
-            })}
-          </div>
+    <div className="settings-sidebar">
+      <div className="settings-mobile-bar">
+        <button className="settings-back-btn" type="button" onClick={onBack} aria-label="Back to app">
+          <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />
+          <span>Back</span>
+        </button>
+        <select
+          className="settings-mobile-picker"
+          value={canonical}
+          onChange={(e) => onChange(e.target.value)}
+          aria-label="Select settings section"
+        >
+          {SETTINGS_GROUPS.map((group) => (
+            <optgroup key={group} label={group}>
+              {SETTINGS_SECTIONS.filter((s) => !s.legacy && (SETTINGS_META[s.slug]?.group ?? "Personal") === group).map((s) => (
+                <option key={s.slug} value={s.slug}>{s.label}</option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </div>
+
+      <button className="settings-back-btn settings-back-btn--desktop" type="button" onClick={onBack} aria-label="Back to app">
+        <ArrowLeft size={16} strokeWidth={2.2} aria-hidden="true" />
+        <span>Back to app</span>
+      </button>
+
+      <div className="settings-search">
+        <Search size={15} className="settings-search__icon" aria-hidden="true" />
+        <input
+          type="search"
+          className="settings-search__input"
+          placeholder="Search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search settings"
+        />
+        {searchQuery && (
+          <button type="button" className="settings-search__clear" onClick={() => setSearchQuery("")} aria-label="Clear search">
+            <X size={13} />
+          </button>
+        )}
+      </div>
+
+      {searchQuery.trim() ? (
+        <div className="settings-search__results" role="listbox" aria-label="Search results">
+          {filteredResults.length === 0 ? (
+            <p className="settings-search__empty">No settings match &ldquo;{searchQuery}&rdquo;</p>
+          ) : (
+            filteredResults.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="settings-search__result"
+                onClick={() => {
+                  onChange(item.section);
+                  setSearchQuery("");
+                  setTimeout(() => {
+                    const el = document.getElementById(item.id);
+                    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }, 60);
+                }}
+              >
+                <span className="settings-search__result-label">{item.label}</span>
+                <span className="settings-search__result-desc">{item.description}</span>
+                <span className="settings-search__result-meta">{item.group} &rsaquo; {item.section}</span>
+              </button>
+            ))
+          )}
         </div>
-      ))}
-    </nav>
+      ) : (
+        <nav ref={navigationRef} className="settings-dock" aria-label="Settings sections">
+          {SETTINGS_GROUPS.map((group) => (
+            <div className="settings-dock__group" key={group} role="group" aria-label={group}>
+              <span className="settings-dock__label" aria-hidden="true">{group}</span>
+              <div className="settings-dock__items">
+                {SETTINGS_SECTIONS.filter((section) => !section.legacy && (SETTINGS_META[section.slug]?.group ?? "Personal") === group).map((section) => {
+                  const Icon = SETTINGS_META[section.slug]?.icon ?? SettingsIcon;
+                  return (
+                    <a key={section.slug} href={settingsPath(section.slug)}
+                      className="settings-dock__item"
+                      data-section={section.slug}
+                      aria-current={canonical === section.slug ? "page" : undefined}
+                      data-tone={section.slug === "delete-account" ? "danger" : undefined}
+                      onClick={(event) => {
+                        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                        event.preventDefault();
+                        onChange(section.slug);
+                      }}>
+                      <span className="settings-dock__icon" aria-hidden="true"><Icon size={19} strokeWidth={1.8} /></span>
+                      <span className="settings-dock__name">{section.label}</span>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+      )}
+    </div>
   );
 }
 
 /* -- Usage ---------------------------------------------------------------- */
 
-const CREDIT_PRESETS = [5, 10, 20, 50];
 
 function formatUsageDate(value) {
   if (!value) return null;
@@ -4545,10 +6064,40 @@ function UsageProgress({ used, limit, label, percentageOnly = false }) {
   );
 }
 
-function UsageDashboard({ onOpenSettings, onLegal }) {
+// The soonest moment tokens used in the rolling window start to free up, from the server's own per-model release times.
+// Null when nothing has been used in the window: there is then no reset to show, and none is made up.
+function earliestRelease(releases) {
+  const times = Object.values(releases ?? {}).map((value) => new Date(value).getTime()).filter((time) => Number.isFinite(time) && time > Date.now());
+  return times.length ? new Date(Math.min(...times)) : null;
+}
+
+function formatUsageRemaining(date) {
+  const minutes = Math.max(1, Math.ceil((date.getTime() - Date.now()) / 60_000));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h${minutes % 60 ? ` ${minutes % 60} min` : ""}`;
+}
+
+// One window of usage: how much of its allowance is used, a thin bar, and when it resets.
+function UsageCard({ title, used, limit, reset }) {
+  const percentage = usagePercentage(used, limit);
+  return (
+    <article className="usage-card">
+      <h2 className="usage-card__title">{title}</h2>
+      <p className="usage-card__percent"><strong>{percentage}%</strong> used</p>
+      <div className="usage-card__track" role="progressbar" aria-label={`${title}: ${percentage}% used`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percentage}>
+        <span style={{ width: `${percentage}%` }} />
+      </div>
+      {reset && <p className="usage-card__reset">{reset}</p>}
+    </article>
+  );
+}
+
+function UsageDashboard({ userId, onOpenSettings, onOpenPlans }) {
   const [usage, setUsage] = useState(null);
+  const [loadedAt, setLoadedAt] = useState(null);
+  useEffect(() => { if (usage) setLoadedAt(new Date()); }, [usage]);
   const [error, setError] = useState("");
-  const [creditAmount, setCreditAmount] = useState("5");
   const [creditBusy, setCreditBusy] = useState(false);
   const [creditPurchases, setCreditPurchases] = useState([]);
   const [creditPurchasesLoading, setCreditPurchasesLoading] = useState(true);
@@ -4585,7 +6134,7 @@ function UsageDashboard({ onOpenSettings, onLegal }) {
 
   async function buyCredits(amount) {
     if (isNativeApp) {
-      setError("Flex Credit purchases are currently available on VibhavGPT web only.");
+      setError("Purchases are available on VibhavGPT web.");
       return;
     }
     setCreditBusy(true);
@@ -4598,191 +6147,108 @@ function UsageDashboard({ onOpenSettings, onLegal }) {
       if (!result.url) throw new Error("Credit checkout did not return a payment page.");
       window.location.assign(result.url);
     } catch (err) {
-      setError(err.message || "Credit checkout could not be started.");
+      setError(err.message || "Checkout could not be started. You were not charged.");
       setCreditBusy(false);
     }
   }
 
   const tier = usage?.tier === "paid" ? "pro" : usage?.tier;
-  const combined = combinedTokenUsage(usage);
-  const resetAt = usage?.periodEndsAt;
-  const resetDate = formatUsageDate(resetAt);
-  const resetCountdown = formatUsageCountdown(resetAt);
+  // The server decides whether AI credits are active; the counters read whichever allowance applies.
+  const creditsActive = Boolean(usage?.credits?.active);
+
+  const counters = usageCounters(usage);
 
   return (
     <main className="page usage-page">
-      <header className="page__header">
-        <p className="ui-eyebrow">Usage & limits</p>
-        <h1 className="page__title"><RevealWords text="A clear view of your usage" /></h1>
-        <p className="page__lede">Your counters come directly from the same usage window that controls your plan access.</p>
+      <header className="usage-head">
+        <h1 className="usage-head__title">Usage{usage && <span className="usage-head__plan">{TIER_LABEL[tier] ?? "Free"} plan</span>}</h1>
+        <p className="usage-head__lede">What you've used on your plan.</p>
+        {loadedAt && <p className="usage-head__updated">Updated {new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(loadedAt)}</p>}
       </header>
 
       {error && <p className="note note--error" role="alert">{error}</p>}
-      {creditResult === "success" && <p className="note note--good">Thanks for your purchase. Your credits will show in your balance once the payment is confirmed.</p>}
+      {creditResult === "success" && <p className="note note--good">Thanks for your purchase. Your image & document credits will show in your balance once the payment is confirmed.</p>}
       {creditResult === "cancelled" && <p className="note">Purchase canceled. You were not charged.</p>}
-      {!usage && !error ? <TypingDots label="Loading usage" /> : usage && (
+      {!creditsActive && <>{isAllowanceUiEnabled() && userId && <AllowancePanel key={userId} userId={userId} />}</>}
+      {!usage && !error ? <TypingDots label="Loading usage" /> : !usage ? (<div className="uo-section" data-uo-state="unavailable"><p className="uo-text" role="status">Your usage could not be loaded, so no numbers are shown. Try again in a moment.</p></div>) : (
         <>
-          <article className="usage-hero">
-            <div>
-              <span className="usage-hero__eyebrow">{TIER_LABEL[tier] ?? "Free"} plan</span>
-              <p className="usage-hero__summary">Token usage</p>
-              <div className="card__body">
-                <UsageProgress used={combined.monthly.used} limit={combined.monthly.limit} label="of monthly token allowances used" percentageOnly />
-                <UsageProgress used={combined.rolling.used} limit={combined.rolling.limit} label="of 5-hour token allowances used" percentageOnly />
-              </div>
-              <p className="usage-cap__reset">Input and output tokens both count. Monthly caps reset on the first day at 00:00 UTC. The 5-hour window rolls continuously. Model limits apply separately.</p>
-            </div>
-            {resetDate && <p className="usage-hero__reset">Monthly token allowances reset<strong>{resetDate}{resetCountdown ? ` (${resetCountdown})` : ""}</strong></p>}
-          </article>
-
-          {tier === "plus" && (
-            <section className="usage-caps" aria-label="Plus plan limits">
-              <article className="usage-cap">
-                <span>Image generation</span>
-                <UsageProgress used={usage.imageGenerationsThisPeriod ?? 0} limit={usage.imageLimit ?? 25} label="image generations this billing month" />
-                <p className="usage-cap__reset">Resets<strong>{formatUsageDate(usage.imagePeriodEndsAt ?? usage.periodEndsAt) ?? "next billing cycle"}</strong></p>
-              </article>
-              <article className="usage-cap">
-                <span>Document generation</span>
-                <UsageProgress used={usage.documentGenerationsThisPeriod ?? 0} limit={usage.documentLimit ?? 20} label="document generations this billing month" />
-                <p className="usage-cap__reset">Resets<strong>{formatUsageDate(usage.imagePeriodEndsAt) ?? "next billing cycle"}</strong></p>
-              </article>
-            </section>
-          )}
-
-          {tier === "pro" && (
-            <section className="usage-caps" aria-label="Pro image generation usage">
-              <article className="usage-cap">
-                <span>Image generation</span>
-                <UsageProgress used={usage.imageGenerationsThisPeriod ?? 0} limit={usage.imageLimit ?? 60} label="image generations this UTC calendar month" />
-              </article>
-              <article className="usage-cap">
-                <span>Document generation</span>
-                <UsageProgress used={usage.documentGenerationsThisPeriod ?? 0} limit={Infinity} label="document generations this calendar month, unlimited" />
-              </article>
-            </section>
-          )}
-
-          <section className="credit-purchase" aria-labelledby="credit-purchase-title">
-            <div className="credit-purchase__intro">
-              <p className="ui-eyebrow">Flex Credits</p>
-              <h2 id="credit-purchase-title">Keep going without changing plans</h2>
-              <p>Credits do not expire. Token caps apply to chat and Study even when you have Flex Credits. On Plus or Pro, image generations beyond the plan allowance cost 3 credits and documents cost 1 credit. Free cannot use credits to unlock image or document generation.</p>
-            </div>
-            <div className="credit-balance" aria-label={`${usage.creditBalance ?? 0} Flex Credits available`}>
-              <strong>{(usage.creditBalance ?? 0).toLocaleString()}</strong>
-              <span>available credits</span>
-            </div>
-            {isNativeApp ? (
-              <p className="note">Flex Credit purchases are currently available on VibhavGPT web only.</p>
-            ) : <div className="credit-purchase__controls">
-              <div className="credit-presets" aria-label="Preset credit purchase amounts">
-                {CREDIT_PRESETS.map((amount) => (
-                  <button key={amount} type="button" className="btn btn--secondary" disabled={creditBusy} onClick={() => buyCredits(amount)}>
-                    ${amount} <small>{amount * 10}</small>
-                  </button>
-                ))}
-              </div>
-              <form className="credit-custom" onSubmit={(event) => { event.preventDefault(); buyCredits(creditAmount); }}>
-                <label htmlFor="credit-amount">Custom amount</label>
-                <div className="credit-custom__input"><span aria-hidden="true">$</span><input id="credit-amount" type="number" min="1" max="500" step="0.10" inputMode="decimal" value={creditAmount} onChange={(event) => setCreditAmount(event.target.value)} /></div>
-                <button className="btn btn--primary" disabled={creditBusy}>{creditBusy ? "Opening…" : "Buy credits"}</button>
-              </form>
-              <small>Custom purchases can be $1 to $500 in $0.10 increments.</small>
-            </div>}
-          </section>
-
-          <section className="credit-purchase-history" aria-labelledby="credit-purchase-history-title">
-            <div>
-              <p className="ui-eyebrow">Purchase history</p>
-              <h2 id="credit-purchase-history-title">Flex Credit purchases</h2>
-            </div>
-            {creditPurchasesLoading ? <p className="credit-purchase-history__empty">Loading purchases…</p> : creditPurchases.length === 0 ? (
-              <p className="credit-purchase-history__empty">No Flex Credit purchases yet.</p>
-            ) : (
-              <ul className="credit-purchase-history__list">
-                {creditPurchases.map((purchase) => {
-                  const date = purchase.purchasedAt ? new Date(purchase.purchasedAt) : null;
-                  const amount = Number.isFinite(purchase.amountCents) ? `$${(purchase.amountCents / 100).toFixed(2)}` : "Amount unavailable";
-                  return (
-                    <li key={purchase.id}>
-                      <div>
-                        <strong>{amount}</strong>
-                        <span>{date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "Purchase date unavailable"}</span>
-                      </div>
-                      <div className="credit-purchase-history__credits">
-                        <span>{purchase.creditsGranted.toLocaleString()} credits</span>
-                        {purchase.receiptUrl && <a href={purchase.receiptUrl} target="_blank" rel="noreferrer">View receipt</a>}
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </section>
-
+          <ul className="usage-counters" aria-label="Usage">
+            {counters.rows.map((row) => (
+              <li key={row.id} className="usage-counter" data-counter={row.id} data-unlimited={row.unlimited || undefined}>
+                <span className="usage-counter__label">{row.label}</span>
+                <strong className="usage-counter__value">{row.value}</strong>
+              </li>
+            ))}
+          </ul>
+          <CreditPurchase
+            flex={usage.overview?.flex}
+            balance={usage.creditBalance ?? 0}
+            purchases={creditPurchases}
+            purchasesLoading={creditPurchasesLoading}
+            busy={creditBusy}
+            native={isNativeApp}
+            onBuy={buyCredits}
+            onSeePlans={onOpenPlans}
+          />
         </>
       )}
 
       <button type="button" className="btn btn--ghost usage-page__back" onClick={onOpenSettings}>Back to settings</button>
-      <SettingsFooter onLegal={onLegal} />
+      <SiteFooter className="site-footer--in-app" />
     </main>
   );
 }
 
 /* -- Billing -------------------------------------------------------------- */
 
-const PLANS = PRODUCT_KNOWLEDGE.plans.map((plan) => ({ ...plan, featured: plan.id === "plus" }));
-
-function AccessNotice({ access, onAction, onDismiss }) {
-  if (!access) return null;
-  if (access.reason === "quota") return <section className="usage-notice" role="status" aria-label={`${access.feature} usage limit`}>
-    <div className="usage-notice__copy">
-      <span className="usage-notice__eyebrow">Usage allowance</span>
-      <h2>{access.feature} {access.window === "rolling" ? "5-hour" : access.window === "monthly" ? "monthly" : "usage"} limit</h2>
-      {access.percentage !== null && access.percentage !== undefined && <p className="usage-notice__percentage">You've used {access.percentage}% of your {access.feature} {access.window === "rolling" ? "5-hour" : "monthly"} limit.</p>}
-      <p>{access.message}</p>
-      <p className="usage-notice__timing">{access.resetAt ? `Tokens start freeing up ${new Date(access.resetAt).toLocaleString()}.` : access.window === "rolling" ? "Tokens free up as earlier usage leaves the 5-hour window." : "Check usage for your allowance reset."}{access.pending > 0 ? " Pending usage is included in your allowance." : ""}</p>
-    </div>
-    <div className="usage-notice__actions">
-      <button type="button" className="btn btn--primary usage-notice__usage" onClick={() => onAction("usage")}><BarChart3 size={16} aria-hidden="true" />View usage<ChevronRight size={14} aria-hidden="true" /></button>
-      <button type="button" className="btn btn--quiet usage-notice__dismiss" onClick={onDismiss}>Dismiss</button>
-    </div>
-  </section>;
-  return <div className="banner" role="status">
-    <span>{access.message}{access.requiredPlan ? ` Available with ${access.requiredPlan}.` : ""}
-      {access.resetAt ? ` Resets ${new Date(access.resetAt).toLocaleString()}.` : ""}</span>{" "}
-    {!["retry", "permission"].includes(access.action) && <button className="btn btn--secondary" onClick={() => onAction(access.action)}>{access.cta}</button>}
-    <button className="btn btn--quiet" aria-label="Dismiss notice" onClick={onDismiss}>Dismiss</button>
-  </div>;
+// The plan cards for a credits mode (null: the existing wording). The running page asks for the
+// mode the server reports (useCreditsMode), so a rollback or activation changes the wording
+// without a frontend deployment; the prerendered pages use the build's mode (see credits-runtime.js).
+const planCardCache = new Map();
+function plansFor(creditsMode) {
+  if (!planCardCache.has(creditsMode ?? "off")) {
+    planCardCache.set(creditsMode ?? "off", productKnowledgeFor(creditsMode).plans.map((plan) => ({ ...plan, featured: plan.id === "plus" })));
+  }
+  return planCardCache.get(creditsMode ?? "off");
 }
 
-// The public /pricing page sits in the landing page's night sky: stars,
-// orbit rings and faint planets behind the plans (pricing.css). The sky is
-// decoration only; the plans keep their own solid, readable surfaces.
+// One short line per plan card (owner request, 2026-11-14: cards that scan at a glance). The full allowances are in Compare all features,
+// from the same product facts; the image counts here come from the same entitlement numbers.
+const PLAN_CARD_LINE = {
+  free: `Lumen and Study, and ${countText(IMAGES_PER_WEEK.free)} images a week`,
+  plus: `More Lumen and Study, and ${countText(IMAGES_PER_MONTH.plus)} images a month`,
+  pro: `Adds Vulcan, ${countText(IMAGES_PER_MONTH.pro)} images a month and unlimited documents`,
+  max: `Adds Zenith, ${countText(IMAGES_PER_MONTH.max)} images a month and our highest limits`,
+};
+
+function AccessNotice(props) {
+  return <WorkspaceNotice {...props} />;
+}
+
+// The public /pricing page: the homepage's floating glass navigation over a
+// calm canvas, so the plans themselves carry the page (pricing.css).
 export function PublicPricing({ signedIn = false }) {
   return (
-    <div className="pricing-cosmos">
-      <div className="pricing-cosmos__sky" aria-hidden="true">
-        <span className="pricing-cosmos__stars" />
-        <span className="pricing-cosmos__orbit pricing-cosmos__orbit--one" />
-        <span className="pricing-cosmos__orbit pricing-cosmos__orbit--two" />
-        <img className="pricing-cosmos__planet pricing-cosmos__planet--earth" src="/planets/earth.webp" alt="" />
-        <img className="pricing-cosmos__planet pricing-cosmos__planet--venus" src="/planets/venus.webp" alt="" />
-        <img className="pricing-cosmos__planet pricing-cosmos__planet--mars" src="/planets/mars.webp" alt="" />
-      </div>
-      <nav className="public-nav"><Brand /><a className="btn btn--primary" href={signedIn ? "/app" : "/signup"}>{signedIn ? "Open workspace" : "Get started"}</a></nav>
+    <div className="pricing-page">
+      <PublicNav current="pricing" />
       <Billing tier="visitor" publicPreview />
     </div>
   );
 }
 
 function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) {
+  const creditsMode = useCreditsMode();
+  const PLANS = plansFor(creditsMode);
   const [period, setPeriod] = useState("monthly");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [subscription, setSubscription] = useState(null);
+  // { tier, source }: the account's plan from the server's one plan resolver, and where it comes from ("stripe", "google_play",
+  // "internal", "complimentary" or "none"). The current-plan card reads this, never a guess from the stored row.
+  const [planInfo, setPlanInfo] = useState(null);
+  // Max is sold once checkout is configured; public preview shows active plan actions.
+  const [maxAvailable, setMaxAvailable] = useState(publicPreview ? true : false);
   const [subscriptionLoaded, setSubscriptionLoaded] = useState(publicPreview);
   const [subscriptionLoadError, setSubscriptionLoadError] = useState(false);
   const [manageBusy, setManageBusy] = useState(false);
@@ -4797,8 +6263,8 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
       setSubscriptionLoaded(false);
       setSubscriptionLoadError(false);
       return api("/api/billing/subscription")
-      .then(({ subscription: value }) => {
-        if (mounted && requestId === version) { setSubscription(value); setSubscriptionLoaded(true); }
+      .then(({ subscription: value, plan: resolvedPlan, maxAvailable: maxReady }) => {
+        if (mounted && requestId === version) { setSubscription(value); setPlanInfo(resolvedPlan ?? null); setMaxAvailable(maxReady === true); setSubscriptionLoaded(true); }
       })
       .catch(() => { if (mounted && requestId === version) setSubscriptionLoadError(true); });
     };
@@ -4814,7 +6280,14 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
   const checkingPlan = tier === null || !subscriptionLoaded;
   // Plans are bought and managed on the web. A plan bought earlier in the
   // Android app can't be changed here; it runs to the end of its paid period.
-  const appSubscription = Boolean(subscription?.billingSource && subscription.billingSource !== "stripe");
+  // A complimentary plan (COMP_PLAN_ACCOUNTS) is Max with nothing to manage or cancel; it is not an app purchase, so plans can still be bought.
+  const planSource = planInfo?.source ?? (subscription ? (subscription.billingSource ?? "stripe") : "none");
+  const complimentaryPlan = planSource === "complimentary";
+  // Only a store purchase that still verifies is shown as bought in the Android app (the server decides; a leftover row shows nothing).
+  const appSubscription = planSource === "google_play";
+  // Access granted by VibhavGPT directly: no store, no checkout, nothing to manage or cancel.
+  const grantedPlan = planSource === "internal";
+  const currentPlanTier = planInfo?.tier ?? subscription?.tier;
 
   // Checks the server's record until it shows the plan, for up to 20 seconds.
   async function waitForPlan(planId) {
@@ -4893,7 +6366,7 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
       <header className="pricing__header">
         <div>
           <h1 className="pricing__title"><RevealWords text="Plans" /></h1>
-          <p className="pricing__lede">{appSubscription ? "Your current plan was bought in the Android app. It stays active until the end of its paid period, and you can choose a plan here after that." : publicPreview ? "Compare Free, Plus and Pro for AI chat, image creation and Study. Start free, choose monthly or yearly billing, and change or cancel your plan when you need to." : "Start free. Move up when you need more room, and change or cancel any time."}</p>
+          <p className="pricing__lede">{appSubscription ? "Your current plan was bought in the Android app. It stays active until the end of its paid period, and you can choose a plan here after that." : publicPreview ? "Start free. Pay monthly or yearly, and change or cancel any time." : "Start free. Move up when you need more room, and change or cancel any time."}</p>
         </div>
         {subscriptionLoaded && !appSubscription && (
           <div className="pricing__period">
@@ -4915,31 +6388,35 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
       <div className="plans rate-card">
         {PLANS.map((plan) => {
           const current = tier === plan.id || (tier === "paid" && plan.id === "pro");
-          const price = annual ? plan.yearly : plan.monthly;
-          const isDowngrade = tier === "pro" && plan.id === "plus";
+          const price = annual && plan.yearly ? plan.yearly : plan.monthly;
+          const isDowngrade = (tier === "max" && (plan.id === "pro" || plan.id === "plus"))
+            || (tier === "pro" && plan.id === "plus");
           return (
             <article className="plan rate-card__plan" key={plan.id} data-current={current || undefined} data-featured={plan.featured || undefined}>
               <div className="plan__head">
                 <h2 className="plan__name">{plan.name}</h2>
-                {current ? <span className={`tag tag--${plan.id}`}>Current</span> : plan.featured ? <span className="tag tag--plus">Popular</span> : null}
               </div>
               <p className="plan__price">
                 {plan.id === "free" ? "$0" : price}
-                <small>{plan.id === "free" ? "forever" : `per ${annual ? "year" : "month"}`}</small>
+                <small>{plan.id === "free" ? "forever" : annual && !plan.yearly ? "per month (billed monthly)" : `per ${annual ? "year" : "month"}`}</small>
               </p>
-              <p className="plan__equivalent">{plan.id !== "free" && annual ? `About ${monthlyEquivalent(plan.yearly)} a month` : " "}</p>
+              {plan.id !== "free" && annual && plan.yearly && <p className="plan__equivalent">About {monthlyEquivalent(plan.yearly)} a month</p>}
               <p className="plan__blurb">{plan.description}</p>
+              {/* The plan's principal allowance in one short line; the details are in Compare all features below. */}
+              {(PLAN_CARD_LINE[plan.id] ?? plan.features?.[0]) && <p className="plan__allowance">{PLAN_CARD_LINE[plan.id] ?? plan.features[0]}</p>}
               {current ? (
                 <p className="plan__current" role="status"><Check size={16} strokeWidth={2.4} aria-hidden="true" />You're on {plan.name}.</p>
               ) : plan.id === "free" ? (
                 <p className="plan__current plan__current--quiet">Included with every account.</p>
+              ) : plan.id === "max" && !maxAvailable ? (
+                <p className="plan__current plan__current--quiet" role="status">Max is not available to purchase yet.</p>
               ) : (
                 <button
                   className={`btn ${plan.featured ? "btn--primary" : "btn--secondary"} btn--block`}
                   disabled={busy || manageBusy || checkingPlan}
                   onClick={() => purchase(plan.id)}
                 >
-                  {checkingPlan ? "Checking…" : busy || manageBusy ? "Opening checkout…" : isDowngrade ? "Move to Plus" : `Choose ${plan.name}`}
+                  {checkingPlan ? "Checking…" : busy || manageBusy ? "Opening checkout…" : isDowngrade ? (plan.id === "pro" ? "Move to Pro" : "Move to Plus") : "Upgrade"}
                 </button>
               )}
             </article>
@@ -4947,8 +6424,8 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
         })}
       </div>
 
-      <section className="compare" aria-labelledby="compare-title">
-        <h2 id="compare-title" className="compare__title">Compare plans</h2>
+      <details className="compare">
+        <summary className="compare__summary">Compare all features</summary>
         <div className="compare__scroll">
           <table className="compare__table">
             <thead>
@@ -4957,7 +6434,7 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
                 {PLANS.map((plan) => <th key={plan.id} scope="col" data-current={(tier === plan.id || (tier === "paid" && plan.id === "pro")) || undefined}>{plan.name}</th>)}
               </tr>
             </thead>
-            {COMPARISON_GROUPS.map((group) => (
+            {comparisonGroupsFor(creditsMode).map((group) => (
               <tbody key={group.title}>
                 <tr className="compare__group"><th scope="rowgroup" colSpan={PLANS.length + 1}>{group.title}</th></tr>
                 {group.rows.map((row) => (
@@ -4976,8 +6453,8 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
             ))}
           </table>
         </div>
-        <p className="compare__footnote">Input and output tokens both count toward an allowance. Monthly allowances reset on the first of the month at 00:00 UTC, and each model also has a rolling five-hour limit. Subscriptions and Flex Credits are bought on the web.</p>
-      </section>
+        <p className="compare__footnote">{creditsMode ? creditsPricingFootnote(creditsMode) : "Plus, Pro, and Max list monthly token allowances. Input and output tokens both count, and each Plus, Pro, or Max model also has a rolling five-hour limit. Free is up to 15 AI requests in any 24-hour period, subject to a shared $0.25 included allowance each UTC calendar month. Lumen and Study share this allowance, and one message or action can use more than one AI request. Subscriptions and image & document credits are bought on the web. Max includes every model Pro has, plus Zenith, with our highest monthly token allowances. " + THIRD_PARTY_BILLING_NOTE}</p>
+      </details>
 
       <aside className="pricing__guarantee">
         <h2>Every plan comes with the VibhavGPT Guarantee</h2>
@@ -4985,7 +6462,7 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
         <a href="/guarantee">Read the Guarantee</a>
       </aside>
       {publicPreview && <PublicFaq path="/pricing" />}
-      {publicPreview && <footer className="note" style={{ color: "var(--muted)", marginTop: 24 }}>Made by Vibhav Thoota</footer>}
+      {publicPreview && <SiteFooter />}
       </>}
 
       {publicPreview ? null : checkingPlan ? (
@@ -4996,14 +6473,19 @@ function Billing({ tier, userId, onEntitlementChanged, publicPreview = false }) 
         <section className="subscription" aria-label="Current plan and billing">
           <div>
             <p className="ui-eyebrow">Current plan</p>
-            <strong>{TIER_LABEL[subscription.tier] ?? "Free"} plan</strong>
-            <span>{appSubscription ? "Bought in the Android app" : "Billed on the web"}</span>
+            <strong>{TIER_LABEL[currentPlanTier] ?? "Free"} plan</strong>
+            {complimentaryPlan ? (
+              <span className="subscription__note">Complimentary</span>
+            ) : grantedPlan ? (
+              <span className="subscription__note">Access granted by VibhavGPT</span>
+            ) : <>
             <span>
               {subscription.status}
               {subscription.currentPeriodEndsAt ? ` · ${subscription.cancelAtPeriodEnd || appSubscription ? "access through" : ["active", "trialing"].includes(subscription.status) ? "renews" : "ended"} ${new Date(subscription.currentPeriodEndsAt).toLocaleDateString()}` : ""}
             </span>
+            </>}
           </div>
-          {!appSubscription && (
+          {!appSubscription && !complimentaryPlan && !grantedPlan && (
             <div className="subscription__actions">
               <button type="button" className="btn btn--secondary" disabled={manageBusy} onClick={openBillingPortal}>
                 Payment method & invoices

@@ -10,18 +10,25 @@
   background: var(--color-paper-2);
   overflow: hidden;
 }
-.diagram-viewer__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--color-rule); }
-.diagram-viewer__label { margin-right: auto; color: var(--color-accent); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+.diagram-viewer__toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; padding: 6px 6px 6px 14px; border-bottom: 1px solid var(--color-rule); }
+.diagram-viewer__label { margin-right: auto; color: var(--color-ink); font-size: 0.86rem; font-weight: 650; }
 .diagram-viewer__action {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px;
-  border: 1px solid var(--color-rule); border-radius: 999px; color: var(--color-ink); font-size: 0.8rem;
-  transition: background-color 160ms ease;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 10px;
+  border: 0; border-radius: 9px; background: transparent; color: var(--color-ink); font-size: 0.82rem; font-weight: 600;
+  transition: background-color var(--dur-press) var(--ease-out);
 }
-.diagram-viewer__action:hover:not(:disabled) { background: var(--color-accent-soft); }
+.diagram-viewer__action:hover:not(:disabled) { background: color-mix(in srgb, var(--color-ink) 7%, transparent); }
 .diagram-viewer__action:disabled { opacity: 0.45; }
 /* Wide diagrams scroll sideways inside the reply instead of widening it. */
 .diagram-viewer__canvas { display: grid; place-items: center; min-height: 160px; padding: var(--space-md); overflow: auto; }
 .diagram-viewer__canvas svg { max-width: 100%; height: auto; }
+/* Nodes in the system's shape: rounded, a fine accent edge, the UI face.
+   rx and ry are CSS geometry properties, so the drawing itself is untouched. */
+.diagram-viewer svg .node rect,
+.diagram-viewer svg .node .label-container { rx: 10px; ry: 10px; stroke-width: 1.4px; }
+.diagram-viewer svg .nodeLabel,
+.diagram-viewer svg .node text,
+.diagram-viewer svg .edgeLabel { font-family: var(--font-body); font-weight: 550; }
 .diagram-viewer__canvas--loading,
 .diagram-viewer--pending { color: var(--color-muted); font-size: 0.9rem; }
 /* Held at a steady height until the drawing arrives, so the thread moves less. */

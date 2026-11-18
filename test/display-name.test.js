@@ -232,7 +232,9 @@ test("a social sign-in with a blocked name stores no name and still signs in", a
 
 test("the production auth config uses these hooks", () => {
   const source = readFileSync(new URL("../src/auth.js", import.meta.url), "utf8");
-  assert.match(source, /databaseHooks: displayNameHooks/);
+  // Slice 8 composes the hooks: the social sign-up email guard runs first, then this same display-name guard on create and update.
+  assert.match(source, /databaseHooks: \{\s*\.\.\.displayNameHooks,/);
+  assert.match(source, /return displayNameHooks\.user\.create\.before\(data, context\);/);
 });
 
 test("the server withholds a blocked stored name from the signed-in user", () => {

@@ -34,7 +34,7 @@ test("Source code and YouTube moved to the Sources page: the sidebar has one Sou
   const sidebar = read("frontend/src/components/Sidebar.jsx");
   const links = sidebar.slice(sidebar.indexOf("const RESOURCE_LINKS = ["), sidebar.indexOf("];", sidebar.indexOf("const RESOURCE_LINKS = [")));
   assert.deepEqual([...links.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), ["Apps", "Sources", "Merch Store"]);
-  assert.match(links, /\{ href: SOURCES_PATH, label: "Sources", icon: <Code size=\{17\} strokeWidth=\{1\.9\} \/> \}/);
+  assert.match(links, /\{ href: SOURCES_PATH, label: "Sources", icon: <Code size=\{20\} strokeWidth=\{1\.6\} \/> \}/);
   assert.doesNotMatch(sidebar, /YoutubeIcon|YOUTUBE_CHANNEL_URL|SOURCE_REPO_URL/, "the channel and repository addresses are no longer in the sidebar");
   assert.match(sidebar, /\{\.\.\.\(link\.external \? \{ target: "_blank", rel: "noopener noreferrer" \} : \{\}\)\}/, "external links open in a new tab without an opener");
   const sources = { href: "/sources", label: "Sources" };
@@ -66,7 +66,8 @@ test("the playful touches live only under .is-desktop-app, move only transform a
     for (const [, property] of body.matchAll(/([a-z-]+):/g)) assert.ok(["scale", "rotate", "translate", "opacity"].includes(property), `${name} animates ${property}`);
   }
   assert.match(css, /--desktop-spring: cubic-bezier\(0\.34, 1\.56, 0\.64, 1\)/);
-  for (const piece of [".opening__planet:hover", ".sidebar__new:hover", ".sidebar .ui-icon-button:hover", ".sidebar__brand:hover img", ".sidebar__brand:hover::after", '.composer[data-send-pulse="odd"]', '.composer[data-send-pulse="even"]']) {
+  // The empty-chat planet was removed in the redesign; its hover went with it.
+  for (const piece of [".sidebar__new:hover", ".sidebar .ui-icon-button:hover", ".sidebar__brand:hover img", ".sidebar__brand:hover::after", '.composer[data-send-pulse="odd"]', '.composer[data-send-pulse="even"]']) {
     assert.ok(media[1].includes(`.is-desktop-app ${piece}`), piece);
   }
   // No other stylesheet mentions the desktop class, so nothing leaks to the web.

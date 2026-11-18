@@ -96,7 +96,11 @@ test("in a chat, the image is drawn from the rewritten prompt, keeps its words, 
   const { config } = await import("../src/config.js");
   config.moderationApiKey = "";
   config.providerKeys.paid = "fixture-key";
-  config.chatModels.nova = "fixture-nova";
+  // Lumen on its production route type (the router's paid zero-retention route) with the fixture engine. (Nova, which this suite
+  // used before, was retired on 2026-11-14.)
+  config.lumenChatRoute = "paid-zdr";
+  config.lumenPaidZdrProviders = ["fixture-host"];
+  config.chatModels.lumenFallback1 = "fixture-lumen";
   config.lumenPrimaryApproved = true;
   config.providerKeys.primaryFree = "fixture-primary-key";
   config.providerBaseUrls.primaryFree = "https://primary.fixture.invalid/v1";
@@ -136,7 +140,7 @@ test("in a chat, the image is drawn from the rewritten prompt, keeps its words, 
   t.after(() => { globalThis.fetch = realFetch; return new Promise((resolve) => server.close(resolve)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const send = async (body) => {
-    const text = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", ...body }) })).text();
+    const text = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen", ...body }) })).text();
     const complete = text.split("\n\n").find((block) => /^event:\s*complete$/m.test(block));
     return complete ? JSON.parse(complete.match(/^data:\s*(.+)$/m)[1]) : assert.fail(`no complete event: ${text.slice(0, 300)}`);
   };
@@ -173,7 +177,11 @@ async function chatApp(t, userId) {
   const { config } = await import("../src/config.js");
   config.moderationApiKey = "";
   config.providerKeys.paid = "fixture-key";
-  config.chatModels.nova = "fixture-nova";
+  // Lumen on its production route type (the router's paid zero-retention route) with the fixture engine. (Nova, which this suite
+  // used before, was retired on 2026-11-14.)
+  config.lumenChatRoute = "paid-zdr";
+  config.lumenPaidZdrProviders = ["fixture-host"];
+  config.chatModels.lumenFallback1 = "fixture-lumen";
   config.lumenPrimaryApproved = true;
   config.providerKeys.primaryFree = "fixture-primary-key";
   config.providerBaseUrls.primaryFree = "https://primary.fixture.invalid/v1";
@@ -218,7 +226,7 @@ async function chatApp(t, userId) {
   t.after(() => { globalThis.fetch = realFetch; return new Promise((resolve) => server.close(resolve)); });
   const base = `http://127.0.0.1:${server.address().port}`;
   const send = async (body) => {
-    const text = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nova", ...body }) })).text();
+    const text = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen", ...body }) })).text();
     const events = text.split("\n\n").map((block) => [block.match(/^event:\s*(\S+)/m)?.[1], block.match(/^data:\s*(.+)$/m)?.[1]]).filter(([event, data]) => event && data);
     const find = (name) => { const found = events.find(([event]) => event === name); return found ? JSON.parse(found[1]) : null; };
     return { complete: find("complete"), error: find("error") };
@@ -265,19 +273,21 @@ test("with no earlier turns the image model gets exactly the old prompt, with no
   assert.equal(context.promptSha256, sha256(real.composeImagePrompt(request, "")));
 });
 
-test("a Free plan's chat image is refused before the rewriter or the image model is called", async (t) => {
+test("a Free plan's chat image, once its 2 images for the week are used, is refused before the rewriter or the image model is called", async (t) => {
   const { reserveImageGeneration } = await import("../src/usage/service.js");
   const { saveExchange } = await import("../src/chat/repository.js");
   realImageDependencies = { reserve: reserveImageGeneration };
   t.after(() => { realImageDependencies = null; });
   const userId = "free-plan-user";
+  const { usageEvents } = await import("../src/db/schema.js");
+  for (let i = 0; i < 2; i += 1) await db.insert(usageEvents).values({ userId, model: "__image__", createdAt: new Date() });
   const app = await chatApp(t, userId);
   // Earlier turns that the request would otherwise be rewritten from.
-  const seeded = await saveExchange({ userId, conversationId: null, modelKey: "nova", userContent: "Give me the key vocab for DNA replication", reply: VOCAB });
+  const seeded = await saveExchange({ userId, conversationId: null, modelKey: "lumen", userContent: "Give me the key vocab for DNA replication", reply: VOCAB });
   const result = await app.send({ message: "Create an image with all the vocab Study listed", conversationId: seeded.conversationId });
   assert.equal(result.complete, null);
-  assert.equal(result.error?.status, 429, "the plan error");
-  assert.equal(result.error.code, "usage-limit");
+  assert.equal(result.error?.status, 429, "the weekly limit");
+  assert.equal(result.error.code, "image_quota_exhausted");
   assert.equal(app.calls.rewriter.length, 0, "no rewriter call");
   assert.equal(app.calls.images.length, 0, "no image call");
 });

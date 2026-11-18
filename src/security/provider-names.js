@@ -9,7 +9,7 @@ import { config } from "../config.js";
 
 // Never treated as a provider name: our own names and words too common to
 // scrub (a model id's tier words, and placeholder hosts).
-const BRAND = /vibhav|pansophy|\b(?:lumen|nova|nebula|vesper|study|comet)\b/i;
+const BRAND = /vibhav|pansophy|\b(?:lumen|nova|nebula|vesper|vulcan|zenith|tecton|prism|study|comet)\b/i;
 const GENERIC = new Set([
   "free", "flash", "lite", "pro", "mini", "max", "auto", "chat", "instruct", "latest", "preview", "turbo", "large", "small", "base",
   "model", "models", "router", "api", "www", "app", "default", "fixture", "example", "test", "local", "localhost", "invalid",

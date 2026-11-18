@@ -5,7 +5,7 @@
 // recorded, reads as plain "VibhavGPT".
 
 export const NEUTRAL_REPLY_LABEL = "VibhavGPT";
-export const IMAGE_REPLY_LABEL = "VibhavGPT Image";
+export const IMAGE_REPLY_LABEL = "VibhavGPT Prism";
 
 // `models` is the picker's list ({ value, label, full }). Study is left out of
 // it on purpose: Study replies read "VibhavGPT", as they always have.

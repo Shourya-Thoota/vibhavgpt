@@ -4,19 +4,6 @@
    widgets use their light theme. Nothing clips the frame, so the widget's
    own footer and attribution always show. */
 
-/* Study's main column is fixed to the screen height and clips (the chat
-   brings its own scroller), so the tools get a scroll area of their own:
-   it fills the column and scrolls inside it. */
-.writing-tools-scroll {
-  flex: 1;
-  min-height: 0;
-  height: 100%;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-rule-2) transparent;
-}
-
 .writing-tools {
   width: 100%;
   max-width: 860px;
@@ -40,6 +27,8 @@
   margin: 0 auto;
 }
 .writing-tools__bar > .ui-segmented { margin-left: auto; }
+.writing-tools__back.btn--secondary { border-color: transparent; background: transparent; padding-inline: 8px; color: var(--color-ink-2); }
+.writing-tools__back.btn--secondary:hover:not(:disabled) { border-color: transparent; background: color-mix(in srgb, var(--color-ink) 6%, transparent); color: var(--color-ink); }
 
 /* The card. The frame inside sets its own height from the widget's
    reports, so the card grows with it instead of cutting anything off. */
@@ -50,11 +39,17 @@
   box-sizing: border-box;
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  background: #ffffff;
+  background: var(--color-paper-2);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 .writing-tools-widget-wrapper iframe { width: 100%; border: none; display: block; }
+.writing-tools__loading { width: 100%; max-width: 820px; margin: 0 auto; color: var(--color-muted); font-size: 0.9rem; }
+
+/* The selected tool's name and what it does, at the reading measure. */
+.writing-tools__head { width: 100%; max-width: 820px; margin: var(--space-md) auto var(--space-xs); }
+.writing-tools__head h2 { margin: 0; color: var(--color-ink); font-family: var(--font-display); font-size: 1.6rem; font-weight: var(--display-weight); letter-spacing: var(--display-tracking); line-height: 1.15; }
+.writing-tools__head p { margin: var(--space-2xs) 0 0; color: var(--color-ink-2); font-size: 0.95rem; }
 
 .writing-tools__notice {
   width: 100%;

@@ -8,25 +8,48 @@ import { userProfiles } from "../db/schema.js";
 import { requireSession } from "../middleware/require-session.js";
 import { NAME_NOT_ALLOWED, preferredNameFromInstructions, reviewDisplayName } from "../security/display-name.js";
 import { getCurrentUsage } from "../usage/service.js";
+import { CUSTOMER_CHAT_MODEL_IDS, isCustomerChatModel, isRetiredHouseModel } from "../models/customer-catalog.js";
+import { isThirdPartyModel } from "../../frontend/src/model-marketplace.js";
 
 const STYLE_OPTIONS = new Set(["concise", "balanced", "detailed", "friendly"]);
 const THINKING_EFFORTS = new Set(["normal", "low", "high", "xhigh", "max"]);
 const MAX_INSTRUCTIONS = 4000;
-const MODEL_OPTIONS = new Set(["lumen", "nova", "nebula", "vesper"]);
+const MODEL_OPTIONS = new Set(CUSTOMER_CHAT_MODEL_IDS);
+
+export function isValidModelSelection(model) {
+  if (!model) return false;
+  const canonical = canonicalModelKey(model);
+  return MODEL_OPTIONS.has(canonical) || isCustomerChatModel(canonical) || isThirdPartyModel(canonical);
+}
 
 function modelAllowedForTier(model, tier, creditBalance = 0) {
-  if (!MODEL_OPTIONS.has(model)) return false;
-  return tier !== "free" || model === "lumen" || model === "nova";
+  const canonical = canonicalModelKey(model);
+  if (!isValidModelSelection(canonical)) return false;
+  if (canonical === "lumen" || canonical === "nova") return true;
+  // Third-party models (Slice 7) are on every plan; Zenith is Max only.
+  if (isThirdPartyModel(canonical)) return true;
+  if (canonical === "zenith") return tier === "max";
+  if (canonical === "tecton") return tier === "pro" || tier === "max" || tier === "paid";
+  if (tier === "free") return false;
+  if (tier === "plus") return canonical !== "vesper";
+  return true;
 }
 
 function profileResponse(profile) {
+  const pref = profile?.preferredModel ? canonicalModelKey(profile.preferredModel) : null;
+  const last = profile?.lastUsedModel ? canonicalModelKey(profile.lastUsedModel) : null;
   return {
     responseStyle: profile?.responseStyle ?? "balanced",
     customInstructions: profile?.customInstructions ?? "",
-    preferredModel: MODEL_OPTIONS.has(canonicalModelKey(profile?.preferredModel)) ? canonicalModelKey(profile.preferredModel) : null,
-    lastUsedModel: MODEL_OPTIONS.has(canonicalModelKey(profile?.lastUsedModel)) ? canonicalModelKey(profile.lastUsedModel) : null,
+    preferredModel: isValidModelSelection(pref) ? pref : null,
+    lastUsedModel: isValidModelSelection(last) ? last : null,
+    // The saved model was a retired tier (Nova, Nebula): named here so the app asks for a model rather than quietly using another one.
+    // The stored value is not rewritten.
+    retiredModel: [pref, last].find((key) => key && isRetiredHouseModel(key)) ?? null,
     productMode: profile?.productMode ?? "chat",
-    thinkingEffort: profile?.thinkingEffort ?? "normal",
+    thinkingEffort: profile?.thinkingEffort ?? "low",
+    // The Settings memory switch, so the composer menu can show its own switch as unavailable when memory is off.
+    memoryEnabled: profile?.memoryEnabled !== false,
   };
 }
 
@@ -92,11 +115,12 @@ profileRouter.get("/preferences", async (req, res, next) => {
 profileRouter.patch("/last-used-model", async (req, res, next) => {
   try {
     const userId = req.authSession.user.id;
-    const lastUsedModel = String(req.body?.lastUsedModel ?? "").trim();
-    if (!MODEL_OPTIONS.has(lastUsedModel)) return res.status(400).json({ error: "Choose a valid model." });
+    const raw = String(req.body?.lastUsedModel ?? "").trim();
+    const lastUsedModel = canonicalModelKey(raw);
+    if (!isValidModelSelection(lastUsedModel)) return res.status(400).json({ error: "Choose a valid model." });
     const [profile] = await db
       .insert(userProfiles)
-      .values({ userId, lastUsedModel })
+      .values({ userId, lastUsedModel, thinkingEffort: "low" })
       .onConflictDoUpdate({
         target: userProfiles.userId,
         set: { lastUsedModel, updatedAt: new Date() },
@@ -112,8 +136,8 @@ profileRouter.patch("/last-used-model", async (req, res, next) => {
 profileRouter.patch("/product-mode", async (req, res, next) => {
   try {
     const productMode = req.body?.productMode;
-    if (!["chat", "study", "image"].includes(productMode)) return res.status(400).json({ error: "Choose an available workspace." });
-    await db.insert(userProfiles).values({ userId: req.authSession.user.id, productMode })
+    if (!["chat", "study", "image", "build"].includes(productMode)) return res.status(400).json({ error: "Choose an available workspace." });
+    await db.insert(userProfiles).values({ userId: req.authSession.user.id, productMode, thinkingEffort: "low" })
       .onConflictDoUpdate({ target: userProfiles.userId, set: { productMode, updatedAt: new Date() } });
     return res.json({ productMode });
   } catch (error) { return next(error); }
@@ -133,7 +157,7 @@ profileRouter.patch("/onboarding", async (req, res, next) => {
     if (answers) set.onboardingAnswers = answers;
     const [profile] = await db
       .insert(userProfiles)
-      .values({ userId, onboardingCompleted: true, onboardingCompletedAt: new Date(), onboardingAnswers: answers })
+      .values({ userId, onboardingCompleted: true, onboardingCompletedAt: new Date(), onboardingAnswers: answers, thinkingEffort: "low" })
       .onConflictDoUpdate({ target: userProfiles.userId, set })
       .returning({
         onboardingCompleted: userProfiles.onboardingCompleted,
@@ -150,11 +174,40 @@ profileRouter.patch("/preferences", async (req, res, next) => {
     const [existing] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
     const responseStyle = String(req.body?.responseStyle ?? existing?.responseStyle ?? "balanced");
     const customInstructions = String(req.body?.customInstructions ?? existing?.customInstructions ?? "").trim();
-    const preferredModel = req.body?.preferredModel === null
-      ? null
-      : canonicalModelKey(String(req.body?.preferredModel ?? existing?.preferredModel ?? "").trim()) || null;
-    const lastUsedModel = canonicalModelKey(String(req.body?.lastUsedModel ?? existing?.lastUsedModel ?? "").trim()) || null;
-    const thinkingEffort = String(req.body?.thinkingEffort ?? existing?.thinkingEffort ?? "normal").toLowerCase();
+    
+    let preferredModel = null;
+    if (req.body?.preferredModel !== undefined) {
+      if (req.body.preferredModel !== null && String(req.body.preferredModel).trim() !== "") {
+        const candidate = canonicalModelKey(String(req.body.preferredModel).trim());
+        if (!isValidModelSelection(candidate)) {
+          return res.status(400).json({ error: "Choose a valid model." });
+        }
+        preferredModel = candidate;
+      }
+    } else if (existing?.preferredModel) {
+      const candidate = canonicalModelKey(String(existing.preferredModel).trim());
+      if (isValidModelSelection(candidate)) {
+        preferredModel = candidate;
+      }
+    }
+
+    let lastUsedModel = null;
+    if (req.body?.lastUsedModel !== undefined) {
+      if (req.body.lastUsedModel !== null && String(req.body.lastUsedModel).trim() !== "") {
+        const candidate = canonicalModelKey(String(req.body.lastUsedModel).trim());
+        if (!isValidModelSelection(candidate)) {
+          return res.status(400).json({ error: "Choose a valid model." });
+        }
+        lastUsedModel = candidate;
+      }
+    } else if (existing?.lastUsedModel) {
+      const candidate = canonicalModelKey(String(existing.lastUsedModel).trim());
+      if (isValidModelSelection(candidate)) {
+        lastUsedModel = candidate;
+      }
+    }
+
+    const thinkingEffort = String(req.body?.thinkingEffort ?? existing?.thinkingEffort ?? "low").toLowerCase();
     if (!STYLE_OPTIONS.has(responseStyle)) return res.status(400).json({ error: "Choose a valid response style." });
     if (!THINKING_EFFORTS.has(thinkingEffort)) return res.status(400).json({ error: "Choose a valid thinking effort." });
     if (customInstructions.length > MAX_INSTRUCTIONS) return res.status(400).json({ error: `Personal instructions must be ${MAX_INSTRUCTIONS} characters or fewer.` });
@@ -165,9 +218,6 @@ profileRouter.patch("/preferences", async (req, res, next) => {
     if (preferredName && preferredName !== preferredNameFromInstructions(existing?.customInstructions)
       && !(await reviewDisplayName(preferredName)).allowed) {
       return res.status(400).json(NAME_NOT_ALLOWED);
-    }
-    if ((preferredModel && !MODEL_OPTIONS.has(preferredModel)) || (lastUsedModel && !MODEL_OPTIONS.has(lastUsedModel))) {
-      return res.status(400).json({ error: "Choose a valid model." });
     }
     const usage = await getCurrentUsage(userId);
     // A remembered model is allowed to remain stored across a plan change. The

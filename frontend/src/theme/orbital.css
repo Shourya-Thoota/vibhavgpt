@@ -1,0 +1,272 @@
+/* ==========================================================================
+   Orbital clarity: the shared component layer.
+
+   Loaded after every App stylesheet (see main.jsx) and before the phone
+   layout. Every value is a token from theme/vibhav.css.
+
+   Principles:
+   - Glass only for chrome that floats over content: the composer, menus,
+     select lists, mobile sheets and dialogs. Content surfaces (messages,
+     cards, tables, settings forms) stay solid and still.
+   - One planetary motif, used sparingly: a horizon (auth, homepage) and an
+     eclipse (Guarantee, onboarding). No starfield, no floating planets, and
+     nothing ornamental inside the working chat area.
+   - Press feedback is immediate and actions commit on release. Menus grow
+     from their trigger. Nothing bounces. Reduced motion removes movement and
+     keeps every state readable.
+   ========================================================================== */
+
+/* --- Canvas --------------------------------------------------------------- */
+
+/* The workspace sits on a plain canvas: no sky washes or star grids. */
+.workspace,
+.legal,
+.boot,
+:root[data-theme="dark"] .workspace,
+:root[data-theme="dark"] .legal {
+  background-color: var(--color-paper);
+  background-image: none;
+}
+
+/* --- Material ------------------------------------------------------------- */
+
+/* The material (theme --lg-* tokens), by weight: bar weight for the
+   composer, small for the mode switcher, panel weight for menus, lists and
+   sheets. Each surface gets its tint, its backdrop filter, the shared inner
+   highlight, glow, hairline and depth (--lg-shadow) and, where the element
+   has a free pseudo-element, the specular rim drawn as a 1px masked ring.
+   Text on glass is set a touch heavier for legibility over moving content. */
+.composer {
+  position: relative;
+  border: 0;
+  background: var(--lg-tint-m);
+  -webkit-backdrop-filter: var(--lg-filter-m);
+  backdrop-filter: var(--lg-filter-m);
+  box-shadow: var(--lg-shadow);
+  transition: box-shadow var(--dur-content) var(--ease-out);
+}
+.composer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: var(--lg-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+.composer:focus-within { box-shadow: var(--lg-shadow), 0 0 0 3px color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.composer .composer__input { font-weight: 500; }
+/* The composer floats over the end of the thread, so the conversation
+   passes under its glass as it scrolls. The thread ends with the same
+   amount of room, so its last line still settles above the composer. Only
+   a short strip below the composer is painted, to keep the safe area calm.
+   The wrap itself lets pointer and wheel input through to the thread. */
+.chat { --composer-overlap: 64px; }
+.composer-wrap {
+  margin-top: calc(-1 * var(--composer-overlap));
+  background: linear-gradient(0deg, var(--wash-fade) 0 14px, transparent 34px);
+  pointer-events: none;
+}
+.composer-wrap > * { pointer-events: auto; }
+.chat__thread { padding-bottom: calc(26px + var(--composer-overlap)); }
+
+/* Level 2: sheets and dialogs (menus and pickers: menus.css). */
+.ui-sheet__panel {
+  border: 0;
+  background: var(--lg-tint-l);
+  -webkit-backdrop-filter: var(--lg-filter-l);
+  backdrop-filter: var(--lg-filter-l);
+  box-shadow: var(--lg-shadow), var(--shadow-pop);
+}
+.ui-modal {
+  border: var(--rule-fine) solid var(--color-rule-2);
+  background: var(--color-paper-raised);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Menus and lists grow from their trigger and return into it along the same
+   path (one transition, styles.css ".ui-popover"); sheets follow the finger
+   and settle on a spring (BottomSheet in ui.jsx). */
+
+/* --- Buttons -------------------------------------------------------------- */
+
+/* Buttons are defined once, in styles.css (".btn"): glossy primary and
+   secondary, text-only ghost and quiet, press on pointer-down. */
+/* Send is the composer's primary action: the glossy blue, round. */
+.composer__send { background: var(--gloss-primary); box-shadow: var(--gloss-primary-edge); color: #fff; }
+.composer__send:active:not(:disabled) { transform: scale(var(--press-scale)); filter: brightness(0.94); }
+.composer__send:disabled { background: var(--color-paper-4); box-shadow: none; color: var(--color-faint); }
+
+/* --- Sidebar -------------------------------------------------------------- */
+
+.sidebar { background: var(--color-paper-deep); }
+.sidebar::before { display: none; }
+/* Rows, the New chat row and the active state are defined once, in
+   styles.css ("Sidebar rows are text first"). */
+
+/* --- Workspace chrome ----------------------------------------------------- */
+
+.mode-tabs {
+  border: 0;
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+/* An empty chat is a quiet invitation, not an illustration. */
+
+/* Messages: solid, readable, never glass. */
+.bubble--user { background: var(--color-paper-3); border-color: transparent; }
+.bubble--assistant { line-height: 1.7; }
+
+/* --- Pages (Usage, Plan, Memory, Settings) -------------------------------- */
+
+/* Editorial headers: type and a fine rule, no framed card or planet. */
+.page__header {
+  min-height: 0;
+  padding: 0 0 var(--space-lg);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.page__header::after { display: none; }
+.page__title { font-family: var(--font-display); font-size: clamp(1.8rem, 2vw + 1rem, 2.3rem); font-weight: var(--display-weight); letter-spacing: var(--display-tracking); }
+.card,
+.memory-group { background: var(--color-paper-2); border-color: var(--color-rule); box-shadow: var(--shadow-card); }
+.plan[data-featured] { background: var(--color-paper-2); }
+
+/* Usage and Flex Credits read as a document, not a stack of cards: each
+   part is a section under a fine rule, its figures and meters in rows, and
+   the reset times set beside what they reset. */
+.usage-hero,
+.credit-purchase,
+.credit-purchase-history {
+  margin-top: 0;
+  padding: var(--space-lg) 0;
+  border: 0;
+  border-top: var(--rule-fine) solid var(--color-rule);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.usage-hero { align-items: flex-start; }
+.usage-hero__eyebrow { color: var(--color-muted); }
+.usage-hero__summary { font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
+.usage-hero__reset { padding-top: 4px; }
+.usage-caps { gap: 0 var(--space-xl); margin-top: 0; padding: 0 0 var(--space-lg); }
+.usage-cap,
+.usage-model,
+.metric { padding: var(--space-md) 0 0; border: 0; border-top: var(--rule-fine) solid var(--color-rule); border-radius: 0; background: none; box-shadow: none; }
+.usage-cap:hover,
+.usage-model:hover,
+.metric:hover,
+.memory-group:hover { transform: none; box-shadow: var(--shadow-card); }
+.usage-cap:hover,
+.usage-model:hover,
+.metric:hover { box-shadow: none; border-color: var(--color-rule); }
+.credit-purchase__intro h2,
+.credit-purchase-history h2 { margin: 0; font-family: var(--font-body); font-size: 1.15rem; font-weight: 650; letter-spacing: -0.01em; }
+.credit-balance { align-content: start; min-width: 0; padding: 0; border: 0; background: none; text-align: right; }
+.credit-balance strong { color: var(--color-ink); font-family: var(--font-body); font-size: 1.6rem; font-weight: 650; }
+.credit-purchase__controls { padding-top: var(--space-md); }
+
+/* Empty states: a heading and one line, in place, with no dashed box. */
+.empty-state { justify-items: start; padding: var(--space-lg) 0; border: 0; border-top: var(--rule-fine) solid var(--color-rule); border-radius: 0; text-align: left; }
+.empty-state strong { font-family: var(--font-body); font-size: 1.05rem; font-weight: 650; }
+
+/* In the app, the four plans sit in one row when there is room for it. */
+@media (min-width: 1240px) { .page .plans.rate-card { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+/* --- Planetary marks ------------------------------------------------------ */
+
+/* The Guarantee's single illustration and the onboarding welcome: an
+   eclipse, a dark disc with a precise lit rim. */
+.guarantee__planet,
+.survey__orb {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: var(--radius-round);
+  background: var(--color-paper-deep);
+  box-shadow: -2px -1px 0 color-mix(in srgb, var(--color-atmosphere) 80%, transparent), -18px -8px 54px -18px color-mix(in srgb, var(--color-atmosphere) 55%, transparent);
+}
+/* By day, the same disc filled with the ink colour was a flat black circle on a pale page: ink is #000 in the light theme, the
+   background had no gradient, and the glow is a pale blue on a pale ground. So by day the planet is lit instead. Light comes
+   from the upper left, the same side as the night version's lit limb: a bright rim, a body that deepens from the atmosphere
+   blue toward the shadow side, and a soft glow around it with a little cast light below. The shading is in the gradient
+   (not in pixel-sized shadows), so it holds from the 56px mark on a phone to the 112px one on a desktop. */
+:root[data-theme="light"] .guarantee__planet,
+:root[data-theme="light"] .survey__orb {
+  background:
+    radial-gradient(circle at 30% 24%, var(--color-sheen) 0, transparent 20%),
+    radial-gradient(ellipse 95% 95% at 32% 28%,
+      color-mix(in srgb, var(--color-atmosphere) 40%, #ffffff) 0%,
+      var(--color-atmosphere) 30%,
+      color-mix(in srgb, var(--color-accent) 88%, var(--color-atmosphere)) 58%,
+      color-mix(in srgb, var(--color-accent) 55%, #3a2418) 84%,
+      color-mix(in srgb, var(--color-accent) 30%, #3a2418) 100%);
+  box-shadow:
+    -2px -1px 0 color-mix(in srgb, #d7e6f8 90%, #ffffff),
+    -16px -8px 44px -14px color-mix(in srgb, #8eb4e8 78%, transparent),
+    10px 16px 34px -14px color-mix(in srgb, var(--color-accent) 50%, transparent);
+}
+.survey__orb { width: clamp(4.5rem, 12vh, 6.5rem); }
+
+/* --- Motion preferences --------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled) { transform: none; }
+  .ui-sheet__panel { animation: none; }
+}
+
+/* --- New chat context ------------------------------------------------------ */
+
+/* One line under the composer on an empty chat: the model the next message
+   goes to and what it is for, and how to send. */
+.composer-context { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; width: min(100%, 748px); margin: 10px auto 0; padding: 0 8px; color: var(--color-muted); font-size: 0.84rem; letter-spacing: var(--tracking-small); pointer-events: auto; }
+.composer-context strong { color: var(--color-ink-2); font-weight: 600; }
+.composer-context kbd { padding: 1px 6px; border-radius: 6px; background: var(--color-paper-2); box-shadow: 0 0 0 0.5px var(--color-rule-2), 0 1px 0 var(--color-rule-2); color: var(--color-ink-2); font: 600 0.76rem/1.4 var(--font-body); }
+
+/* --- Real planets ----------------------------------------------------------- */
+
+/* The decorative planets are photographs of Earth (Apollo 17) and Jupiter (Hubble), kept on this site and cut to a circle; credits are
+   in THIRD_PARTY_NOTICES.md. The light and the shadow are painted over them in CSS: a soft highlight at the upper left and a
+   terminator toward the lower right, so each reads as a lit sphere on a pale page and on a dark one alike, never as a flat disc.
+   Only the pictures replace the old blobs: sizes, positions and the ring that marks a chosen sky are unchanged. A fixed size keeps
+   every one of them from shifting the page as it loads. */
+:root:root:root .guarantee__planet,
+:root:root:root .survey__orb,
+:root:root:root .survey-sky__planet,
+:root:root:root .survey-preview__planet,
+:root:root:root .theme-option__planet {
+  --planet-art: url("/planets/earth-sphere.webp");
+  background-color: transparent;
+  /* By night (the default) a dark veil dims the photograph, so the body reads dark with its lit limb. */
+  background-image:
+    linear-gradient(rgb(8 6 5 / 0.68), rgb(8 6 5 / 0.68)),
+    radial-gradient(circle at 28% 24%, rgb(255 244 232 / 0.18), transparent 36%),
+    radial-gradient(circle at 74% 80%, rgb(28 16 12 / 0.5), transparent 64%),
+    var(--planet-art);
+  background-size: 100% 100%, 100% 100%, 100% 100%, cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* Deep Space is Jupiter; Daybreak is Earth. */
+:root:root:root .survey-sky[data-sky="dark"] .survey-sky__planet,
+:root:root:root .theme-option[data-preview="dark"] .theme-option__planet { --planet-art: url("/planets/jupiter-sphere.webp"); }
+/* By day the shadow is lighter, so the planet is lit rather than dark on a pale page. */
+:root[data-theme="light"]:root .guarantee__planet,
+:root[data-theme="light"]:root .survey__orb,
+:root[data-theme="light"]:root .survey-preview__planet,
+:root[data-theme="light"]:root .survey-sky[data-sky="light"] .survey-sky__planet,
+:root[data-theme="light"]:root .theme-option[data-preview="light"] .theme-option__planet {
+  background-image:
+    radial-gradient(circle at 28% 24%, rgb(255 255 255 / 0.22), transparent 36%),
+    radial-gradient(circle at 74% 80%, rgb(10 30 70 / 0.62), transparent 62%),
+    var(--planet-art);
+  background-size: 100% 100%, 100% 100%, cover;
+}
+.theme-option__planet { box-shadow: 0 2px 10px rgb(0 0 0 / 0.35) !important; }

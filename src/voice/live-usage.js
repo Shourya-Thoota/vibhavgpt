@@ -221,7 +221,7 @@ export async function reconcileStaleLiveSessions(now = new Date()) {
     const usage = await getCurrentUsage(userId).catch(() => ({ tier: "free" }));
     const allowance = usage.tier === "pro" ? PRO_FLAGSHIP_DAILY_SECONDS : (MINI_POOL_SECONDS[usage.tier] ?? MINI_POOL_SECONDS.free);
     if (Number(row.totalActual) > allowance * SUSPEND_INCOMPLETE_SECONDS_MULTIPLIER || Number(row.count) >= SUSPEND_INCOMPLETE_COUNT_THRESHOLD) {
-      await db.insert(userProfiles).values({ userId, voiceSuspendedAt: now }).onConflictDoUpdate({ target: userProfiles.userId, set: { voiceSuspendedAt: now, updatedAt: now } }); suspended.push(userId);
+      await db.insert(userProfiles).values({ userId, voiceSuspendedAt: now, thinkingEffort: "low" }).onConflictDoUpdate({ target: userProfiles.userId, set: { voiceSuspendedAt: now, updatedAt: now } }); suspended.push(userId);
     }
   }
   return { finalized: stale.length, suspended };

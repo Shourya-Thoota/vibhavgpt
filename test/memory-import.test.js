@@ -47,6 +47,6 @@ test("Study uses its independent server-selected route", () => {
   assert.doesNotMatch(router, /today's Study messages/);
   const app = readFileSync(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /const sentModel = studyMode \? STUDY_MODEL : model;/);
-  assert.match(app, /\{!studyMode && <Select/);
+  assert.match(app, /\{!studyMode && <ModelTrigger /, "Study hides the model picker");
   assert.match(app, /studyMode \? "VibhavGPT" : modelLabel\(message\.model\)/);
 });

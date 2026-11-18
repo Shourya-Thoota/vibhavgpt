@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- Tecton: an original orb for the home page's model showcase, in the lit-sphere style of the others: sky blue, with a faint grid of
+       traces across its face for the coding model in Build. -->
+  <defs>
+    <radialGradient id="te-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0.7" stop-color="#d9fbf6" stop-opacity="0"/>
+      <stop offset="0.84" stop-color="#d9fbf6" stop-opacity="0.15"/>
+      <stop offset="0.93" stop-color="#d9fbf6" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#d9fbf6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="te-body" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#e9fffb"/>
+      <stop offset="0.28" stop-color="#9fdcf6"/>
+      <stop offset="0.6" stop-color="#1593d6"/>
+      <stop offset="0.88" stop-color="#0b3f66"/>
+      <stop offset="1" stop-color="#041a2e"/>
+    </radialGradient>
+    <radialGradient id="te-night" cx="78%" cy="80%" r="70%">
+      <stop offset="0.35" stop-color="#021316" stop-opacity="0"/>
+      <stop offset="1" stop-color="#021316" stop-opacity="0.8"/>
+    </radialGradient>
+    <radialGradient id="te-rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0.9" stop-color="#d9fbf6" stop-opacity="0"/>
+      <stop offset="0.985" stop-color="#d9fbf6" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#d9fbf6" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="te-gloss" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="te-disc"><circle cx="400" cy="400" r="300"/></clipPath>
+  </defs>
+  <circle cx="400" cy="400" r="392" fill="url(#te-halo)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#te-body)"/>
+  <g clip-path="url(#te-disc)" fill="none" stroke="#e9fffb" stroke-opacity="0.22" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M150 330 H300 V430 H470 V540 H640"/>
+    <path d="M200 520 H330 V610 H520"/>
+    <path d="M360 160 V280 H560 V380 H680"/>
+    <path d="M240 240 H330"/>
+    <circle cx="300" cy="330" r="9" fill="#e9fffb" fill-opacity="0.3"/>
+    <circle cx="470" cy="430" r="9" fill="#e9fffb" fill-opacity="0.3"/>
+    <circle cx="560" cy="280" r="9" fill="#e9fffb" fill-opacity="0.3"/>
+    <circle cx="330" cy="520" r="9" fill="#e9fffb" fill-opacity="0.3"/>
+  </g>
+  <circle cx="400" cy="400" r="300" fill="url(#te-night)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#te-rim)"/>
+  <ellipse cx="318" cy="288" rx="88" ry="56" fill="url(#te-gloss)" transform="rotate(-28 318 288)"/>
+</svg>

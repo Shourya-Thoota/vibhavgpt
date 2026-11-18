@@ -43,6 +43,10 @@ async function seed(client, id, email) {
   }
   await client.query(`INSERT INTO "verification" (id, identifier) VALUES ($1, $2)`, [`otp-${id}`, `sign-in-otp-${email}`]);
   await client.query(`INSERT INTO user_profiles (user_id) VALUES ($1)`, [id]);
+  await client.query(`INSERT INTO saved_avatars (user_id, name, content_type, width, height, byte_size, sha256, data) VALUES ($1, 'Me', 'image/jpeg', 64, 64, 3, $2, $3)`, [id, `av-${id}`, Buffer.from([1, 2, 3])]);
+  await client.query(`INSERT INTO account_preferences (user_id, accent) VALUES ($1, 'pine')`, [id]);
+  await client.query(`INSERT INTO account_agreements (user_id, terms_version, privacy_version, accepted_at, age_check, age_checked_at) VALUES ($1, '2026-11-16', '2026-11-16', now(), '16_plus', now())`, [id]);
+  await client.query(`INSERT INTO profile_pictures (user_id, byte_size, sha256, data) VALUES ($1, 3, $2, $3)`, [id, `sha-${id}`, Buffer.from([1, 2, 3])]);
   const { rows: [group] } = await client.query(`INSERT INTO conversation_groups (user_id, kind, name) VALUES ($1, 'project', 'Thesis') RETURNING id`, [id]);
   await client.query(`INSERT INTO conversation_groups (user_id, kind, name, parent_id) VALUES ($1, 'folder', 'Drafts', $2)`, [id, group.id]);
   const { rows: [conversation] } = await client.query(`INSERT INTO conversations (user_id, title, model, group_id) VALUES ($1, 'Chat', 'nova', $2) RETURNING id`, [id, group.id]);
@@ -54,6 +58,15 @@ async function seed(client, id, email) {
   const { rows: [usage] } = await client.query(`INSERT INTO usage_events (user_id, model, input_tokens, output_tokens) VALUES ($1, 'nova', 10, 20) RETURNING id`, [id]);
   await client.query(`INSERT INTO credit_ledger (user_id, credits, kind, usage_event_id) VALUES ($1, -1, 'usage', $2)`, [id, usage.id]);
   await client.query(`INSERT INTO billing_customers (user_id, customer_id) VALUES ($1, $2)`, [id, `cus_${id}`]);
+  await client.query(`INSERT INTO shadow_cost_ledger (user_id, idempotency_key, model_key, operation, status, pricing_version_id, pricing_source) VALUES ($1, $2, 'nova', 'chat_stream', 'measured', 'pricing_snapshot_2026_10', 'configured_provider_rates_v1')`, [id, `shadow-${id}`]);
+  await client.query(`INSERT INTO user_connectors (user_id, provider, status) VALUES ($1, 'github', 'connected')`, [id]);
+  await client.query(`INSERT INTO pending_tool_actions (user_id, tool_name, action_description, payload, payload_hash, idempotency_key, expires_at) VALUES ($1, 'test_tool', 'Test action', '{}'::jsonb, 'hash1', $2, now() + interval '5 minutes')`, [id, `idemp-${id}`]);
+  await client.query(`INSERT INTO user_skills (user_id, name, instructions) VALUES ($1, 'Research Helper', 'Summarize facts.')`, [id]);
+  await client.query(`INSERT INTO connector_account_owners (alias, user_id, toolkit, app, account_id) VALUES ($1, $2, 'gmail', 'gmail', $3)`, [`vgc_${id}`, id, `gmail_${id}`]);
+  const { rows: [project] } = await client.query(`INSERT INTO build_projects (user_id, conversation_id, title, kind) VALUES ($1, $2, 'A build', 'web') RETURNING id`, [id, conversation.id]);
+  await client.query(`INSERT INTO build_revisions (project_id, user_id, number, kind, entry, files, total_bytes) VALUES ($1, $2, 1, 'web', 'index.html', '[]'::jsonb, 0)`, [project.id, id]);
+  await client.query(`INSERT INTO marketplace_charges (usage_event_id, user_id, model, provider, raw_cost_micros, upcharge_micros, charged_micros, credits, cost_source) VALUES ($1, $2, 'glm-5.3-flash', 'GLM', 1000, 100, 1100, '0.022', 'provider-reported')`, [usage.id, id]);
+  await client.query(`INSERT INTO chat_capacity_leases (id, tier, user_id, state, instance_id, expires_at) VALUES (gen_random_uuid(), 'nova', $1, 'active', 'test', now() + interval '20 seconds')`, [id]);
   const files = [`${id}-notes.pdf`, `${id}-image.png`, `${id}-unsent.txt`];
   await client.query(
     `INSERT INTO attachments (user_id, conversation_id, message_id, original_name, stored_name, mime_type, kind, size_bytes)
@@ -73,8 +86,9 @@ async function seed(client, id, email) {
 }
 
 const OWNED = [
-  "user_profiles", "conversations", "conversation_groups", "memory_facts", "image_folders", "voice_live_sessions",
-  "attachments", "usage_events", "credit_ledger", "billing_customers",
+  "user_profiles", "profile_pictures", "account_preferences", "account_agreements", "saved_avatars", "conversations", "conversation_groups", "memory_facts", "image_folders", "voice_live_sessions",
+  "attachments", "usage_events", "credit_ledger", "billing_customers", "shadow_cost_ledger",
+  "user_connectors", "pending_tool_actions", "user_skills", "chat_capacity_leases", "marketplace_charges", "connector_account_owners", "build_projects", "build_revisions",
 ];
 
 async function count(client, table, where, value) {

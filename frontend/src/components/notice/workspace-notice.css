@@ -1,0 +1,15 @@
+/* Workspace notices: where the notice sits (above the mode tabs, in the page's flow). Its look is the shared Banner (ui/banner.css):
+   tokens only, an icon and a title as well as a tint, no edge stripe, one action and a labelled dismiss. */
+.workspace-notices-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 100%;
+  padding: var(--space-xs) var(--space-md) 0;
+  box-sizing: border-box;
+}
+.workspace-notices-container .ui-banner { margin-bottom: 0; }
+@media (max-width: 580px) {
+  .workspace-notices-container { padding: var(--space-xs) var(--space-sm) 0; }
+}

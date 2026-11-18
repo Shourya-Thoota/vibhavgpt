@@ -7,7 +7,7 @@
    as four statements, large and plain, under one planet.
    ========================================================================== */
 
-.legal { min-height: 100dvh; color: var(--color-ink); }
+.legal { min-height: 100dvh; color: var(--color-ink); padding-top: 5.5rem; }
 
 .legal-bar {
   display: flex;
@@ -55,15 +55,6 @@
   padding: var(--space-xl) 0 var(--space-3xl);
 }
 .legal-doc__header { grid-area: header; max-width: 68ch; margin-bottom: var(--space-xl); }
-.legal-doc__title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.6rem, 3vw + 1.4rem, 3.8rem);
-  font-weight: 400;
-  letter-spacing: -0.022em;
-  line-height: 1.02;
-}
-.legal-doc__lede { margin: var(--space-sm) 0 0; color: var(--color-ink-2); font-size: 1.08rem; line-height: 1.55; }
 .legal-doc__guarantee {
   display: flex;
   align-items: flex-start;
@@ -81,16 +72,10 @@
 }
 .legal-doc__guarantee:hover { border-color: var(--color-accent); }
 .legal-doc__guarantee strong { color: var(--color-ink); font-weight: 600; }
-.legal-doc__guarantee-mark,
-.guarantee__mark {
-  flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  margin-top: 6px;
-  border-radius: var(--radius-round);
-  background: radial-gradient(circle at 34% 30%, color-mix(in srgb, var(--color-accent) 45%, var(--color-ink)), var(--color-accent) 48%, color-mix(in srgb, var(--color-accent) 40%, var(--color-paper-deep)));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 14%, transparent);
-}
+/* The Terms' pointer to the Guarantee is marked by a fine accent rule; the
+   Guarantee's promises are numbered. No glowing dots. */
+.legal-doc__guarantee-mark { flex: 0 0 auto; align-self: stretch; width: 2px; border-radius: 1px; background: var(--color-accent); }
+.guarantee__mark { color: var(--color-muted); font: 500 0.9rem/1 var(--font-mono); letter-spacing: 0.04em; }
 
 .legal-doc__toc { grid-area: toc; }
 .legal-doc__toc ol {
@@ -130,7 +115,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 1.4rem;
-  font-weight: 400;
+  font-weight: var(--display-weight);
   line-height: 1.25;
 }
 .legal-doc__number { flex: 0 0 auto; min-width: 1.6em; color: var(--color-faint); font-family: var(--font-body); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
@@ -152,56 +137,22 @@
   margin: 0 auto;
   padding: var(--space-xl) 0 var(--space-3xl);
 }
-.guarantee__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--space-lg);
-  align-items: center;
-}
-.guarantee__planet {
-  grid-column: 2;
-  grid-row: 1;
-  display: block;
-  width: 112px;
-  height: 112px;
-  margin: 0;
-  object-fit: contain;
-  filter: drop-shadow(0 18px 36px var(--color-planet-shadow));
-}
-
-.guarantee__title {
-  grid-column: 1;
-  grid-row: 1;
-  max-width: 14ch;
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2.8rem, 4vw + 1.2rem, 4.6rem);
-  font-weight: 400;
-  letter-spacing: -0.025em;
-  line-height: 1;
-}
-.guarantee__lede { grid-column: 1 / -1; max-width: 52ch; margin: var(--space-md) 0 0; color: var(--color-ink-2); font-size: 1.15rem; line-height: 1.55; }
-
-@media (max-width: 600px) {
-  .guarantee__header { column-gap: var(--space-sm); }
-  .guarantee__planet { width: 56px; height: 56px; }
-  .guarantee__title { font-size: clamp(2rem, 7vw, 2.8rem); }
-}
+.guarantee__header { margin-bottom: 0; }
 
 .guarantee__promises { margin: var(--space-2xl) 0 0; padding: 0; list-style: none; }
 .guarantee__promise {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: 2.25rem minmax(0, 1fr);
   gap: var(--space-md);
   padding: var(--space-xl) 0;
   border-top: var(--rule-fine) solid var(--color-rule);
 }
-.guarantee__promise .guarantee__mark { width: 16px; height: 16px; margin-top: 14px; }
+.guarantee__promise .guarantee__mark { margin-top: 0.95rem; }
 .guarantee__promise h2 {
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.7rem, 1.2rem + 1.6vw, 2.4rem);
-  font-weight: 400;
+  font-weight: var(--display-weight);
   letter-spacing: -0.015em;
   line-height: 1.12;
 }
@@ -214,7 +165,7 @@
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--color-paper-2) 80%, transparent);
 }
-.guarantee__fine h2 { margin: 0; font-family: var(--font-display); font-size: 1.3rem; font-weight: 400; }
+.guarantee__fine h2 { margin: 0; font-family: var(--font-display); font-size: 1.3rem; font-weight: var(--display-weight); }
 .guarantee__fine p { max-width: 64ch; margin: var(--space-sm) 0 0; color: var(--color-muted); font-size: 0.95rem; line-height: 1.65; }
 .guarantee__actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-md); }
 .guarantee__actions .btn { text-decoration: none; }

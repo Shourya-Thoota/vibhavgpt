@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcuts (long-press the app icon): each opens the app on a fresh session. The web app reads the link through
+     Capacitor's appUrlOpen / getLaunchUrl and accepts only these three paths (frontend/src/keyboard-shortcuts.js). Static
+     shortcuts need Android 7.1 (API 25), hence xml-v25; older devices simply have none. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_chat"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_new_chat"
+        android:shortcutShortLabel="@string/shortcut_new_chat_short"
+        android:shortcutLongLabel="@string/shortcut_new_chat_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pansophy.vibhavgpt.direct"
+            android:targetClass="com.pansophy.vibhavgpt.direct.MainActivity"
+            android:data="vibhavgpt://open/app/chat" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_image"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_new_image"
+        android:shortcutShortLabel="@string/shortcut_new_image_short"
+        android:shortcutLongLabel="@string/shortcut_new_image_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pansophy.vibhavgpt.direct"
+            android:targetClass="com.pansophy.vibhavgpt.direct.MainActivity"
+            android:data="vibhavgpt://open/app/image" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="new_build"
+        android:enabled="true"
+        android:icon="@drawable/shortcut_new_build"
+        android:shortcutShortLabel="@string/shortcut_new_build_short"
+        android:shortcutLongLabel="@string/shortcut_new_build_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.pansophy.vibhavgpt.direct"
+            android:targetClass="com.pansophy.vibhavgpt.direct.MainActivity"
+            android:data="vibhavgpt://open/app/build" />
+    </shortcut>
+</shortcuts>

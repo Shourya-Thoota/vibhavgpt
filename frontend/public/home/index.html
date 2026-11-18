@@ -1,92 +1,166 @@
 <!doctype html>
 <html lang="en">
 <head>
-<base target="_top">
-
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-
-
-
-
-
-
-
-
-
-
-
-
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico">
-
+<!-- The reader's saved sky, accent and material before first paint: no flash. -->
+<script src="/theme/appearance-boot.js"></script>
+<!-- The presentation's layout is chosen before first paint, so switching it on never moves the page. Without script, or with reduced
+     motion, the five features stay as cards. -->
+<script>if (matchMedia("(prefers-reduced-motion:no-preference)").matches) document.documentElement.classList.add("presenting");document.documentElement.classList.add("slideshow");if (navigator.connection && navigator.connection.saveData) document.documentElement.classList.add("save-data");</script>
 <!-- Fonts are self-hosted: no visitor IP or referrer reaches a font CDN. -->
-<link rel="preload" href="/fonts/v1/hanken-grotesk/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/v1/prata/prata-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts/v1/fonts.css">
+<link rel="stylesheet" href="/theme/vibhav.css">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--dw:1353;--dh:1163;--gutter:25;--u:max(min(.72px,calc(100vh / 700)),min(calc(100vw / 1353),calc(100vh / 1163)));--dh-px:calc(1163 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .42);--ink:#fff;--cyan:#79dce8;--cyan-logo:#5fd0e1;--rule:rgba(255,255,255,.23);--btn-ink:#071227;--font-serif:'Prata',Georgia,serif;--font-body:'Hanken Grotesk',system-ui,-apple-system,'Segoe UI',sans-serif;--font-logo:'Prata',Georgia,serif}
-@supports(height:100dvh){:root{--u:max(min(.72px,calc(100dvh / 700)),min(calc(100vw / 1353),calc(100dvh / 1163)));--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .42)}}
-html,body{height:100%}body{background:#04101f;color:var(--ink);font-family:var(--font-body);-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:geometricPrecision;overflow:hidden}
-.stage{position:fixed;inset:0;overflow:hidden;isolation:isolate}.sky{position:absolute;inset:0;z-index:0;background:#030b17;overflow:hidden}.sky::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(1,7,18,.1),rgba(1,7,18,.12) 60%,rgba(1,7,18,.7));pointer-events:none}
-.atmosphere{position:absolute;inset:0;opacity:0;transition:opacity .22s linear;background:radial-gradient(ellipse at 50% 66%,var(--glow),transparent 66%)}.atmosphere.is-active{opacity:1}.atmosphere[data-planet=earth]{--glow:#12547380}.atmosphere[data-planet=venus]{--glow:#8b66345c}.atmosphere[data-planet=mars]{--glow:#873f305e}
-.orb{position:absolute;width:calc(1090 * var(--u));height:calc(1090 * var(--u));left:50%;top:calc(660 * var(--u));transform:translateX(-50%);animation:drift 28s ease-in-out infinite alternate;filter:brightness(.54);opacity:.82}.orb img{width:100%;height:100%;display:block}.atmosphere::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 88%,var(--glow),transparent 55%);animation:breathe 14s ease-in-out infinite alternate}.stars{position:absolute;inset:0;pointer-events:none}.star{position:absolute;width:calc(var(--s) * var(--u));height:calc(var(--s) * var(--u));border-radius:50%;background:#d5e9f3;opacity:var(--a)}
-@keyframes drift{to{transform:translateX(-50%) rotate(3deg) translateY(calc(-12 * var(--u)))}}@keyframes breathe{to{opacity:.4;transform:scale(1.1)}}
-.ui{position:absolute;inset:0;z-index:3}.copy{position:absolute;inset:0;transform:translateY(var(--vshift));pointer-events:none}.copy a{pointer-events:auto}.col{position:absolute;left:0;right:calc(var(--gutter) * var(--u));text-align:center}
-.navbar{position:absolute;top:0;left:0;right:0;z-index:6;height:calc(88 * var(--u))}.navbar::after{content:'';position:absolute;left:calc(25 * var(--u));right:calc(49 * var(--u));top:calc(86 * var(--u));height:calc(2 * var(--u));background:var(--rule)}.navrow{position:absolute;left:calc(25 * var(--u));right:calc(49 * var(--u));top:0;height:calc(86 * var(--u));display:flex;align-items:center;justify-content:space-between}
-.logo{font-family:var(--font-logo);font-weight:400;font-size:calc(18.4 * var(--u));letter-spacing:calc(-.15 * var(--u));line-height:1;color:#fff;text-decoration:none;white-space:nowrap;position:relative;top:calc(-1 * var(--u))}.logo i{font-style:normal;color:var(--cyan-logo)}
-.burger{display:none;position:relative;width:calc(46 * var(--u));height:calc(46 * var(--u));padding:0;border:0;background:none;cursor:pointer;flex-direction:column;align-items:center;justify-content:center;gap:calc(6 * var(--u));flex:none}.burger span{display:block;width:calc(24 * var(--u));height:calc(2 * var(--u));border-radius:calc(2 * var(--u));background:#fff;transition:transform .28s cubic-bezier(.4,0,.2,1),opacity .18s linear}.navrow[data-open=true] .burger span:nth-child(1){transform:translateY(calc(8 * var(--u))) rotate(45deg)}.navrow[data-open=true] .burger span:nth-child(2){opacity:0}.navrow[data-open=true] .burger span:nth-child(3){transform:translateY(calc(-8 * var(--u))) rotate(-45deg)}
-.links{display:flex;align-items:center}.links a{position:relative;display:flex;align-items:center;height:calc(86 * var(--u));font-size:calc(18.4 * var(--u));font-weight:400;line-height:1;color:#fff;text-decoration:none;padding:0 calc(17.5 * var(--u));letter-spacing:calc(-1 * var(--u));white-space:nowrap}.links a[aria-current=page]::after{content:'';position:absolute;left:0;right:0;top:calc(83.5 * var(--u));height:calc(4 * var(--u));background:var(--cyan);border-radius:calc(1 * var(--u))}.links a+a{margin-left:calc(25 * var(--u))}
-.links a.enroll{margin-left:calc(28.5 * var(--u));min-width:calc(107 * var(--u));width:auto;height:calc(38 * var(--u));border-radius:calc(19 * var(--u));display:flex;align-items:center;justify-content:center;font-size:calc(17 * var(--u));font-weight:600;letter-spacing:calc(-.75 * var(--u));line-height:1;color:var(--btn-ink);padding-top:calc(2 * var(--u));padding-left:calc(18 * var(--u));padding-right:calc(18 * var(--u));background:linear-gradient(180deg,#fff 0%,#d8ecfe 9%,#dceefe 72%,#f4f9ff 100%);box-shadow:0 calc(3 * var(--u)) calc(14 * var(--u)) #ffffff38,inset 0 0 0 calc(1.5 * var(--u)) #ffffffeb;flex:none}
-.links .avatar-chip + .enroll{margin-left:calc(16 * var(--u))}
-/* Shown in place of "Sign in" once /api/me confirms a session (see script
-   below). Sized against the same --u scale as the rest of the nav so it
-   doesn't look like a foreign element bolted onto a static page. */
-.links .avatar-chip{margin-left:calc(24 * var(--u));box-sizing:border-box;width:calc(34 * var(--u));height:calc(34 * var(--u));padding:0;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:0 0 calc(34 * var(--u));background:var(--cyan-logo);color:var(--btn-ink);font-family:var(--font-body);font-weight:600;font-size:calc(13.5 * var(--u));letter-spacing:0;text-decoration:none;line-height:1}
-.avatar-chip[hidden]{display:none}
-@media(max-width:1030px),(max-height:620px){.navrow .links a.avatar-chip{align-self:flex-start;border:0;justify-content:center;letter-spacing:0;width:calc(38 * var(--u));height:calc(38 * var(--u));margin:calc(6 * var(--u)) calc(16 * var(--u));padding:0;flex-basis:calc(38 * var(--u));font-size:calc(15 * var(--u))}}
-.eyebrow{top:calc(188.8 * var(--u));font-size:calc(30.45 * var(--u));font-weight:500;line-height:1;letter-spacing:calc(4 * var(--u));text-indent:calc(4 * var(--u))}h1.title{top:calc(268 * var(--u));font-family:var(--font-serif);font-weight:400;font-size:calc(112.4 * var(--u));line-height:1;letter-spacing:calc(2 * var(--u));text-indent:calc(2 * var(--u))}.rule{top:calc(405.5 * var(--u));height:calc(5 * var(--u));font-size:0;line-height:0;padding-right:calc(2 * var(--u))}.rule span{display:inline-block;vertical-align:top;width:calc(100 * var(--u));height:100%;border-radius:calc(2.5 * var(--u));background:var(--cyan)}p.lede{top:calc(433.2 * var(--u));font-size:calc(18.36 * var(--u));font-weight:400;line-height:calc(30 * var(--u));color:#fffffff2;max-width:calc(690 * var(--u));margin-left:auto;margin-right:auto;text-wrap:pretty}
-.cta{top:calc(597 * var(--u));height:calc(66 * var(--u));isolation:isolate}.cta a{display:inline-flex;align-items:center;justify-content:center;width:calc(216 * var(--u));height:calc(66 * var(--u));border-radius:calc(33 * var(--u));font-size:calc(17 * var(--u));font-weight:700;line-height:1;color:var(--btn-ink);text-decoration:none;padding-top:calc(2 * var(--u));background:linear-gradient(180deg,#fff 0%,#d6e8f8 4%,#d9ecfe 72%,#fff 100%);box-shadow:0 calc(10 * var(--u)) calc(18 * var(--u)) calc(-8 * var(--u)) #ffffff80,0 0 calc(26 * var(--u)) #ffffff2e,inset 0 0 0 calc(2 * var(--u)) #ffffffe6}
-.planet{position:absolute;z-index:-1;padding:0;border:0;background:none;appearance:none;line-height:0;cursor:pointer;pointer-events:auto;transition:transform .45s cubic-bezier(.22,1,.36,1)}.planet img{display:none;width:100%;height:auto}.planet img.is-shown{display:block}.planet:hover{transform:scale(1.045)}.planet:active{transform:scale(.99)}.planet-l{width:calc(143 * var(--u));left:calc(-69.5 * var(--u));top:calc(-38.3 * var(--u))}.planet-r{width:calc(143 * var(--u));right:calc(-64.7 * var(--u));top:calc(-40.6 * var(--u))}.label{position:absolute;top:calc(33 * var(--u));font-family:var(--font-serif);font-weight:400;font-size:calc(17.8 * var(--u));letter-spacing:calc(4.6 * var(--u));line-height:1;white-space:nowrap}.label-l{left:calc(111 * var(--u))}.label-r{right:calc(104 * var(--u))}
-.scroll{position:absolute;z-index:4;left:50%;margin-left:calc((-48 - (var(--gutter) / 2)) * var(--u));bottom:calc(68 * var(--u));width:calc(96 * var(--u));height:calc(96 * var(--u));border-radius:50%;background:#181e2ab3;backdrop-filter:blur(calc(6 * var(--u)));border:0;display:flex;align-items:center;justify-content:center;cursor:pointer}.scroll svg{width:calc(20 * var(--u));height:calc(25 * var(--u));display:block}
-:is(.scroll,.links a,.cta a,.logo,.burger):focus-visible{outline:calc(2 * var(--u)) solid var(--cyan);outline-offset:calc(3 * var(--u))}.planet:focus-visible{outline:calc(2 * var(--u)) solid var(--cyan);outline-offset:calc(6 * var(--u));border-radius:50%}
-/* A — collapse navigation */
-@media(max-width:1030px),(max-height:620px){.navrow{left:calc(25 * var(--u));right:calc(25 * var(--u))}.burger{display:flex}.links{position:absolute;top:calc(96 * var(--u));right:0;z-index:5;width:min(calc(324 * var(--u)),calc(100vw - 50 * var(--u)));flex-direction:column;align-items:stretch;padding:calc(12 * var(--u));border-radius:calc(20 * var(--u));background:#09152ad6;backdrop-filter:blur(calc(18 * var(--u)));border:calc(1 * var(--u)) solid #ffffff24;box-shadow:0 calc(18 * var(--u)) calc(44 * var(--u)) #0208148c;opacity:0;visibility:hidden;transform:translateY(calc(-10 * var(--u)));transition:opacity .24s ease,transform .28s cubic-bezier(.4,0,.2,1),visibility .28s}.navrow[data-open=true] .links{opacity:1;visibility:visible;transform:none}.links a:nth-child(n){margin-left:0;height:auto;justify-content:flex-start;padding:calc(14 * var(--u)) calc(16 * var(--u));font-size:calc(19 * var(--u));letter-spacing:calc(-.6 * var(--u))}.links a+a{border-top:calc(1 * var(--u)) solid #ffffff14}.links a[aria-current=page]::after{top:auto;bottom:calc(9 * var(--u));left:calc(16 * var(--u));right:auto;width:calc(26 * var(--u));height:calc(3 * var(--u))}.links a.enroll{margin:calc(14 * var(--u)) 0 calc(2 * var(--u));width:100%;height:calc(46 * var(--u));border-radius:calc(23 * var(--u));justify-content:center;padding-top:calc(2 * var(--u));font-size:calc(18 * var(--u));letter-spacing:calc(-.4 * var(--u));border-top:0}.links a.enroll::after{content:none}}
-/* B — tablet */
-@media(min-width:580px) and (max-width:1030px) and (min-height:621px){:root{--gutter:0;--u:min(max(min(.85px,calc(100vh / 780)),min(calc(100vw / 900),calc(100vh / 1163))),1.15px);--dh-px:calc(1120 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .38)}@supports(height:100dvh){:root{--u:min(max(min(.85px,calc(100dvh / 780)),min(calc(100vw / 900),calc(100dvh / 1163))),1.15px);--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .38)}}.navbar::after{left:calc(25 * var(--u));right:calc(25 * var(--u))}p.lede br{display:none}p.lede{max-width:calc(620 * var(--u))}.label-r{right:calc(116 * var(--u))}}
-/* C — phone, including short viewports */
-@media(max-width:579px),(max-height:620px){:root{--gutter:0;--u:max(min(.92px,calc(100vh / 620)),min(calc(100vw / 430),calc(100vh / 880)));--dh-px:calc(880 * var(--u));--vshift:calc(max(0px,(100vh - var(--dh-px))) * .34)}@supports(height:100dvh){:root{--u:max(min(.92px,calc(100dvh / 620)),min(calc(100vw / 430),calc(100dvh / 880)));--vshift:calc(max(0px,(100dvh - var(--dh-px))) * .34)}}.navbar{height:calc(76 * var(--u))}.navbar::after{left:calc(24 * var(--u));right:calc(24 * var(--u));top:calc(74 * var(--u))}.navrow{left:calc(24 * var(--u));right:calc(24 * var(--u));height:calc(74 * var(--u))}.links{top:calc(84 * var(--u))}.copy{top:calc(76 * var(--u));display:flex;flex-direction:column;align-items:center;padding:calc(56 * var(--u)) calc(26 * var(--u)) 0}.col{position:static;width:100%;right:auto}.eyebrow{font-size:calc(20 * var(--u));letter-spacing:calc(5 * var(--u));text-indent:calc(5 * var(--u))}h1.title{font-size:calc(86 * var(--u));margin-top:calc(15 * var(--u))}.rule{margin-top:calc(20 * var(--u));height:calc(5 * var(--u));padding-right:0}.rule span{width:calc(84 * var(--u))}p.lede{margin-top:calc(19 * var(--u));font-size:calc(15.5 * var(--u));line-height:calc(26 * var(--u));max-width:calc(400 * var(--u));text-wrap:balance}p.lede br{display:none}.cta{top:auto;margin-top:calc(32 * var(--u));height:calc(60 * var(--u));position:relative;flex-shrink:0}.cta a{width:calc(190 * var(--u));height:calc(60 * var(--u));border-radius:calc(30 * var(--u))}.label{top:50%;transform:translateY(-50%);font-size:calc(16 * var(--u));letter-spacing:calc(4 * var(--u))}.label-l{left:calc(56 * var(--u))}.label-r{right:calc(60 * var(--u))}.planet-l{width:calc(89 * var(--u));left:calc(-44.5 * var(--u));top:calc(-17 * var(--u))}.planet-r{width:calc(89 * var(--u));right:calc(-44.5 * var(--u));top:calc(-18.3 * var(--u))}.scroll{width:calc(74 * var(--u));height:calc(74 * var(--u));margin-left:calc(-37 * var(--u));bottom:calc(49 * var(--u))}.scroll svg{width:calc(15.5 * var(--u));height:calc(19.5 * var(--u))}.orb{top:calc(590 * var(--u));width:calc(730 * var(--u));height:calc(730 * var(--u))}}
-/* D — hide lower control where space is limited */
-@media(max-height:660px){.scroll{display:none}}
-/* E — short */
-@media(max-height:620px){:root{--u:max(min(.85px,calc(100vh / 470)),min(calc(100vw / 640),calc(100vh / 560)));--dh-px:calc(560 * var(--u));--vshift:0px}.copy{padding-top:calc(26 * var(--u))}h1.title{font-size:calc(64 * var(--u));margin-top:calc(8 * var(--u))}.rule{margin-top:calc(12 * var(--u))}p.lede{margin-top:calc(12 * var(--u))}.cta{margin-top:calc(20 * var(--u))}.label{top:50%;transform:translateY(-50%);font-size:calc(15 * var(--u))}.label-l{left:calc(58 * var(--u))}.label-r{right:calc(58 * var(--u))}}@media(min-width:821px) and (max-height:660px){.copy{transform:none}}
-/* F — narrow phone, deliberately last */
-@media(max-width:500px){h1.title{font-size:min(calc(86 * var(--u)),calc((100vw - 52 * var(--u)) / 4.5))}.label{top:calc(100% + 34 * var(--u));transform:none;font-size:calc(15 * var(--u))}.label-l{left:calc(6 * var(--u))}.label-r{right:calc(6 * var(--u))}}
-@keyframes ent-reveal{from{transform:translateY(115%)}to{transform:translateY(0)}}@keyframes ent-rise{from{opacity:0;transform:translateY(var(--rise,calc(10 * var(--u))))}to{opacity:var(--settle,1);transform:none}}@keyframes ent-settle{from{opacity:0;transform:translateY(var(--rise,calc(8 * var(--u)))) scale(.965)}to{opacity:1;transform:none}}@keyframes ent-draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes ent-fade{from{opacity:0}to{opacity:1}}
-.anim{--e-expo:cubic-bezier(.16,1,.3,1);--e-quint:cubic-bezier(.22,1,.36,1);--e-slow:cubic-bezier(.4,0,.2,1)}.ent-mask,.ent-line{display:block}.anim .ent-mask{overflow:hidden;padding-top:calc(20 * var(--u));margin-top:calc(-20 * var(--u))}.anim .ent-line{transform:translateY(115%);will-change:transform}.anim .navbar::after,.anim .links a[aria-current=page]::after,.anim .rule span{transform:scaleX(0)}.anim .logo,.anim .links a,.anim .burger,.anim p.lede,.anim .label,.anim .cta a,.anim .scroll,.anim .sky{opacity:0}.anim .sky{will-change:opacity}
-.anim.play .sky{animation:ent-fade 1.6s var(--e-slow) .25s both}.anim.play .navbar::after{animation:ent-draw .9s var(--e-expo) .12s both}.anim.play .logo{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) .20s both}.anim.play .links a{--rise:calc(8 * var(--u));animation:ent-rise .55s var(--e-quint) .26s both}.anim.play .links a:nth-child(2){animation-delay:.31s}.anim.play .links a:nth-child(3){animation-delay:.36s}.anim.play .links a:nth-child(4){animation-delay:.41s}.anim.play .links a.enroll,.anim.play .burger{--rise:calc(8 * var(--u));animation:ent-settle .6s var(--e-quint) .46s both}.anim.play .links a[aria-current]::after{animation:ent-draw .55s var(--e-expo) .60s both}.anim.play .eyebrow .ent-line{animation:ent-reveal .75s var(--e-expo) .30s both}.anim.play h1.title .ent-line{animation:ent-reveal .95s var(--e-expo) .44s both}.anim.play .rule span{animation:ent-draw .65s var(--e-expo) .78s both}.anim.play p.lede{--rise:calc(12 * var(--u));animation:ent-rise .7s var(--e-quint) .86s both}.anim.play .label-l{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) 1.04s both}.anim.play .label-r{--rise:calc(8 * var(--u));animation:ent-rise .6s var(--e-quint) 1.10s both}.anim.play .cta a{--rise:calc(8 * var(--u));animation:ent-settle .7s var(--e-quint) 1.14s both}.anim.play .scroll{animation:ent-settle .6s var(--e-quint) 1.42s both}
-/* Animate artwork independently of positioning, entrance and button hover. */
-.orb img{transform-origin:50% 50%;animation:planet-spin 240s linear infinite;animation-play-state:paused}
-.atmosphere.is-active .orb img{animation-play-state:running}
-.planet img.is-shown{animation:planet-idle 12s ease-in-out infinite}
-.planet-r img.is-shown{animation-duration:15s;animation-delay:-5s}
-@keyframes planet-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-@keyframes planet-idle{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(calc(-3 * var(--u))) scale(1.012)}}
-@media(prefers-reduced-motion:reduce){.orb,.orb img,.planet img.is-shown,.atmosphere::before{animation:none!important}.planet,.links,.burger span,.atmosphere{transition:none}.planet:hover,.planet:active{transform:none}}
-/* The Guarantee's gold world; its shield stays upright, so it doesn't spin. */
-.atmosphere[data-planet=guarantee]{--glow:#9a6d1f66}.atmosphere[data-planet=guarantee] .orb img{animation:none}
-/* The official mark beside a sans wordmark (the app's Hanken Grotesk). */
-.logo{display:inline-flex;align-items:center;gap:calc(10 * var(--u));font-family:var(--font-body);font-weight:650;font-size:calc(21 * var(--u));letter-spacing:calc(-.45 * var(--u));top:0}.logo img{display:block;flex:0 0 auto;width:calc(30 * var(--u));height:calc(30 * var(--u))}.logo i{font-weight:700}
-/* Titles stay on one line on wide screens (the script fits their size) and wrap, balanced, on phones. */
-h1.title .ent-line{white-space:nowrap}
-.label{pointer-events:auto;cursor:pointer}
-@media(max-width:579px),(max-height:620px){h1.title{font-size:calc(46 * var(--u));line-height:1.08}h1.title .ent-line{white-space:normal;text-wrap:balance}}
-/* Short, cinematic titles in a narrow centred column, with the lede beneath. */
-h1.title{max-width:680px;margin:0 auto;text-wrap:balance;text-align:center;text-indent:0;font-size:clamp(2.2rem,5vw,3.4rem);letter-spacing:-0.02em;line-height:1.15}
-p.lede{max-width:540px;margin:14px auto 0;font-size:clamp(0.95rem,1.4vw,1.05rem);line-height:1.5;opacity:0.85;--settle:0.85}
-@media(max-width:579px),(max-height:620px){h1.title{margin-top:calc(15 * var(--u))}}@media(max-height:620px){h1.title{margin-top:calc(8 * var(--u))}}
-</style>
-  <script src="/theme/page-scroll-boot.js"></script>
+/* VibhavGPT homepage: a hero, a plain list of what the product does, and a call to action. Colours, radii, durations and the glass
+   material are theme tokens from /theme/vibhav.css. */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;color:var(--color-ink);font-family:var(--font-body);font-size:1.0625rem;line-height:1.55;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+img,svg{display:block;max-width:100%}
+a{color:inherit}
+h1,h2,h3,p{margin:0}
+:focus-visible{outline:2px solid var(--color-focus);outline-offset:3px;border-radius:6px}
+.skip{position:absolute;left:12px;top:-60px;z-index:100;padding:10px 14px;border-radius:12px;background:var(--color-ink);color:var(--color-paper);text-decoration:none}
+.skip:focus{top:12px}
+/* The background effect (src/splash-cursor-island.jsx): a fixed layer behind the content. The page wash is the body's ::before, also at -1;
+   this comes after it in the document, so it paints over the wash and under everything else. It takes no clicks and holds no space. */
+.splash-bg{position:fixed;inset:0;z-index:-1;pointer-events:none}
+.wrap{width:min(100% - 2*var(--page-gutter),70rem);margin-inline:auto}
+/* Buttons: the glossy primary and secondary from the theme (--gloss-*).
+   Press feedback is on pointer-down; the action commits on click. */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.45em;min-height:44px;padding:0 1.15em;border-radius:12px;border:0;font:600 .97rem/1 var(--font-body);letter-spacing:var(--tracking-small);text-decoration:none;cursor:pointer;transition:transform var(--dur-press) var(--ease-out),filter var(--dur-micro) var(--ease-out);-webkit-tap-highlight-color:transparent}
+.btn:active{transform:scale(var(--press-scale))}
+.btn-primary{background:var(--gloss-primary);box-shadow:var(--gloss-primary-edge);color:var(--color-accent-ink)}
+.btn-primary:hover{background:var(--gloss-primary-hover)}
+.btn-primary:active{filter:brightness(.94)}
+.btn-quiet{background:var(--gloss-secondary);box-shadow:var(--gloss-secondary-edge);color:var(--color-ink)}
+.btn-quiet:hover{filter:brightness(.98)}
+.btn-quiet:active{filter:brightness(.94)}
+.text-link{display:inline-flex;align-items:center;min-height:44px;color:var(--color-ink-2);font-size:.94rem;font-weight:550;text-decoration:underline;text-decoration-color:var(--color-rule-2);text-underline-offset:4px}
+.text-link:hover{color:var(--color-ink);text-decoration-color:currentColor}
 
+/* Glass (see "Material" in /theme/vibhav.css): a thin tint over a blurred,
+   saturated backdrop drawn on its own layer beneath the labels, a specular
+   rim, an inner glow and a contact shadow. lg-s, lg-m and lg-l set the
+   weight for small controls, bars, and panels. Only floating controls use it. */
+.lg{position:relative;isolation:isolate;background:var(--lg-tint);box-shadow:var(--lg-shadow)}
+.lg::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;-webkit-backdrop-filter:var(--lg-filter);backdrop-filter:var(--lg-filter);pointer-events:none}
+.lg::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;background:var(--lg-rim);-webkit-mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+.lg-s{--lg-tint:var(--lg-tint-s);--lg-filter:var(--lg-filter-s)}
+.lg-m{--lg-tint:var(--lg-tint-m);--lg-filter:var(--lg-filter-m)}
+.lg-l{--lg-tint:var(--lg-tint-l);--lg-filter:var(--lg-filter-l)}
+/* Chromium can bend the backdrop at the rim (an SVG displacement map on the
+   backdrop layer only); labels, icons and focus rings stay on top, untouched. */
+html.lens .lg-m::before{-webkit-backdrop-filter:url(#lg-lens) var(--lg-filter-m);backdrop-filter:url(#lg-lens) var(--lg-filter-m)}
+
+/* Navigation: compact, sized to its content. */
+.nav{position:fixed;top:12px;left:50%;z-index:50;translate:-50% 0;display:flex;align-items:center;gap:2px;width:max-content;max-width:calc(100% - 24px);white-space:nowrap;padding:5px 5px 5px 12px;border-radius:999px;color:var(--color-ink);--veil:color-mix(in srgb,var(--color-paper-2) 45%,transparent);background-image:linear-gradient(var(--veil),var(--veil))}
+/* A firmer glass than the shared bar weight: on a narrow screen the hero's bright logo passes under the bar and must not lift the labels' background. It is a veil over the shared tint, not a replacement for the tint token, so "solid" appearance, reduced transparency, more contrast and no backdrop support (which all switch that token to an opaque surface) still give the plain solid bar. */
+.brand{display:inline-flex;align-items:center;gap:8px;margin-right:6px;font-weight:700;font-size:1rem;letter-spacing:-.02em;text-decoration:none;min-height:40px}
+.brand img{width:22px;height:22px}
+.nav-links{display:flex;align-items:center}
+.nav-links a{display:inline-flex;align-items:center;min-height:38px;padding:0 11px;border-radius:999px;color:var(--color-ink-2);font-size:.92rem;font-weight:550;text-decoration:none;transition:background-color var(--dur-press) var(--ease-out),color var(--dur-press) var(--ease-out)}
+.nav-links a:hover{background:color-mix(in srgb,var(--color-ink) 8%,transparent);color:var(--color-ink)}
+.nav .btn{min-height:36px;margin-left:4px;padding:0 .95em;border-radius:999px;font-size:.9rem}
+.avatar-chip{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--color-accent-soft);color:var(--color-ink);font-size:.8rem;font-weight:650;text-decoration:none}
+.avatar-chip[hidden]{display:none}
+.avatar-chip img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.menu-toggle{display:none;align-items:center;justify-content:center;width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:inherit;cursor:pointer}
+.menu-toggle svg{width:20px;height:20px}
+@media (max-width:760px){.nav{left:12px;right:12px;translate:none;width:auto;max-width:none}.brand{margin-right:auto}.nav-links{display:none}.menu-toggle{display:inline-flex}}
+.sheet{position:fixed;inset:66px 12px auto;z-index:49;padding:8px;border-radius:22px;transform-origin:top right;opacity:0;scale:.97;visibility:hidden;transition:opacity var(--dur-menu) var(--ease-out),scale var(--dur-menu) var(--ease-glide),visibility 0s linear var(--dur-menu)}
+.sheet[data-open]{opacity:1;scale:1;visibility:visible;transition-delay:0s}
+.sheet a{display:flex;align-items:center;min-height:48px;padding:0 14px;border-radius:14px;color:var(--color-ink);font-weight:550;text-decoration:none}
+.sheet a:hover{background:color-mix(in srgb,var(--color-ink) 7%,transparent)}
+.sheet a.btn-primary{justify-content:center;margin-top:6px;color:var(--color-accent-ink)}
+
+/* Hero ----------------------------------------------------------------- */
+.hero{position:relative;padding:clamp(6rem,11vw,8rem) 0 clamp(2.5rem,6vw,4.5rem)}
+.hero__grid{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(.5rem,3vw,2rem);align-items:center;width:min(100% - 2*var(--page-gutter),76rem);margin-inline:auto}
+.hero__copy{position:relative;z-index:1;display:grid;justify-items:start;align-content:center} /* above the logo stage, whose empty, faded edge overlaps it a little on a phone */
+.hero h1{max-width:18ch;font-size:clamp(2rem,2.4vw + 1rem,3.1rem);font-weight:600;letter-spacing:var(--tracking-title);line-height:1.12;text-wrap:balance}
+.hero__lead{max-width:32rem;margin-top:clamp(.9rem,2vw,1.25rem);color:var(--color-ink);font-size:clamp(1.02rem,.3vw + 1rem,1.15rem);line-height:1.55;text-wrap:pretty}
+.hero__note{max-width:32rem;margin-top:10px;color:var(--color-ink-2);font-size:1rem;text-wrap:pretty}
+.hero .actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px 14px;margin-top:clamp(1.25rem,3vw,1.75rem)}
+.hero .btn{min-height:48px;padding:0 1.4em;font-size:1.02rem}
+.hero__mark{position:relative;display:grid;place-items:center;height:clamp(260px,38vw,600px);order:-1;overflow:hidden;background:var(--wash-stage);-webkit-mask-image:radial-gradient(closest-side,#000 42%,transparent 98%);mask-image:radial-gradient(closest-side,#000 42%,transparent 98%)}
+.hero__mark>img{width:clamp(110px,20vw,220px);height:auto}
+@media (max-width:480px){.hero .actions{flex-wrap:nowrap;gap:10px}.hero .btn{flex:1 1 0;padding:0 .5em;font-size:.95rem;white-space:nowrap}}
+@media (max-width:899px){.hero{padding-top:clamp(4.25rem,12vw,5.5rem)}.hero__mark{height:clamp(190px,32svh,340px);margin-bottom:-1.75rem}}
+/* The stage is taller than it was, and the copy is centred against it: less padding above keeps the actions where they were. */
+@media (min-width:900px){.hero{padding-top:clamp(5rem,7vw,8rem)}.hero__grid{grid-template-columns:minmax(0,1.02fr) minmax(0,1fr)}.hero__mark{order:0}}
+
+/* Models. With script, a stage that sticks while the page scrolls (a lazy island: src/components/ui/orbit-showcase.tsx). Without
+   script, and for readers who save data, the plain list of the five models the build wrote into it. Before the stage loads, the
+   box has the stage's exact height (the whole scroll length where it will pin, one stage height where reduced motion keeps it from
+   pinning) and clips anything taller, so the page is the same size before and after and nothing below it moves. The list is taller
+   than one stage on a phone, which is why this is a height and not a minimum. The box is released when the stage is live, still, or
+   failed to load, and the list then shows in full. */
+.orbits{position:relative;padding:clamp(1.5rem,4vw,3rem) 0 0;scroll-margin-top:70px}
+.orbits__head h2{font-size:clamp(1.4rem,.8vw + 1.2rem,1.75rem);font-weight:600;letter-spacing:var(--tracking-title)}
+.orbits__head p{margin-top:.5rem;max-width:40rem;color:var(--color-ink-2)}
+.orbits__stage{position:relative;margin-top:clamp(.5rem,2vw,1rem)}
+.orbits__list,.orbits__actions{width:min(100% - 2*var(--page-gutter),70rem);margin-inline:auto}
+.orbits__list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,19rem),1fr));gap:clamp(.75rem,2vw,1.25rem);margin-block:0;padding:0;list-style:none}
+.orbits__item{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;min-width:0;padding:16px;border-radius:16px;border:1px solid var(--color-rule);background:var(--color-paper-3)}
+.orbits__orb{width:96px;height:96px;object-fit:contain}
+.orbits__copy{display:grid;gap:6px;min-width:0}
+.orbits__copy h3{font-size:1.05rem;font-weight:600;letter-spacing:var(--tracking-title)}
+.orbits__copy p{margin:0;font-size:.95rem;line-height:1.45}
+.orbits__meta{color:var(--color-ink-2);font-weight:550}
+.orbits__allow{color:var(--color-muted);font-size:.88rem!important}
+.orbits__actions{display:flex;flex-wrap:wrap;gap:12px;margin-block:clamp(1rem,2.5vw,1.5rem) 0}
+html.presenting:not(.save-data) .orbits__stage:not([data-home-effect-state="live"]):not([data-home-effect-state="failed"]):not([data-home-effect-state="still"]){height:calc((100svh - 72px) * var(--orbit-track,4.5));overflow:hidden}
+@media (prefers-reduced-motion:reduce){html:not(.save-data) .orbits__stage:not([data-home-effect-state="live"]):not([data-home-effect-state="failed"]):not([data-home-effect-state="still"]){height:calc(100svh - 72px);overflow:hidden}}
+
+/* Features. Without script, the five features are cards, each with its picture, name and one line. With script (html.slideshow) they are a
+   slide show: five static slides, one showing at a time, each complete inside the frame. A slide is its picture, with its caption in a strip
+   BELOW it (never over it). Every slide sits in the same grid cell, so the frame is as tall as the tallest slide and nothing moves when the
+   slide changes. Slides change by a short crossfade; nothing inside a slide moves, and the page's own scroll does nothing to it. */
+.showcase{position:relative;padding:clamp(2.5rem,5vw,4rem) 0;scroll-margin-top:70px}
+.showcase h2{font-size:clamp(1.4rem,.8vw + 1.2rem,1.75rem);font-weight:600;letter-spacing:var(--tracking-title)}
+.presenter{margin-top:clamp(1rem,2.5vw,1.75rem)}
+.presenter__slides{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,17rem),1fr));gap:clamp(1rem,2vw,1.5rem)}
+.slide{display:grid;gap:12px;align-content:start;min-width:0;position:relative}
+:root[data-theme="light"] .slide__art--dark,:root:not([data-theme="light"]) .slide__art--light{display:none}
+html.save-data .slide__art{display:none}
+.slide__art{width:100%;height:auto;aspect-ratio:16/9;border-radius:16px;border:1px solid var(--color-rule);background:var(--color-paper-3);object-fit:cover}
+.slide__copy h3{font-size:1.05rem;font-weight:600;letter-spacing:var(--tracking-title)}
+.slide__copy h3 a{display:inline-flex;align-items:center;min-height:44px;min-width:44px;color:var(--color-ink);text-decoration:none}
+.slide__copy h3 a:hover{text-decoration:underline;text-underline-offset:4px}
+.slide__copy p{margin:0;color:var(--color-ink-2);font-size:.97rem;line-height:1.5}
+.presenter__bar{display:none}
+.slide__badge{display:none}
+
+html.slideshow .showcase{padding-bottom:3rem}
+html.slideshow .presenter{max-width:62rem;margin-inline:auto;border-radius:20px}
+html.slideshow .presenter:focus-visible{outline:2px solid var(--color-focus,var(--color-accent));outline-offset:6px}
+html.slideshow .presenter__slides{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+html.slideshow .slide{grid-area:1/1;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"art art" "badge copy";gap:12px 16px;align-items:start;opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s linear .35s;pointer-events:none}
+html.slideshow .slide[data-on],html.slideshow .presenter:not([data-ready]) .slide:first-child{opacity:1;visibility:visible;transition:opacity .35s ease,visibility 0s;pointer-events:auto}
+html.slideshow .slide__art{grid-area:art;aspect-ratio:16/9;object-fit:contain;border-radius:20px;border:1px solid var(--color-rule-2,var(--color-rule));box-shadow:var(--shadow-md)}
+html.slideshow .slide__badge{grid-area:badge;display:inline-flex;align-items:center;gap:8px;align-self:start;justify-self:start;margin-top:6px;padding:6px 14px 6px 12px;border-radius:999px;background:var(--color-paper-2);border:1px solid var(--color-rule);color:var(--color-ink);font-size:.85rem;font-weight:600;line-height:1.2;white-space:nowrap}
+html.slideshow .slide__badge-dot{width:8px;height:8px;border-radius:50%;background:var(--color-accent)}
+html.slideshow .slide__copy{grid-area:copy;min-width:0;padding:0}
+html.slideshow .presenter__bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;min-width:0;margin-top:10px}
+@media (max-width:639px){html.slideshow .slide{grid-template-columns:minmax(0,1fr);grid-template-areas:"art" "badge" "copy";gap:10px}}
+
+.presenter__dots{display:flex;gap:2px}
+.presenter__dot{display:inline-grid;place-items:center;width:44px;height:44px;border:0;background:transparent;cursor:pointer;border-radius:50%}
+.presenter__dot::before{content:"";width:9px;height:9px;border-radius:50%;background:color-mix(in srgb,var(--color-ink) 28%,transparent)}
+.presenter__dot[aria-current="true"]::before{background:var(--color-accent);transform:scale(1.25)}
+.presenter__dot:focus-visible,.presenter__toggle:focus-visible{outline:2px solid var(--color-focus,var(--color-accent));outline-offset:2px}
+.presenter__toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 14px;border:0;border-radius:999px;background:var(--gloss-secondary);box-shadow:var(--gloss-secondary-edge);color:var(--color-ink);font:600 .92rem/1 var(--font-body);cursor:pointer}
+.presenter__toggle svg{width:14px;height:14px}
+/* Reduced motion: no autoplay and no fade. The reader moves through the slides with the dots, so there is nothing to pause. */
+@media (prefers-reduced-motion:reduce){html.slideshow .slide,html.slideshow .slide[data-on]{transition:none}.presenter__toggle{display:none}}
+.cta{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px 20px;margin-top:clamp(1.75rem,4vw,2.75rem)}
+.cta p{color:var(--color-ink-2)}
+@media (prefers-reduced-motion:reduce){*:not([data-home-effect] *),*::before,*::after{transition-duration:.01ms!important;animation:none!important}}
+</style>
 <title>VibhavGPT: Private AI Chat, Image Creation and Study</title>
     <meta name="description" content="Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.">
     <meta name="robots" content="index, follow, max-image-preview:large">
@@ -102,95 +176,229 @@ p.lede{max-width:540px;margin:14px auto 0;font-size:clamp(0.95rem,1.4vw,1.05rem)
     <meta name="twitter:title" content="VibhavGPT: Private AI Chat, Image Creation and Study">
     <meta name="twitter:description" content="Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.">
     <script id="vibhavgpt-structured-data" type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vibhavgpt.com/#organization","name":"Pansophy LLC","alternateName":"VibhavGPT","url":"https://vibhavgpt.com/home","logo":"https://vibhavgpt.com/brand/vibhavgpt-icon-512.png","email":"support@pansophy.com","founder":{"@type":"Person","@id":"https://vibhavgpt.com/#founder","name":"Vibhav Thoota","jobTitle":"Founder"}},{"@type":"WebSite","@id":"https://vibhavgpt.com/#website","name":"VibhavGPT","url":"https://vibhavgpt.com/","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}},{"@type":"SoftwareApplication","@id":"https://vibhavgpt.com/#software","name":"VibhavGPT","url":"https://vibhavgpt.com/home","applicationCategory":"ProductivityApplication","operatingSystem":"Web, Android","publisher":{"@id":"https://vibhavgpt.com/#organization"},"creator":{"@id":"https://vibhavgpt.com/#founder"}}]}</script>
+  <link rel="stylesheet" href="/theme/site-footer.css" />
 </head>
 <body>
-<main class="stage" id="features">
- <div class="sky" aria-hidden="true">
-  <div class="stars"></div>
-  <div class="atmosphere is-active" data-planet="earth"><div class="orb"><img src="/planets/earth.webp" alt=""></div></div>
-  <div class="atmosphere" data-planet="guarantee"><div class="orb"><img src="/planets/guarantee.svg" alt=""></div></div>
-  <div class="atmosphere" data-planet="venus"><div class="orb"><img src="/planets/venus.webp" alt=""></div></div>
-  <div class="atmosphere" data-planet="mars"><div class="orb"><img src="/planets/mars.webp" alt=""></div></div>
- </div>
- <div class="ui">
-  <header class="navbar"><div class="navrow">
-   <a class="logo" href="/home"><img src="/brand/vibhavgpt-icon-64.png" srcset="/brand/vibhavgpt-icon-64.png 1x, /brand/vibhavgpt-icon-192.png 3x" width="30" height="30" alt=""><span>Vibhav<i>GPT</i></span></a>
-   <nav class="links" id="site-nav" aria-label="Main navigation"><a href="#features" aria-current="page">Features</a><a href="/pricing">Pricing</a><a href="/app" id="nav-signin">Sign in</a><a class="avatar-chip" href="/app" id="nav-avatar" aria-label="Open your workspace" hidden></a><a class="enroll" href="/signup" id="nav-enroll">Get Started</a></nav>
-   <button class="burger" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-nav"><span></span><span></span><span></span></button>
-  </div></header>
-  <div class="copy">
-   <div class="col eyebrow"><span class="ent-mask"><span class="ent-line">WORKSPACE</span></span></div>
-   <h1 class="col title" aria-live="polite"><span class="ent-mask"><span class="ent-line">ALL-IN-ONE AI</span></span></h1>
-   <div class="col rule"><span></span></div>
-   <p class="col lede">Private AI chat, image creation, and interactive study tools.</p>
-   <div class="col cta">
-    <button class="planet planet-l" type="button" data-slot="l" aria-label="Show STUDY"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="guarantee" src="/planets/guarantee.svg" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" class="is-shown" src="/planets/mars.webp" alt=""></button>
-    <button class="planet planet-r" type="button" data-slot="r" aria-label="Show GUARANTEE"><img data-planet="earth" src="/planets/earth.webp" alt=""><img data-planet="guarantee" class="is-shown" src="/planets/guarantee.svg" alt=""><img data-planet="venus" src="/planets/venus.webp" alt=""><img data-planet="mars" src="/planets/mars.webp" alt=""></button>
-    <a href="/signup">GET STARTED</a><span class="label label-l">STUDY</span><span class="label label-r">GUARANTEE</span>
+<div class="splash-bg" data-home-effect="splash-cursor" aria-hidden="true"></div>
+<a class="skip" href="#main">Skip to content</a>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+ <!-- The rim lens: pushes the backdrop outward near the edges, as curved
+      glass would. Used only on a backdrop layer, never on labels. -->
+ <filter id="lg-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+  <feImage result="map" preserveAspectRatio="none" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' preserveAspectRatio='none'%3E%3ClinearGradient id='x'%3E%3Cstop offset='0' stop-color='%23f00'/%3E%3Cstop offset='.12' stop-color='%23800'/%3E%3Cstop offset='.88' stop-color='%23800'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3ClinearGradient id='y' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%230f0'/%3E%3Cstop offset='.24' stop-color='%23080'/%3E%3Cstop offset='.76' stop-color='%23080'/%3E%3Cstop offset='1' stop-color='%23000'/%3E%3C/linearGradient%3E%3Crect width='100' height='100' fill='url(%23x)'/%3E%3Crect width='100' height='100' fill='url(%23y)' style='mix-blend-mode:screen'/%3E%3C/svg%3E"/>
+  <feDisplacementMap in="SourceGraphic" in2="map" scale="12" xChannelSelector="R" yChannelSelector="G"/>
+ </filter>
+</svg>
+<header class="nav lg lg-m" id="top-nav">
+ <a class="brand" href="/home"><img src="/brand/vibhavgpt-icon-64.png" srcset="/brand/vibhavgpt-icon-64.png 1x, /brand/vibhavgpt-icon-192.png 3x" width="22" height="22" alt=""><span>VibhavGPT</span></a>
+ <nav class="nav-links" aria-label="Main navigation">
+  <a href="/pricing">Pricing</a><a href="/apps">Apps</a><a href="/guarantee">Guarantee</a><a href="/app" id="nav-signin">Sign in</a><a class="avatar-chip" href="/app" id="nav-avatar" hidden aria-label="Open your workspace"></a>
+ </nav>
+ <a class="btn btn-primary" href="/signup" id="nav-enroll">Get started</a>
+ <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-sheet" aria-label="Open menu"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6.5h14M3 13.5h14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>
+</header>
+<div class="sheet lg lg-l" id="site-sheet" aria-label="Menu" hidden>
+ <a href="/pricing">Pricing</a><a href="/apps">Apps</a><a href="/guarantee">Guarantee</a><a href="/app" id="sheet-signin">Sign in</a>
+ <a class="btn btn-primary" href="/signup" id="sheet-enroll">Get started</a>
+</div>
+
+<main id="main">
+ <section class="hero" aria-labelledby="hero-title">
+  <div class="hero__grid">
+   <div class="hero__copy">
+    <h1 id="hero-title">AI chat, study tools and image creation.</h1>
+    <p class="hero__lead">Ask questions, make images, study with flashcards and quizzes, and get diagrams drawn in the reply. It is one private website and app.</p>
+    <p class="hero__note">Free to start. We never train on your chats, sell your data, or show ads.</p>
+    <div class="actions">
+     <a class="btn btn-primary" href="/signup" id="hero-start">Get started free</a>
+     <a class="btn btn-quiet" href="#showcase" id="hero-explore">Explore features</a>
+    </div>
    </div>
+   <div class="hero__mark" data-home-effect="logo-reveal"><img src="/brand/vibhavgpt-icon-512.png" width="512" height="512" alt="VibhavGPT" decoding="async"></div>
   </div>
- </div>
- <button class="scroll" type="button" aria-label="Explore next feature"><svg viewBox="0 0 26 33" fill="none" aria-hidden="true"><path d="M13 1.5 V31.5 M1.9 20.4 L13 31.5 L24.1 20.4" stroke="#fff" stroke-width="3" stroke-linecap="square"/></svg></button>
-<footer style="position:fixed;bottom:12px;left:0;right:0;text-align:center;font-size:12px;color:rgba(255,255,255,.55);z-index:50;pointer-events:none">Made by Vibhav Thoota · <a href="https://github.com/Shourya-Thoota/vibhavgpt" target="_blank" rel="noopener noreferrer" style="color:inherit;pointer-events:auto;cursor:pointer">Source code</a></footer>
+ </section>
+
+ <section class="orbits" id="models" aria-labelledby="models-title">
+  <div class="wrap orbits__head">
+   <h2 id="models-title">Models</h2>
+   <p>Seven VibhavGPT models, each made for a different kind of work.</p>
+  </div>
+  <!-- The interactive stage loads here when it is about to be seen (src/orbit-showcase-island.jsx). The build writes the same five
+       models into it as a plain list (scripts/prerender-public.js), which stays for crawlers, readers without script and readers
+       saving data. --orbit-track is the stage's scroll length in stage heights; a test keeps it equal to the component's. -->
+  <div class="orbits__stage" data-home-effect="orbit-showcase" style="--orbit-track:5.2"><!-- orbit-showcase --></div>
+ </section>
+
+ <section class="showcase" id="showcase" aria-labelledby="showcase-title">
+  <div class="wrap">
+   <h2 id="showcase-title">Features</h2>
+   <div class="presenter" id="presenter" role="group" aria-roledescription="carousel" aria-label="VibhavGPT features" tabindex="0">
+    <div class="presenter__slides" aria-live="off">
+    <article class="slide" id="slide-chat" data-i="0">
+     <span class="slide__badge"><span class="slide__badge-dot" aria-hidden="true"></span>Chat</span>
+     <img class="slide__art slide__art--dark" src="/home/artwork/chat-dark.webp" width="1280" height="720" alt="A VibhavGPT conversation about Jupiter's moons, with a table and a short code example." loading="lazy" decoding="async"><img class="slide__art slide__art--light" src="/home/artwork/chat-light.webp" width="1280" height="720" alt="A VibhavGPT conversation about Jupiter's moons, with a table and a short code example." loading="lazy" decoding="async">
+     <div class="slide__copy"><h3><a href="/app/chat">Chat</a></h3><p>Ask a question and read the answer in a conversation.</p></div>
+    </article>
+    <article class="slide" id="slide-image" data-i="1">
+     <span class="slide__badge"><span class="slide__badge-dot" aria-hidden="true"></span>Images</span>
+     <img class="slide__art slide__art--dark" src="/home/artwork/image-dark.webp" width="1280" height="720" alt="An image made from a written description." loading="lazy" decoding="async"><img class="slide__art slide__art--light" src="/home/artwork/image-light.webp" width="1280" height="720" alt="An image made from a written description." loading="lazy" decoding="async">
+     <div class="slide__copy"><h3><a href="/pricing">Image creation</a></h3><p>Describe a picture and see it made. Included with Plus and Pro.</p></div>
+    </article>
+    <article class="slide" id="slide-study" data-i="2">
+     <span class="slide__badge"><span class="slide__badge-dot" aria-hidden="true"></span>Study</span>
+     <img class="slide__art slide__art--dark" src="/home/artwork/study-dark.webp" width="1280" height="720" alt="A flashcard in Study." loading="lazy" decoding="async"><img class="slide__art slide__art--light" src="/home/artwork/study-light.webp" width="1280" height="720" alt="A flashcard in Study." loading="lazy" decoding="async">
+     <div class="slide__copy"><h3><a href="/app/study">Study</a></h3><p>Make flashcards and a quiz from an answer.</p></div>
+    </article>
+    <article class="slide" id="slide-diagrams" data-i="3">
+     <span class="slide__badge"><span class="slide__badge-dot" aria-hidden="true"></span>Diagrams</span>
+     <img class="slide__art slide__art--dark" src="/home/artwork/diagrams-dark.webp" width="1280" height="720" alt="A diagram drawn in a reply." loading="lazy" decoding="async"><img class="slide__art slide__art--light" src="/home/artwork/diagrams-light.webp" width="1280" height="720" alt="A diagram drawn in a reply." loading="lazy" decoding="async">
+     <div class="slide__copy"><h3><a href="/app/chat">Diagrams</a></h3><p>Ask for a diagram and it appears in the reply.</p></div>
+    </article>
+    <article class="slide" id="slide-guarantee" data-i="4">
+     <span class="slide__badge"><span class="slide__badge-dot" aria-hidden="true"></span>The VibhavGPT Guarantee</span>
+     <img class="slide__art slide__art--dark" src="/home/artwork/guarantee-dark.webp" width="1280" height="720" alt="The VibhavGPT Guarantee." loading="lazy" decoding="async"><img class="slide__art slide__art--light" src="/home/artwork/guarantee-light.webp" width="1280" height="720" alt="The VibhavGPT Guarantee." loading="lazy" decoding="async">
+     <div class="slide__copy"><h3><a href="/guarantee">The VibhavGPT Guarantee</a></h3><p>We never train on your chats, sell your data, or show ads.</p></div>
+    </article>
+    </div>
+    <div class="presenter__bar">
+     <div class="presenter__dots" role="group" aria-label="Choose a feature">
+      <button type="button" class="presenter__dot" aria-label="Show Chat"></button><button type="button" class="presenter__dot" aria-label="Show Image creation"></button><button type="button" class="presenter__dot" aria-label="Show Study"></button><button type="button" class="presenter__dot" aria-label="Show Diagrams"></button><button type="button" class="presenter__dot" aria-label="Show The VibhavGPT Guarantee"></button>
+     </div>
+     <button type="button" class="presenter__toggle" aria-pressed="false"><svg viewBox="0 0 14 14" fill="currentColor" aria-hidden="true"><rect x="2" y="1.5" width="3.5" height="11" rx="1"/><rect x="8.5" y="1.5" width="3.5" height="11" rx="1"/></svg><span>Pause</span></button>
+    </div>
+   </div>
+   <div class="cta"><p>You can start on the free plan.</p><a class="btn btn-primary" href="/signup">Get started free</a></div>
+  </div>
+ </section>
 </main>
+
+<!-- site-footer:start --><footer class="site-footer"><div class="site-footer__brand"><a class="site-footer__mark" href="/home"><img src="/brand/vibhavgpt-icon-64.png" alt="" width="24" height="24" /><span>VibhavGPT</span></a><p>Operated by Pansophy LLC.</p><a class="site-footer__support" href="mailto:support@pansophy.com">support@pansophy.com</a></div><nav class="site-footer__links" aria-label="Site"><ul><li><a href="/guarantee">The VibhavGPT Guarantee</a></li><li><a href="/privacy">Privacy Policy</a></li><li><a href="/terms">Terms of Service</a></li><li><a href="/account-deletion">Account deletion</a></li><li><a href="https://github.com/Shourya-Thoota/vibhavgpt" target="_blank" rel="noopener noreferrer" aria-label="Source code (opens in a new tab)">Source code</a></li></ul></nav><nav class="site-footer__social" aria-label="VibhavGPT on social media"><ul><li><a href="https://www.youtube.com/@vibhavthoota" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on YouTube, @vibhavthoota (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5.5" width="18" height="13" rx="4"/><path d="m10.5 9.5 4 2.5-4 2.5z"/></svg><span>YouTube</span></a></li><li><a href="https://www.instagram.com/vibhavgpt.ai/" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on Instagram, @vibhavgpt.ai (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.75"/><path d="M17 7h.01"/></svg><span>Instagram</span></a></li><li><a href="https://x.com/VibhavGPT" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on X, @VibhavGPT (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 4h4.2l10.8 16h-4.2z"/><path d="M19.5 4 13.3 11.1M4.5 20l6.2-7.1"/></svg><span>X</span></a></li><li><a href="https://bsky.app/profile/vibhavgpt.bsky.social" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on Bluesky, @vibhavgpt.bsky.social (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 11.2C10.6 8.4 7.3 4.7 4.8 4.2 3.6 4 3 4.6 3 5.8c0 1.1.5 4.5.9 5.4.8 1.9 3 2.4 5 2.1-3 .6-4.6 2.3-2.4 4.5 2.4 2.4 4.4.2 5.5-3 1.1 3.2 3.1 5.4 5.5 3 2.2-2.2.6-3.9-2.4-4.5 2 .3 4.2-.2 5-2.1.4-.9.9-4.3.9-5.4 0-1.2-.6-1.8-1.8-1.6-2.5.5-5.8 4.2-7.2 7z"/></svg><span>Bluesky</span></a></li><li><a href="https://www.reddit.com/user/Cool-Issue-2311/" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on Reddit, u/Cool-Issue-2311 (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><ellipse cx="12" cy="14" rx="7.5" ry="5.5"/><path d="M9.5 16.3c1.5.9 3.5.9 5 0"/><path d="m12 8.5 1.1-4.3 3.6.9"/><circle cx="18" cy="5.4" r="1.1"/><path d="M9 13.2h.01M15 13.2h.01"/></svg><span>Reddit</span></a></li><li><a href="https://www.threads.net/@vibhavgpt.ai" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on Threads, @vibhavgpt.ai (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16.6 10.6c-.3-2.6-2-4.1-4.5-4.1-2.3 0-3.9 1.3-4.4 3.3"/><path d="M15.5 11.4c-1.4-.6-3.4-.7-4.8-.2-1.4.5-2 1.6-1.8 2.7.3 1.4 1.8 2.1 3.4 2 2.4-.2 3.6-1.8 3.6-5.1 0-4.5-2-7.3-6-7.3S4 6.6 4 12s2.6 8.3 7.9 8.3c3.3 0 5.6-1.3 6.8-3.6.9-1.9.5-4.1-1.1-5.3"/></svg><span>Threads</span></a></li><li><a href="https://github.com/Shourya-Thoota" target="_blank" rel="noopener noreferrer" aria-label="VibhavGPT on GitHub, @Shourya-Thoota (opens in a new tab)"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 19c-4 1.3-4-2-5.5-2.5M14.5 21v-3.4c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.7 11.7 0 0 0-6.2 0C6.1 3 5.1 3.3 5.1 3.3a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.7 9.6c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg><span>GitHub</span></a></li></ul></nav><p class="site-footer__credit">Made by Vibhav Thoota</p></footer><!-- site-footer:end -->
+
 <script>
 (() => {
- // This is a static page with no framework and no session state of its own,
- // so the nav always started rendered as signed-out ("Sign in" / "Get
- // Started") — it never checked whether the visitor actually had a session,
- // which is the bug: a signed-in visitor landing here always saw "Sign in".
- //
- // Fired as the very first thing on the page (ahead of the entrance
- // animation, which takes >=500ms — see the bottom of this file) specifically
- // so the real race condition is closed: the check finishing *after* the nav
- // has already been shown to the visitor. That ordering is fine — the
- // markup's default (signed-out) is a safe first paint — as long as the DOM
- // is actually corrected once the answer comes back, which is what needs
- // verifying here, not just "does a request get sent."
- //
- // api.<host> because this file is a static asset with no build step, so it
- // can't read VITE_API_URL the way the React app does; every other page on
- // this domain resolves the API the same way (see api.vibhavgpt.com in the
- // deployed Caddy/Railway config). Falls back to a relative path so this
- // still works against the local Vite dev proxy (see vite.config.js).
+ // The nav starts signed-out, which is a safe first paint. A visitor with a
+ // session gets "Open workspace" once /api/me answers. This static file has no
+ // build step, so it resolves the API host the way the other static pages do.
  const apiBase = /^(localhost|127\.0\.0\.1)$/.test(location.hostname) ? "" : `https://api.${location.hostname.replace(/^www\./, "")}`;
  fetch(`${apiBase}/api/me`, { credentials: "include", cache: "no-store" })
-  .then(response => (response.ok ? response.json() : null))
-  .then(data => {
+  .then((response) => (response.ok ? response.json() : null))
+  .then((data) => {
    const user = data?.user;
-   if (!user) return; // Genuinely signed out (or the check failed) — the default markup is already correct for this case.
+   if (!user) return;
+   // The accent saved to the account, so the page shows the same colours as the app on every device. Only a known id is applied.
+   if (/^(cerulean|nebula|ember|pine|amber)$/.test(user.accent || "")) {
+    document.documentElement.setAttribute("data-accent", user.accent);
+    try { localStorage.setItem("vibhavgpt-accent", user.accent); } catch (error) { /* storage blocked */ }
+   }
    const displayName = user.name?.trim() || user.email.split("@")[0];
-   const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]).join("").toUpperCase();
-   const signIn = document.getElementById("nav-signin");
+   const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
+   document.getElementById("nav-signin")?.remove();
    const avatar = document.getElementById("nav-avatar");
+   if (avatar) {
+    avatar.textContent = initials || "V";
+    avatar.hidden = false;
+    // The picture the person uploaded, else the Google photo the server vouched for. The initials stay underneath if it fails.
+    const source = user.pictureVersion ? `${apiBase}/api/profile/picture?v=${encodeURIComponent(user.pictureVersion)}` : (typeof user.image === "string" ? user.image : "");
+    if (source) {
+     const photo = document.createElement("img");
+     photo.alt = ""; photo.width = 36; photo.height = 36; photo.referrerPolicy = "no-referrer"; photo.decoding = "async";
+     photo.addEventListener("error", () => photo.remove());
+     photo.src = source;
+     avatar.append(photo);
+    }
+   }
    const enroll = document.getElementById("nav-enroll");
-   if (signIn) signIn.remove();
-   if (avatar) { avatar.textContent = initials || "V"; avatar.hidden = false; }
    if (enroll) { enroll.textContent = "Open workspace"; enroll.href = "/app"; }
+   const sheetSignin = document.getElementById("sheet-signin");
+   if (sheetSignin) sheetSignin.hidden = true;
+   const sheetEnroll = document.getElementById("sheet-enroll");
+   if (sheetEnroll) { sheetEnroll.textContent = "Open workspace"; sheetEnroll.href = "/app"; }
   })
-  .catch(() => {}); // Network hiccup: leave the safe signed-out default in place.
-})();
-</script>
-<script type="application/json" id="carousel-slides">{"order":["earth","guarantee","venus","mars"],"slides":{"earth":{"label":"WHAT IT IS","badge":"WORKSPACE","title":"ALL-IN-ONE AI","lede":"Private AI chat, image creation, and interactive study tools."},"guarantee":{"label":"GUARANTEE","badge":"PRIVACY","title":"OUR GUARANTEE","lede":"No training on your chats, no data selling, and no ads. Complete privacy by design."},"venus":{"label":"IMAGE","badge":"VISUALS","title":"IMAGE CREATION","lede":"Turn descriptions, ideas, and study notes into visual art."},"mars":{"label":"STUDY","badge":"LEARNING","title":"STUDY TOOLS","lede":"3D flippable flashcards and instant-feedback quizzes with score tracking."}}}</script>
-<script>
-(() => {
- // The four slides, in order (the #carousel-slides block above): What It Is
- // over Earth, the VibhavGPT Guarantee, Image and Study. The planets beside
- // the button, their labels and the arrow keys move one step either way,
- // wrapping round.
- const SLIDES=JSON.parse(document.getElementById('carousel-slides').textContent);const ORDER=SLIDES.order;const data=SLIDES.slides;
- const slots=[...document.querySelectorAll('.planet')];let featured=null;
- const titleBox=document.querySelector('h1.title'),titleLine=titleBox.querySelector('.ent-line'),narrow=matchMedia('(max-width:579px),(max-height:620px)');
- function fitTitle(){titleLine.style.fontSize='';if(narrow.matches)return;const range=document.createRange();range.selectNodeContents(titleLine);const need=range.getBoundingClientRect().width,room=titleBox.clientWidth*0.94;if(need>room&&need>0)titleLine.style.fontSize=(parseFloat(getComputedStyle(titleBox).fontSize)*room/need)+'px';}
- function adjacent(direction){return ORDER[(ORDER.indexOf(featured)+direction+ORDER.length)%ORDER.length];}
- function show(next){if(!data[next]||featured===next)return;featured=next;document.querySelectorAll('.atmosphere').forEach(el=>el.classList.toggle('is-active',el.dataset.planet===next));document.querySelector('.eyebrow .ent-line').textContent=data[next].badge;document.querySelector('h1 .ent-line').textContent=data[next].title;document.querySelector('.lede').textContent=data[next].lede;fitTitle();slots.forEach(slot=>{const preview=adjacent(slot.dataset.slot==='l'?-1:1);slot.querySelectorAll('img').forEach(img=>img.classList.toggle('is-shown',img.dataset.planet===preview));slot.dataset.planet=preview;slot.setAttribute('aria-label','Show '+data[preview].label);document.querySelector('.label-'+slot.dataset.slot).textContent=data[preview].label;});}
- // All nine image nodes retain their original src; decode up front for same-frame swaps.
- const images=[...document.images];const decoded=Promise.all(images.map(img=>img.decode().catch(()=>{})));
- slots.forEach(slot=>slot.addEventListener('click',()=>show(adjacent(slot.dataset.slot==='l'?-1:1))));document.querySelector('.scroll').addEventListener('click',()=>show(adjacent(1)));document.querySelectorAll('.label').forEach(label=>label.addEventListener('click',()=>show(adjacent(label.classList.contains('label-l')?-1:1))));document.addEventListener('keydown',e=>{if(e.defaultPrevented||e.altKey||e.ctrlKey||e.metaKey||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target?.tagName??''))return;if(e.key==='ArrowRight'){e.preventDefault();show(adjacent(1));}if(e.key==='ArrowLeft'){e.preventDefault();show(adjacent(-1));}});addEventListener('resize',fitTitle);document.fonts?.ready.then(fitTitle);show('earth');
- const nav=document.querySelector('.navrow'),menu=document.querySelector('.links'),burger=document.querySelector('.burger');function setMenu(open){nav.dataset.open=String(open);burger.setAttribute('aria-expanded',String(open));burger.setAttribute('aria-label',open?'Close navigation':'Open navigation');}setMenu(false);burger.addEventListener('click',e=>{e.stopPropagation();setMenu(nav.dataset.open!=='true');});document.addEventListener('click',e=>{if(!menu.contains(e.target)&&!burger.contains(e.target))setMenu(false);});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&nav.dataset.open==='true'){setMenu(false);burger.focus();}});menu.addEventListener('click',e=>{if(e.target.closest('a'))setMenu(false);});
- let seed=218;const stars=document.querySelector('.stars');for(let i=0;i<85;i++){seed=(seed*16807)%2147483647;const x=seed%10000/100;seed=(seed*16807)%2147483647;const y=seed%10000/100;const star=document.createElement('i');star.className='star';star.style.cssText=`left:${x}%;top:${y}%;--s:${i%9===0?2:1};--a:${.12+(i%5)*.08}`;stars.append(star);}
- if(!matchMedia('(prefers-reduced-motion: reduce)').matches){document.documentElement.classList.add('anim');let started=false;const start=()=>{if(started)return;started=true;requestAnimationFrame(()=>requestAnimationFrame(()=>{document.documentElement.classList.add('play');setTimeout(()=>document.documentElement.classList.remove('anim','play'),2150);}));};Promise.race([Promise.all([document.fonts.ready,decoded]),new Promise(resolve=>setTimeout(resolve,500))]).then(start);}
-})();
-</script>
-</body></html>
+  .catch(() => {});
 
+ // Mobile menu: opens from the bar, closes on Escape, a link or outside, and
+ // returns focus to the button.
+ const toggle = document.querySelector(".menu-toggle");
+ const sheet = document.getElementById("site-sheet");
+ const setOpen = (open, returnFocus = true) => {
+  sheet.toggleAttribute("data-open", open);
+  sheet.toggleAttribute("hidden", !open);
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
+  if (open) sheet.querySelector("a")?.focus();
+  else if (returnFocus) toggle.focus();
+ };
+ toggle.addEventListener("click", () => setOpen(!sheet.hasAttribute("data-open")));
+ sheet.addEventListener("click", (event) => { if (event.target.closest("a")) setOpen(false, false); });
+ document.addEventListener("keydown", (event) => { if (event.key === "Escape" && sheet.hasAttribute("data-open")) setOpen(false); });
+ document.addEventListener("click", (event) => { if (sheet.hasAttribute("data-open") && !sheet.contains(event.target) && !toggle.contains(event.target)) setOpen(false, false); });
+ window.addEventListener("resize", () => { if (window.innerWidth >= 768 && sheet.hasAttribute("data-open")) setOpen(false, false); });
+
+ // Rim lens: Chromium can filter a backdrop through SVG. Other engines keep
+ // the same material without the bent edge.
+ if (navigator.userAgentData?.brands?.some((brand) => /Chromium/.test(brand.brand))) document.documentElement.classList.add("lens");
+
+})();
+ // Features: a slide show of five static slides. It changes slide by itself every 6 seconds, unless the reader has asked for reduced
+ // motion (then the dots are the only way on). The pause button stops and resumes it; a dot or an arrow key goes to that slide and
+ // restarts the six seconds. It also holds while the tab is hidden, while the show is off screen, on hover, and on keyboard focus.
+ // Slides are announced (aria-live) only when the reader changes them, never on autoplay. The page's scroll has no part in it.
+ (() => {
+  const presenter = document.getElementById("presenter");
+  if (!presenter) return;
+  const root = document.documentElement;
+  const frame = presenter.querySelector(".presenter__slides");
+  const slides = [...presenter.querySelectorAll(".slide")];
+  // A reader who asked to save data gets the words and no pictures (the head script sets html.save-data, which hides them before they load).
+  if (root.classList.contains("save-data")) presenter.classList.add("presenter--text");
+  const motion = matchMedia("(prefers-reduced-motion:no-preference)");
+  const INTERVAL = 6000;
+  let index = 0; let timer = 0; let paused = false; let hover = false; let focus = false; let visible = true; let bar = null; let toggle = null; let started = false;
+  const show = (next, byReader) => {
+    // Set before the change, so a screen reader announces a slide the reader chose and stays quiet for one that came by itself.
+    frame.setAttribute("aria-live", byReader ? "polite" : "off");
+    index = (next + slides.length) % slides.length;
+    slides.forEach((slide, i) => { if (i === index) slide.setAttribute("data-on", ""); else slide.removeAttribute("data-on"); slide.setAttribute("aria-hidden", i === index ? "false" : "true"); slide.toggleAttribute("inert", i !== index); });
+    if (bar) bar.querySelectorAll(".presenter__dot").forEach((dot, i) => dot.setAttribute("aria-current", i === index ? "true" : "false"));
+  };
+  const running = () => motion.matches && !paused && !hover && !focus && visible && !document.hidden;
+  const tick = () => { clearTimeout(timer); if (running()) timer = setTimeout(() => { show(index + 1, false); tick(); }, INTERVAL); };
+  const go = (next) => { show(next, true); tick(); };
+  const setToggle = () => {
+    toggle.setAttribute("aria-pressed", String(paused));
+    toggle.querySelector("span").textContent = paused ? "Play" : "Pause";
+    toggle.querySelector("svg").innerHTML = paused ? '<path d="M3 1.5v11l9-5.5z"/>' : '<rect x="2" y="1.5" width="3.5" height="11" rx="1"/><rect x="8.5" y="1.5" width="3.5" height="11" rx="1"/>';
+  };
+  const start = () => {
+    if (started) return;
+    started = true;
+    bar = presenter.querySelector(".presenter__bar");
+    toggle = bar.querySelector(".presenter__toggle");
+    presenter.setAttribute("data-ready", "");
+    bar.querySelectorAll(".presenter__dot").forEach((dot, i) => dot.addEventListener("click", () => go(i)));
+    toggle.addEventListener("click", () => { paused = !paused; setToggle(); tick(); });
+    presenter.addEventListener("pointerenter", () => { hover = true; tick(); });
+    presenter.addEventListener("pointerleave", () => { hover = false; tick(); });
+    // Only keyboard focus holds the show: a click on a dot must not freeze it.
+    presenter.addEventListener("focusin", (event) => { focus = event.target.matches(":focus-visible"); tick(); });
+    presenter.addEventListener("focusout", () => { focus = false; tick(); });
+    presenter.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowRight") { event.preventDefault(); go(index + 1); }
+      else if (event.key === "ArrowLeft") { event.preventDefault(); go(index - 1); }
+    });
+    document.addEventListener("visibilitychange", tick);
+    if ("IntersectionObserver" in window) new IntersectionObserver((entries) => { visible = entries.some((entry) => entry.isIntersecting); tick(); }, { threshold: 0.25 }).observe(presenter);
+    motion.addEventListener("change", tick);
+    show(0, false); tick();
+  };
+  // Only start once the section is near the screen, so the page's first paint is not spent on it.
+  if ("IntersectionObserver" in window) {
+   const watch = new IntersectionObserver((entries) => { if (entries.some((entry) => entry.isIntersecting)) { watch.disconnect(); start(); } }, { rootMargin: "300px 0px" });
+   watch.observe(presenter);
+  } else start();
+ })();
+
+</script>
+<!-- home-effects -->
+</body>
+</html>

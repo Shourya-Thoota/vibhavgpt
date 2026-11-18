@@ -1,23 +1,23 @@
+import { CREDIT_PURCHASE, parsePurchaseAmount, purchaseEligibility } from "../../frontend/src/flex-credits.js";
 import Stripe from "stripe";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { config } from "../config.js";
 import { logFailure } from "../security/error-log.js";
 import { db } from "../db/client.js";
 import { billingCustomers, creditLedger, subscriptions } from "../db/schema.js";
+import { planPriceProblem } from "./price-check.js";
 
 export const VALID_PRICE_LOOKUP_KEYS = new Set([
   "vibhavgpt_plus_monthly",
   "vibhavgpt_plus_yearly",
   "vibhavgpt_pro_monthly",
   "vibhavgpt_pro_yearly",
+  "vibhavgpt_max_monthly",
+  "vibhavgpt_max_yearly",
 ]);
 
-export const CREDIT_PURCHASE = Object.freeze({
-  minimumCents: 100,
-  maximumCents: 50_000,
-  creditsPerDollar: 100,
-  presets: [5, 10, 20, 50],
-});
+// The purchase terms live in one shared module, so the screens and this server always say and charge the same thing.
+export { CREDIT_PURCHASE };
 
 // The tier for one of our own price lookup keys, or null for anything else.
 // There is no default: an unknown or missing price never maps to a paid tier.
@@ -26,18 +26,41 @@ const PRICE_TIERS = new Map([
   ["vibhavgpt_plus_yearly", "plus"],
   ["vibhavgpt_pro_monthly", "pro"],
   ["vibhavgpt_pro_yearly", "pro"],
+  ["vibhavgpt_max_monthly", "max"],
+  ["vibhavgpt_max_yearly", "max"],
 ]);
-const TIER_RANK = { plus: 1, pro: 2 };
+const TIER_RANK = { plus: 1, pro: 2, max: 3 };
 
 export function tierForPriceLookupKey(priceLookupKey) {
   return PRICE_TIERS.get(priceLookupKey) ?? null;
+}
+
+// Max's first prices ($50 a month, $500 a year). On 2026-11-15 their lookup keys moved to the $49.99 and $499.90 prices, so new checkouts
+// charge those; a subscription already on a first price keeps it (Stripe never moves it), and is still known as Max, by its id, for
+// webhooks, the account page and plan changes.
+export const LEGACY_PRICE_LOOKUP_KEYS = Object.freeze(new Map([
+  ["price_1UZK0mEvJtB4KP3epmg81zGY", "vibhavgpt_max_monthly"],
+  ["price_1UZK0mEvJtB4KP3epTXokRWc", "vibhavgpt_max_yearly"],
+]));
+
+/** The plan key a billed price stands for: its own lookup key, or, for a price whose key moved on, the key it had. */
+export function priceLookupKeyOf(price) {
+  return price?.lookup_key || LEGACY_PRICE_LOOKUP_KEYS.get(price?.id) || "";
 }
 
 const billingInterval = (priceLookupKey) => (priceLookupKey?.endsWith("_yearly") ? "yearly" : "monthly");
 
 // The tier the provider actually bills this subscription for, or null.
 export function billedTier(subscription) {
-  return tierForPriceLookupKey(subscription?.items?.data?.[0]?.price?.lookup_key ?? "");
+  const item = subscription?.items?.data?.[0];
+  const lookupKey = priceLookupKeyOf(item?.price);
+  const fromLookup = tierForPriceLookupKey(lookupKey);
+  if (fromLookup) return fromLookup;
+  const priceId = item?.price?.id;
+  if (priceId && (priceId === config.stripeMaxPriceId || priceId === config.stripeMaxYearlyPriceId)) {
+    return "max";
+  }
+  return null;
 }
 
 // Newer provider API versions keep the billing period on the item.
@@ -118,21 +141,32 @@ export const CHECKOUT_TEXT = {
     after_submit: { message: CANCEL_NOTE },
   },
   credits: {
-    submit: { message: "This is a one-time purchase of VibhavGPT Flex Credits. It does not renew." },
+    submit: { message: "This is a one-time purchase of VibhavGPT image & document credits. It does not renew." },
     after_submit: { message: "Your credits are added to your VibhavGPT account once the payment is confirmed. Credit terms are at vibhavgpt.com/terms." },
   },
 };
 
+// Max is authorized for release with monthly and annual billing.
+export function isMaxCheckoutConfigured() {
+  return true;
+}
+
+function assertPlanPurchasable(priceLookupKey) {
+  if (tierForPriceLookupKey(priceLookupKey) === "max" && !isMaxCheckoutConfigured()) {
+    throw new Error("The selected plan is unavailable.");
+  }
+}
+
 export async function createCheckoutSession({ userId, email, priceLookupKey, origin, returnToApp = false }, { stripe, executor = db, getCustomer = getOrCreateBillingCustomer } = {}) {
   if (!tierForPriceLookupKey(priceLookupKey ?? "")) throw new Error("Invalid price selection.");
+  assertPlanPurchasable(priceLookupKey);
   const client = stripe ?? stripeClient();
-  const prices = await client.prices.list({ lookup_keys: [priceLookupKey], limit: 1 });
-  const price = prices.data[0];
-  if (!price) throw new Error("The selected plan is unavailable.");
+  const price = await resolvePlanPrice(client, priceLookupKey);
   const baseUrl = config.clientOrigins.includes(origin) ? origin : config.clientOrigins[0];
   const redirects = checkoutRedirectUrls({ baseUrl, returnToApp });
   const customerId = await getCustomer({ userId, email }, { stripe: client, executor });
-  const trial = !(await hadSubscriptionBefore({ userId, customerId }, { stripe: client, executor }));
+  const isMax = tierForPriceLookupKey(priceLookupKey) === "max";
+  const trial = !isMax && !(await hadSubscriptionBefore({ userId, customerId }, { stripe: client, executor }));
   // The tier is never taken from metadata; the webhook reads the billed price.
   const session = await client.checkout.sessions.create({
     mode: "subscription",
@@ -162,14 +196,17 @@ export async function createCustomerPortalSession({ userId, origin }, executor =
   return session.url;
 }
 
+// A balance is not sold to an account that could not spend it. Free has no documents and Pro and Max have unlimited ones, so there is nothing
+// for the credits to pay for. A balance already held is not touched by this.
+export function assertCreditPurchaseAllowed(tier) {
+  const eligibility = purchaseEligibility(tier);
+  if (!eligibility.eligible) throw Object.assign(new Error(eligibility.reason), { status: 403, code: "credits_not_usable_on_plan" });
+}
+
 export function normalizeCreditPurchaseAmount(amount) {
-  const dollars = Number(amount);
-  const cents = Math.round(dollars * 100);
-  const faithfullyRepresented = Number.isFinite(dollars) && Math.abs(dollars * 100 - cents) < 0.0001;
-  if (!faithfullyRepresented || cents < CREDIT_PURCHASE.minimumCents || cents > CREDIT_PURCHASE.maximumCents || cents % 10 !== 0) {
-    throw new Error("Enter an amount from $1 to $500 in $0.10 increments.");
-  }
-  return { dollars: cents / 100, cents, credits: cents };
+  const parsed = parsePurchaseAmount(amount);
+  if (!parsed.ok) throw new Error(parsed.error);
+  return { dollars: parsed.dollars, cents: parsed.cents, credits: parsed.credits };
 }
 
 export function creditCheckoutSessionParams({ userId, customerId, cents, credits, redirects }) {
@@ -182,7 +219,7 @@ export function creditCheckoutSessionParams({ userId, customerId, cents, credits
       price_data: {
         currency: "usd",
         unit_amount: cents,
-        product_data: { name: `VibhavGPT Flex Credits (${credits})` },
+        product_data: { name: `VibhavGPT image & document credits (${credits})` },
       },
     }],
     metadata: {
@@ -297,11 +334,39 @@ export async function getSubscriptionDetailsForUser(userId) {
   }
 }
 
+// The price a checkout or plan change charges. Max may be pinned to an exact price by STRIPE_PRICE_ID_MAX / STRIPE_PRICE_ID_MAX_YEARLY, but a
+// pinned price is used only if it is the right one (active, USD, recurring, the chosen interval, our own lookup key for this plan). A slip in
+// those hand-set variables is logged by kind (never the id) and the price our lookup key names is used instead, so it cannot charge the wrong thing.
+export async function resolvePlanPrice(stripe, priceLookupKey) {
+  const pinnedId = priceLookupKey === "vibhavgpt_max_monthly" ? config.stripeMaxPriceId
+    : priceLookupKey === "vibhavgpt_max_yearly" ? config.stripeMaxYearlyPriceId
+    : null;
+  let price = null;
+  if (pinnedId) {
+    const candidate = await stripe.prices.retrieve(pinnedId).catch(() => null);
+    const problem = planPriceProblem(candidate, priceLookupKey);
+    if (problem) console.warn(JSON.stringify({ event: "billing_price_override_rejected", priceLookupKey, problem }));
+    else price = candidate;
+  }
+  if (!price) {
+    const prices = await stripe.prices.list({ lookup_keys: [priceLookupKey], limit: 1, active: true });
+    price = prices.data[0];
+    // The price our own lookup key names is held to the same rule for Max. If it is wrong too, nothing is charged: the plan is unavailable,
+    // never another plan or another interval.
+    const problem = tierForPriceLookupKey(priceLookupKey) === "max" && price ? planPriceProblem(price, priceLookupKey) : null;
+    if (problem) {
+      console.warn(JSON.stringify({ event: "billing_price_rejected", priceLookupKey, source: "lookup", problem }));
+      price = null;
+    }
+  }
+  if (!price) throw new Error("The selected plan is unavailable.");
+  return price;
+}
+
 async function priceForLookupKey(stripe, priceLookupKey) {
   if (!VALID_PRICE_LOOKUP_KEYS.has(priceLookupKey)) throw new Error("Invalid price selection.");
-  const prices = await stripe.prices.list({ lookup_keys: [priceLookupKey], limit: 1, active: true });
-  if (!prices.data[0]) throw new Error("The selected plan is unavailable.");
-  return prices.data[0];
+  assertPlanPurchasable(priceLookupKey);
+  return resolvePlanPrice(stripe, priceLookupKey);
 }
 
 // A refused plan change, carrying the code the route answers with.
@@ -335,7 +400,7 @@ export async function changeSubscriptionPlan({ userId, priceLookupKey }, { strip
   if (!isPaidStatus(current.status)) throw new Error("No active Stripe subscription was found for this account.");
   const item = current.items?.data?.[0];
   if (!item) throw new Error("The Stripe subscription has no billable item.");
-  const currentKey = item.price?.lookup_key ?? "";
+  const currentKey = priceLookupKeyOf(item.price);
   const currentTier = tierForPriceLookupKey(currentKey);
   if (!currentTier) throw new PlanChangeError("plan-change-unavailable", "This plan can't be changed here. Please contact support to change your plan.");
   if (currentKey === priceLookupKey) throw new PlanChangeError("already-on-plan", "You're already on this plan.");

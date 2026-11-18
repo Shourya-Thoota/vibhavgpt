@@ -1,8 +1,14 @@
-import { PRODUCT_KNOWLEDGE } from "./product-knowledge.js";
+import { PRODUCT_KNOWLEDGE, productKnowledgeFor } from "./product-knowledge.js";
+import { useCreditsMode } from "./credits-runtime.js";
 import "./legal.css";
+import "./public-pages.css";
 import { PublicFaq } from "./components/PublicPageDetails.jsx";
 import { resetPageScroll } from "./page-scroll.js";
 import { useLayoutEffect } from "react";
+import { PublicNav } from "./components/PublicNav.jsx";
+import SiteFooter from "./components/SiteFooter.jsx";
+import { LEGAL_UPDATED } from "./legal-versions.js";
+import { SUBPROCESSORS_SECTION } from "./subprocessors.js";
 
 // Voice features were removed in October 2026. Recordings and calls made
 // before then were processed by AI inference providers, so the policy keeps
@@ -12,18 +18,22 @@ const PRIVACY_HISTORY = {
   "AI, hosting, and service providers": "Before voice features were removed in October 2026, voice dictation audio and Live Comet voice calls were also processed by AI inference providers. Transcripts of those calls were saved to your chat history like any other conversation.",
 };
 
-const UPDATED = "October 4, 2026";
+const UPDATED = LEGAL_UPDATED;
 
 const DOCUMENTS = {
   terms: {
     title: "Terms of Service",
     lede: "The agreement between you and Pansophy LLC for using VibhavGPT.",
-    sections: () => PRODUCT_KNOWLEDGE.terms,
+    sections: (creditsMode) => productKnowledgeFor(creditsMode).terms,
   },
   privacy: {
     title: "Privacy Policy",
     lede: "What we collect, why we collect it, who processes it, and the choices you have.",
-    sections: () => PRODUCT_KNOWLEDGE.privacy.map(([title, body]) => [title, PRIVACY_HISTORY[title] ? `${body} ${PRIVACY_HISTORY[title]}` : body]),
+    // The sub-processor list follows the section on service providers (subprocessors.js: named here only, never to the assistant).
+    sections: () => PRODUCT_KNOWLEDGE.privacy.flatMap(([title, body]) => {
+      const section = [title, PRIVACY_HISTORY[title] ? `${body} ${PRIVACY_HISTORY[title]}` : body];
+      return title === "AI, hosting, and service providers" ? [section, [...SUBPROCESSORS_SECTION]] : [section];
+    }),
   },
 };
 
@@ -58,22 +68,21 @@ function OtherDocuments({ current }) {
 /* -- The Guarantee --------------------------------------------------------- */
 
 // Four promises, each set as a statement rather than a feature card, under
-// one planet: the page's single illustration.
+// one eclipse: the page's single illustration, drawn in CSS.
 function Guarantee({ onBack, backLabel }) {
   return (
     <main className="legal guarantee">
-      <Bar onBack={onBack} backLabel={backLabel} />
+      <PublicNav current="guarantee" />
       <article className="guarantee__sheet">
-        <header className="guarantee__header">
-          <img className="guarantee__planet" src="/planets/earth.webp" alt="" />
-          <h1 className="guarantee__title">The VibhavGPT Guarantee</h1>
-          <p className="guarantee__lede">Pansophy LLC promises no training on your chats, no data sales, no ads, and control to export or delete your data. These four promises are written into our Terms of Service and bind us.</p>
+        <header className="page-header guarantee__header">
+          <h1 className="page-header__title">The VibhavGPT Guarantee</h1>
+          <p className="page-header__lede">Pansophy LLC promises no training on your chats, no data sales, no ads, and control to export or delete your data. These four promises are written into our Terms of Service and bind us.</p>
         </header>
 
         <ul className="guarantee__promises">
-          {PRODUCT_KNOWLEDGE.guarantee.map(([title, body]) => (
+          {PRODUCT_KNOWLEDGE.guarantee.map(([title, body], index) => (
             <li key={title} className="guarantee__promise">
-              <span className="guarantee__mark" aria-hidden="true" />
+              <span className="guarantee__mark" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
               <div>
                 <h2>{title}</h2>
                 <p>{body}</p>
@@ -94,8 +103,8 @@ function Guarantee({ onBack, backLabel }) {
         <PublicFaq path="/guarantee" />
         <p className="legal-updated">Last updated {UPDATED}</p>
         <OtherDocuments current="guarantee" />
-        <footer className="note" style={{ color: "var(--muted)", marginTop: 24 }}>Made by Vibhav Thoota</footer>
       </article>
+      <SiteFooter />
     </main>
   );
 }
@@ -104,16 +113,17 @@ function Guarantee({ onBack, backLabel }) {
 
 export default function Legal({ page, onBack, backLabel = "Back to sign in" }) {
   useLayoutEffect(() => { resetPageScroll(); }, [page]);
+  const creditsMode = useCreditsMode();
   if (page === "guarantee") return <Guarantee onBack={onBack} backLabel={backLabel} />;
   const doc = DOCUMENTS[page === "terms" ? "terms" : "privacy"];
-  const sections = doc.sections();
+  const sections = doc.sections(creditsMode);
   return (
     <main className="legal legal-doc">
-      <Bar onBack={onBack} backLabel={backLabel} />
+      <PublicNav current={page} />
       <div className="legal-doc__layout">
-        <header className="legal-doc__header">
-          <h1 className="legal-doc__title">{doc.title}</h1>
-          <p className="legal-doc__lede">{doc.lede}</p>
+        <header className="page-header legal-doc__header">
+          <h1 className="page-header__title legal-doc__title">{doc.title}</h1>
+          <p className="page-header__lede legal-doc__lede">{doc.lede}</p>
           {page !== "terms" && <p className="legal-updated">VibhavGPT is operated by Pansophy LLC.</p>}
           <p className="legal-updated">Last updated {UPDATED}</p>
           <a className="legal-doc__guarantee" href="/guarantee">
@@ -136,9 +146,9 @@ export default function Legal({ page, onBack, backLabel = "Back to sign in" }) {
             </section>
           ))}
           <OtherDocuments current={page} />
-          <footer className="note" style={{ color: "var(--muted)", marginTop: 24 }}>Made by Vibhav Thoota</footer>
         </article>
       </div>
+      <SiteFooter />
     </main>
   );
 }

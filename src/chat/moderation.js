@@ -1,6 +1,9 @@
 import { config } from "../config.js";
 import { logFailure } from "../security/error-log.js";
+import { logUpstreamFailure } from "./upstream-telemetry.js";
+import { routeAllowed } from "./route-inventory.js";
 import { primaryProviderApproved } from "./providers.js";
+import { recordShadowCostEvent } from "../usage/shadow-ledger.js";
 
 const hostOf = (url) => { try { return new URL(url).host; } catch { return null; } };
 
@@ -101,12 +104,13 @@ function classifierInput(message) {
   return `${message.slice(0, 5_500)}\n[content shortened]\n${message.slice(-1_500)}`;
 }
 
-export async function checkModeration(userMessage, { fetchImpl = fetch } = {}) {
+export async function checkModeration(userMessage, { fetchImpl = fetch, userId = null, requestId = null } = {}) {
   const deterministic = checkDeterministicModeration(userMessage);
   if (deterministic.flagged) return deterministic;
 
   const apiKey = moderationClassifierKey();
-  if (!apiKey) return { flagged: false, category: "" };
+  // The deterministic rules above still apply; the classifier is only asked while its route may receive text (route-inventory.js).
+  if (!apiKey || !routeAllowed("moderation")) return { flagged: false, category: "" };
 
   try {
     const response = await fetchImpl(config.moderationApiUrl, {
@@ -129,8 +133,15 @@ export async function checkModeration(userMessage, { fetchImpl = fetch } = {}) {
       }),
       signal: AbortSignal.timeout(5_000),
     });
-    if (!response.ok) return { flagged: false, category: "" };
+    if (!response.ok) {
+      await logUpstreamFailure({ route: "moderation", model: config.moderationModel ?? null, response, requestBody: { messages: [{ content: String(userMessage ?? "") }] } });
+      return { flagged: false, category: "" };
+    }
     const data = await response.json();
+    if (data?.usage) {
+      // Safety classification is platform overhead, recorded separately and never charged to a customer.
+      void recordShadowCostEvent({ userId, requestId, operation: "moderation", modelKey: config.moderationModel || "primaryFree", provider: "primaryFree", usage: data.usage }).catch(() => {});
+    }
     return parseClassifierJson(data?.choices?.[0]?.message?.content) ?? {
       flagged: false,
       category: "",

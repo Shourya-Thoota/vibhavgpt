@@ -14,7 +14,12 @@
   var root = document.documentElement;
   function applySavedAppearance() {
     try {
+      // Study has its own sky (vibhavgpt-theme-study); everything else uses Chat's (vibhavgpt-theme). Until Study's has been set, it is Chat's.
       var saved = localStorage.getItem("vibhavgpt-theme");
+      if (/^\/app\/study(\/|$)/.test((typeof location !== "undefined" && location.pathname) || "")) {
+        var study = localStorage.getItem("vibhavgpt-theme-study");
+        if (study === "system" || study === "light" || study === "dark") saved = study;
+      }
       var chosen = localStorage.getItem("vibhavgpt-theme-chosen") === "1";
       var sky = saved === "light" || saved === "dark"
         ? saved
@@ -22,6 +27,9 @@
       root.setAttribute("data-theme", sky);
       var accent = localStorage.getItem("vibhavgpt-accent");
       if (/^(cerulean|nebula|ember|pine|amber)$/.test(accent || "")) root.setAttribute("data-accent", accent);
+      // "Solid surfaces" replaces the glass material with opaque panels.
+      if (localStorage.getItem("vibhavgpt-effects") === "solid") root.setAttribute("data-effects", "solid");
+      else if (root.removeAttribute) root.removeAttribute("data-effects");
     } catch (error) {
       // Storage blocked (private mode, site data off): the night sky and Orbit
       // cyan are the theme's own defaults, so nothing else needs setting.
@@ -33,7 +41,7 @@
   // return, another tab's selection, and a system-theme change.
   window.addEventListener("pageshow", applySavedAppearance);
   window.addEventListener("storage", function (event) {
-    if (!event.key || /^(vibhavgpt-theme|vibhavgpt-theme-chosen|vibhavgpt-accent)$/.test(event.key)) applySavedAppearance();
+    if (!event.key || /^(vibhavgpt-theme|vibhavgpt-theme-study|vibhavgpt-theme-chosen|vibhavgpt-accent|vibhavgpt-effects)$/.test(event.key)) applySavedAppearance();
   });
   var media = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)");
   if (media && media.addEventListener) media.addEventListener("change", applySavedAppearance);

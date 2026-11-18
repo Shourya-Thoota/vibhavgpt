@@ -147,7 +147,113 @@
 }
 .move-list__empty { margin: var(--space-sm) 0 0; color: var(--color-muted); font-size: 0.82rem; }
 
-.library__instructions { min-height: 116px; resize: vertical; line-height: 1.5; }
+/* The instructions box is a textarea: the same padding and line height as every other textarea, with a comfortable starting height. */
+.library__instructions { min-height: 116px; resize: vertical; line-height: 1.55; padding: 12px 14px; }
+/* The counter shares the label's row, so it reads with the label and is never clipped or overlapping. Same size and colour as helper text. */
+.library__count { color: var(--muted); font-size: 0.76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* --- Notebook and Project type picker ---------------------------------- */
+
+.notebook-type-picker,
+.project-type-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xs);
+  margin-top: var(--space-2xs);
+}
+@media (max-width: 520px) {
+  .notebook-type-picker,
+  .project-type-picker {
+    grid-template-columns: 1fr;
+  }
+}
+.notebook-type-card,
+.project-type-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  min-width: 0;
+  min-height: var(--hit-min);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-input);
+  border: var(--rule-fine) solid var(--color-rule);
+  overflow-wrap: anywhere;
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+}
+.notebook-type-card:hover,
+.project-type-card:hover {
+  background: var(--color-paper-3);
+  color: var(--color-ink);
+}
+.notebook-type-card--selected,
+.project-type-card--selected {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 var(--rule-fine) var(--color-accent);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+.notebook-type-card:active,
+.project-type-card:active { background: var(--color-paper-3); }
+.notebook-type-card:focus-visible,
+.project-type-card:focus-visible { outline: var(--ring-width) solid var(--color-focus); outline-offset: var(--ring-offset); transition: none; }
+.project-type-card small { color: var(--color-muted); font-size: var(--text-xs); line-height: 1.45; }
+.notebook-type-card__head,
+.project-type-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.notebook-type-card__head svg,
+.project-type-card__head svg {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+.notebook-type-card__title,
+.project-type-card__title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.notebook-type-card__desc,
+.project-type-card__desc {
+  font-size: 0.76rem;
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.library-group__type-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-ink) 7%, transparent);
+}
+.library-group__type-badge[data-mode="study"] {
+  color: var(--color-accent-text, var(--color-accent));
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.move-list__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-paper-3);
+  color: var(--color-muted);
+  margin-left: auto;
+}
+.move-list__badge--study {
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .library-group__caret { transition: none; }

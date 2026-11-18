@@ -56,11 +56,11 @@ const rule = (css, selector) => {
 
 // --- Order (rendered markup) --------------------------------------------------
 
-test("rendered: the history keeps its previous order, Projects, Folders, then the main list", () => {
-  for (const [variant, last] of [["chat", "Recent chats"], ["study", "Study sessions"]]) {
+test("rendered: the history renders Projects, then the main list", () => {
+  for (const [variant, last] of [["chat", "Your chats"], ["study", "Study sessions"]]) {
     const html = render({ variant });
     const heads = [...html.matchAll(/<div class="library__head"><span>([^<]*)<\/span>/g)].map((match) => match[1]);
-    assert.deepEqual(heads, ["Projects", "Folders", last], `${variant}: section order`);
+    assert.deepEqual(heads, ["Projects", last], `${variant}: section order`);
   }
 });
 
@@ -94,19 +94,18 @@ test("rendered and source: there is no bottom group and no More disclosure, in m
 test("source: the library's order, grouping, saved state and actions are the code they were before", () => {
   const source = read("frontend/src/components/ConversationLibrary.jsx");
   for (const piece of [
-    'const openKey = (mode) => `vibhavgpt-groups-open:${mode}`;',
-    "const known = new Set(groups.map((group) => group.id));",
-    "if (conversation.groupId && known.has(conversation.groupId)) {",
-    "writeOpen(productMode, next);",
-    'api(`/api/chat/groups?mode=${productMode}`).catch(() => ({ groups: [] }))',
+    'const openKey = () => "vibhavgpt-projects-open";',
+    "const projectList = groups.filter",
+    "writeOpen(next);",
+    'api("/api/chat/groups").catch(() => ({ groups: [] }))',
     'await api(`/api/chat/conversations/${conversation.id}`, { method: "DELETE" });',
     "if (activeId === conversation.id) onNew();",
-    "const startRename =", "const startMove =", "async function removeGroup(",
+    "const startRename =", "const startMove =", "async function removeProject(",
   ]) assert.ok(source.includes(piece), piece);
   assert.equal(source.split("{chatRows(unfiled)}").length - 1, 1, "the main list is still rendered once, from the same array");
   const render_ = source.slice(source.indexOf('<section className="conversation-history library"'));
-  const order = ["<span>Projects</span>", "<span>Folders</span>", "{heading}</span>"].map((needle) => render_.indexOf(needle));
-  assert.ok(order.every((index) => index > 0) && order[0] < order[1] && order[1] < order[2], "Projects, then Folders, then the main list");
+  const order = ["<span>Projects</span>", "{heading}</span>"].map((needle) => render_.indexOf(needle));
+  assert.ok(order.every((index) => index > 0) && order[0] < order[1], "Projects, then the main list");
 });
 
 // --- Rail names and the tooltip ------------------------------------------------
@@ -118,7 +117,7 @@ test("rendered: in the rail every control has an explicit name and the same tool
   }
   assert.equal(chat.includes('title="New chat"'), false, "no native title doubling the tooltip");
   const study = render({ variant: "study", rail: true });
-  assert.ok(study.includes('aria-label="Writing Tools" data-rail-label="Writing Tools"'));
+  assert.equal(study.includes("Writing Tools"), false, "no Writing Tools item: the tools open in place on the Study home");
   assert.ok(study.includes('aria-label="New study session" data-rail-label="New study session"'));
   // Every anchor and button in the rail that carries no visible text has an aria-label.
   const unnamed = [...chat.matchAll(/<(a|button) ([^>]*)>([\s\S]*?)<\/\1>/g)].filter(([, , attributes, inner]) => {
@@ -151,13 +150,14 @@ test("source: the rail tooltip is one label fixed to the window, shown for hover
 
 // --- The Resources section's CSS (source text) ---------------------------------
 
-test("css: the Resources heading keeps its previous style, and its links are the ordinary stacked sidebar links", () => {
+test("css: the Resources heading is a quiet label, and its links are the ordinary text-first sidebar rows", () => {
   const label = rule(styles, ".sidebar__apps-label");
-  for (const piece of ["display: flex;", "align-items: center;", "min-height: 26px;", "padding: 0 11px 3px;", "color: var(--color-muted);", "font-size: 0.74rem;", "font-weight: 600;"]) assert.ok(label.includes(piece), piece);
-  assert.match(rule(styles, ".sidebar__link"), /min-height: 40px;/);
-  assert.match(planetary, /\.sidebar__link \{ border-radius: var\(--radius-pill\); min-height: 42px; \}/, "the previous 42px links on desktop");
+  for (const piece of ["display: flex;", "align-items: center;", "min-height: 26px;", "color: var(--color-muted);", "font-weight: 600;"]) assert.ok(label.includes(piece), piece);
+  assert.match(rule(styles, ".sidebar__link"), /min-height: 36px;/, "rows are dense on desktop");
+  assert.doesNotMatch(styles, /\.sidebar__link > svg \{ display: none; \}/, "rows keep their icons while expanded, one treatment in both states");
+  assert.doesNotMatch(planetary, /\.sidebar__link \{/, "one definition of the rows, not an override stack");
+  assert.doesNotMatch(styles, /\.sidebar__link:nth-child\(1\) \{ animation/, "no entrance stagger on navigation");
   assert.match(mobile, /\.sidebar__link, \.conversation-item__open \{ min-height: 44px; \}/, "44px in the drawer");
-  assert.match(styles, /\.sidebar__link:nth-child\(1\) \{ animation: lift-in 420ms/, "the previous entrance stagger is unchanged");
 });
 
 // --- Spacing, scrolling and the plan card (source text, plus one render) ---------
@@ -228,7 +228,8 @@ test("css: history spacing is tightened without reordering, hiding or shrinking 
   assert.match(rule(styles, ".conversation-item"), /min-height: 44px;/, "chat rows keep their 44px height");
   assert.match(rule(planetary, ".sidebar"), /gap: 14px;/, "the 14px section gap is unchanged");
   const source = read("frontend/src/components/ConversationLibrary.jsx");
-  const order = ["<span>Projects</span>", "<span>Folders</span>", "{heading}</span>"].map((needle) => source.indexOf(needle));
-  assert.ok(order[0] > 0 && order[0] < order[1] && order[1] < order[2], "Projects, Folders, then the main list, as before");
+  const order = ["<span>Projects</span>", "{heading}</span>"].map((needle) => source.indexOf(needle));
+  assert.ok(order[0] > 0 && order[0] < order[1], "Projects, then the main list");
+  assert.doesNotMatch(source, /<span>Folders<\/span>/);
   assert.doesNotMatch(source, /setOpenIds\(new Set\(\)\)|defaultOpen|autoCollapse/, "no auto-collapse of the user's groups");
 });

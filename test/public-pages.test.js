@@ -49,7 +49,7 @@ test("structured data names the operator, website, matching breadcrumbs and visi
       assert.deepEqual(get("FAQPage").mainEntity.map(q => [q.name, q.acceptedAnswer.text]), page.faq);
       const { faq } = detailsHtml(path);
       assert.equal((faq.match(/<h3>/g) ?? []).length, page.faq.length);
-      for (const [q] of page.faq) assert.ok(faq.includes(q));
+      for (const [q] of page.faq) assert.ok(faq.includes(q.replace(/&/g, "&amp;")), `${q} is shown on the page (HTML-escaped)`);
     }
   }
 });
@@ -168,16 +168,19 @@ test("creator credit is visible in public footers and shared Settings and usage 
     assert.match(html, /name="description" content="[^"]*Made by Vibhav Thoota\./);
   }
   const app = read("frontend/src/App.jsx");
-  for (const [start, end] of [["function Settings(", "function SettingsFooter("], ["function UsageDashboard(", "export function PublicPricing("]]) {
+  // Settings and Usage show the same footer as the public pages (one footer, owner request 2026-11-15), so the credit and the legal
+  // links reach them through that footer's markup.
+  for (const [start, end] of [["function Settings(", "function SettingsIndex("], ["function UsageDashboard(", "export function PublicPricing("]]) {
     const section = app.slice(app.indexOf(start), end ? app.indexOf(end) : undefined);
-    assert.match(section, /<SettingsFooter onLegal=\{onLegal\} \/>/);
+    assert.match(section, /<SiteFooter className="site-footer--in-app" \/>/);
   }
-  const sharedFooter = app.slice(app.indexOf("function SettingsFooter("), app.indexOf("function SettingsIndex("));
-  assert.match(sharedFooter, /<footer[^>]*>[\s\S]*Made by Vibhav Thoota[\s\S]*<\/footer>/);
-  for (const label of ["Terms of Service", "Privacy Policy", "The VibhavGPT Guarantee"]) assert.ok(sharedFooter.includes(label));
-  assert.match(app.slice(app.indexOf("function Billing(")), /<footer[^>]*>Made by Vibhav Thoota<\/footer>/);
+  const sharedFooter = read("frontend/src/site-footer.js");
+  for (const label of ["Terms of Service", "Privacy Policy", "The VibhavGPT Guarantee"]) assert.ok(sharedFooter.includes(`label: "${label}"`), label);
+  // The public pages share one footer (site-footer.js), which carries the credit; the pricing page and the legal pages render it.
+  assert.match(read("frontend/src/site-footer.js"), /<p class="site-footer__credit">Made by Vibhav Thoota<\/p>/);
+  assert.match(app.slice(app.indexOf("function Billing(")), /\{publicPreview && <SiteFooter \/>\}/);
   const legal = read("frontend/src/Legal.jsx");
-  assert.equal((legal.match(/<footer[^>]*>Made by Vibhav Thoota<\/footer>/g) ?? []).length, 2);
+  assert.equal((legal.match(/<SiteFooter \/>/g) ?? []).length, 2);
 });
 
 test("the frontend server publishes prerendered public documents from the frontend build", () => {

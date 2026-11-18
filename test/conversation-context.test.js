@@ -5,8 +5,8 @@ import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
-// Whichever model answers gets the whole conversation: switching from Nova
-// to Nebula mid-chat keeps every earlier turn, any Mermaid diagram exactly as
+// Whichever model answers gets the whole conversation: switching from Vulcan
+// to Lumen mid-chat (Nova to Nebula until both were retired on 2026-11-14) keeps every earlier turn, any Mermaid diagram exactly as
 // written, and what the learner did with the reply's flashcards or quiz.
 // Runs the real /api/chat routes on an in-memory database, with the model
 // stubbed so each request it receives can be inspected.
@@ -31,9 +31,13 @@ const { config } = await import("../src/config.js");
 config.moderationApiKey = "";
 config.providerKeys.primaryFree = "";
 config.providerKeys.paid = "fixture-key";
-config.chatModels.nova = "fixture-nova";
-config.chatModels.nebula = "fixture-nebula";
-config.nebulaDataPolicyVerified = true;
+// Nova and Nebula were retired on 2026-11-14. Nova's turns (the tool-capable default) run on Vulcan over the router, and Nebula's on
+// Lumen's production route type (the router's paid zero-retention route), both with fixture engines.
+config.chatModels.vesper = "fixture-vesper";
+config.vesperTransport = "router";
+config.lumenChatRoute = "paid-zdr";
+config.lumenPaidZdrProviders = ["route-b"];
+config.chatModels.lumenFallback1 = "fixture-lumen";
 const { default: express } = await import("express");
 const { chatRouter } = await import("../src/chat/router.js");
 const { appendStudyNote, studyResultNote, withStudyResults } = await import("../src/chat/study-results.js");
@@ -85,19 +89,19 @@ async function serve(t, userId, replies) {
 
 const historyOf = (request) => request.messages.filter((message) => message.role !== "system").map((message) => ({ role: message.role, content: message.content }));
 
-test("switching from Nova to Nebula mid-chat sends Nebula every earlier turn, the diagram source unchanged", async (t) => {
+test("switching from Vulcan to Lumen mid-chat sends Lumen every earlier turn, the diagram source unchanged", async (t) => {
   const { base, send, requests } = await serve(t, "switcher", [DIAGRAM, "Mitosis copies a cell; meiosis makes gametes.", "Here is the updated diagram."]);
-  const first = await send({ model: "nova", message: "Draw photosynthesis as a flowchart" });
-  await send({ model: "nova", conversationId: first.conversationId, message: "And how do mitosis and meiosis differ?" });
-  assert.equal(requests[1].model, "fixture-nova");
+  const first = await send({ model: "vesper", message: "Draw photosynthesis as a flowchart" });
+  await send({ model: "vesper", conversationId: first.conversationId, message: "And how do mitosis and meiosis differ?" });
+  assert.equal(requests[1].model, "fixture-vesper");
 
-  const switched = await fetch(`${base}/api/chat/conversations/${first.conversationId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "nebula" }) });
-  assert.equal(switched.status, 200, "the same conversation, now on Nebula");
-  const nebulaReply = await send({ model: "nebula", conversationId: first.conversationId, message: "Add a step for water to the diagram" });
+  const switched = await fetch(`${base}/api/chat/conversations/${first.conversationId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "lumen" }) });
+  assert.equal(switched.status, 200, "the same conversation, now on Lumen");
+  const lumenReply = await send({ model: "lumen", conversationId: first.conversationId, message: "Add a step for water to the diagram" });
 
-  assert.equal(requests[2].model, "fixture-nebula", "Nebula answers");
-  assert.equal(nebulaReply.conversationId, first.conversationId, "still the same conversation");
-  assert.deepEqual([nebulaReply.modelKey, nebulaReply.model], ["nebula", "VibhavGPT Nebula"], "the live reply names its model by key and by its old display name");
+  assert.equal(requests[2].model, "fixture-lumen", "Lumen answers");
+  assert.equal(lumenReply.conversationId, first.conversationId, "still the same conversation");
+  assert.deepEqual([lumenReply.modelKey, lumenReply.model], ["lumen", "VibhavGPT Lumen"], "the live reply names its model by key and by its display name");
   assert.deepEqual(historyOf(requests[2]), [
     { role: "user", content: "Draw photosynthesis as a flowchart" },
     { role: "assistant", content: DIAGRAM },
@@ -114,18 +118,18 @@ test("switching from Nova to Nebula mid-chat sends Nebula every earlier turn, th
   // reply keeps the model that wrote it. User messages carry no model.
   const reloaded = await (await fetch(`${base}/api/chat/conversations/${first.conversationId}`)).json();
   assert.equal(reloaded.conversation.id, first.conversationId);
-  assert.equal(reloaded.conversation.model, "nebula", "the conversation's current model");
+  assert.equal(reloaded.conversation.model, "lumen", "the conversation's current model");
   assert.deepEqual(reloaded.history.map((message) => [message.role, message.model]), [
-    ["user", null], ["assistant", "nova"],
-    ["user", null], ["assistant", "nova"],
-    ["user", null], ["assistant", "nebula"],
+    ["user", null], ["assistant", "vesper"],
+    ["user", null], ["assistant", "vesper"],
+    ["user", null], ["assistant", "lumen"],
   ]);
   assert.deepEqual(reloaded.history.map((message) => message.content).slice(0, 2), ["Draw photosynthesis as a flowchart", DIAGRAM], "nothing rewritten");
 });
 
 test("another account can't read, switch or write to someone else's conversation", async (t) => {
   const { base, send } = await serve(t, "isolation-owner", ["The owner's answer."]);
-  const owned = await send({ model: "nova", message: "A private question" });
+  const owned = await send({ model: "vesper", message: "A private question" });
   const stranger = { "x-test-user": "isolation-stranger", "Content-Type": "application/json" };
   const rows = async () => (await client.query("SELECT role, content, metadata FROM messages WHERE conversation_id = $1 ORDER BY created_at", [owned.conversationId])).rows;
   const before = await rows();
@@ -133,21 +137,21 @@ test("another account can't read, switch or write to someone else's conversation
   const read = await fetch(`${base}/api/chat/conversations/${owned.conversationId}`, { headers: stranger });
   assert.equal(read.status, 404);
   assert.doesNotMatch(await read.text(), /private question|owner's answer/, "nothing of the conversation leaks");
-  const switched = await fetch(`${base}/api/chat/conversations/${owned.conversationId}`, { method: "PATCH", headers: stranger, body: JSON.stringify({ model: "nebula" }) });
+  const switched = await fetch(`${base}/api/chat/conversations/${owned.conversationId}`, { method: "PATCH", headers: stranger, body: JSON.stringify({ model: "lumen" }) });
   assert.equal(switched.status, 404);
-  const streamed = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: stranger, body: JSON.stringify({ model: "nova", conversationId: owned.conversationId, message: "Let me in" }) })).text();
+  const streamed = await (await fetch(`${base}/api/chat/stream`, { method: "POST", headers: stranger, body: JSON.stringify({ model: "vesper", conversationId: owned.conversationId, message: "Let me in" }) })).text();
   const error = streamed.split("\n\n").find((block) => /^event:\s*error$/m.test(block));
   assert.equal(JSON.parse(error.match(/^data:\s*(.+)$/m)[1]).status, 404);
   assert.doesNotMatch(streamed, /event:\s*(conversation|complete)/, "no conversation is opened or answered");
 
   assert.deepEqual(await rows(), before, "the owner's messages are unchanged");
-  assert.equal((await client.query("SELECT model FROM conversations WHERE id = $1", [owned.conversationId])).rows[0].model, "nova", "the owner's model is unchanged");
+  assert.equal((await client.query("SELECT model FROM conversations WHERE id = $1", [owned.conversationId])).rows[0].model, "vesper", "the owner's model is unchanged");
   assert.equal(Number((await client.query("SELECT count(*) FROM conversations WHERE user_id = 'isolation-stranger'")).rows[0].count), 0, "nothing saved for the stranger");
 });
 
 test("a finished quiz is kept with its reply, and the next model sees the score and the missed questions", async (t) => {
   const { base, send, requests } = await serve(t, "learner", [QUIZ, "Let's go over meiosis again."]);
-  const quizReply = await send({ model: "nova", message: "Quiz me on cell division" });
+  const quizReply = await send({ model: "vesper", message: "Quiz me on cell division" });
   assert.ok(quizReply.messageId, "the reply's id comes back with it");
   const quiz = parseStudyBlock("quiz", QUIZ.replace(/^```quiz\n|\n```$/g, ""));
   const result = quizResult(quiz, { 0: 0, 1: 0 });
@@ -161,10 +165,10 @@ test("a finished quiz is kept with its reply, and the next model sees the score 
   const junk = await fetch(`${base}/api/chat/conversations/${quizReply.conversationId}/messages/${quizReply.messageId}/study-results`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind: "quiz", score: 9, total: 2 }) });
   assert.equal(junk.status, 400);
 
-  await client.query("UPDATE conversations SET model = 'nebula' WHERE id = $1", [quizReply.conversationId]);
-  await send({ model: "nebula", conversationId: quizReply.conversationId, message: "What should I review?" });
+  await client.query("UPDATE conversations SET model = 'lumen' WHERE id = $1", [quizReply.conversationId]);
+  await send({ model: "lumen", conversationId: quizReply.conversationId, message: "What should I review?" });
   const history = historyOf(requests[1]);
-  assert.equal(requests[1].model, "fixture-nebula");
+  assert.equal(requests[1].model, "fixture-lumen");
   assert.equal(history[1].role, "assistant");
   assert.equal(history[1].content, `${QUIZ}\n\n[Study result: Quiz "Cells": 1/2 correct. Missed: "Which makes gametes?" (chose "Mitosis"; correct: "Meiosis").]`);
   // The saved reply itself is unchanged; the note travels in its metadata.
@@ -214,7 +218,7 @@ test("finished widgets report once to their reply, through the chat", () => {
 // and a pagination cursor sent to the chat route changes nothing.
 test("past 80 messages the model still gets only the newest window, whatever cursor is sent", async (t) => {
   const { base, send, requests } = await serve(t, "long-context", ["Latest answer.", "Another answer."]);
-  const started = await send({ model: "nova", message: "The newest question" });
+  const started = await send({ model: "vesper", message: "The newest question" });
   // 120 older turns, saved before that exchange.
   await client.query(`INSERT INTO messages (conversation_id, role, content, created_at)
     SELECT $1, CASE WHEN g % 2 = 1 THEN 'user' ELSE 'assistant' END, 'old turn ' || g, now() - make_interval(hours => 1, secs => -g)
@@ -224,7 +228,7 @@ test("past 80 messages the model still gets only the newest window, whatever cur
 
   const asked = (await fetch(`${base}/api/chat/stream?before=${page.nextCursor}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "nova", conversationId: started.conversationId, message: "One more", before: page.nextCursor }),
+    body: JSON.stringify({ model: "vesper", conversationId: started.conversationId, message: "One more", before: page.nextCursor }),
   })).text();
   assert.match(await asked, /event:\s*complete/);
   const context = historyOf(requests.at(-1)).map((message) => message.content);

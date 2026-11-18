@@ -1,0 +1,42 @@
+/* The Library: a calm grid of cards. Theme tokens only. */
+.lib-page { width: min(100% - 2 * var(--page-gutter, 16px), 70rem); margin-inline: auto; padding-block: var(--space-lg, 24px) var(--space-xl, 48px); }
+.lib-page__head { display: grid; gap: 4px; margin-bottom: var(--space-md, 16px); }
+.lib-page__lede { margin: 0; color: var(--color-muted, var(--muted)); font-size: 0.95rem; }
+.lib-page__tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--space-md, 16px); }
+.lib-page__filters { display: inline-flex; padding: 3px; border-radius: 12px; background: color-mix(in srgb, var(--color-ink) 7%, transparent); }
+.lib-page__filter { min-height: 34px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; color: var(--color-ink-2); font: 600 0.9rem/1 var(--font-body); cursor: pointer; }
+.lib-page__filter[aria-pressed="true"] { background: var(--color-paper-2, var(--surface)); color: var(--color-ink); box-shadow: 0 1px 2px rgb(0 0 0 / 0.14); }
+.lib-page__search { display: flex; align-items: center; gap: 8px; flex: 1 1 14rem; max-width: 22rem; min-height: 40px; padding: 0 12px; border: 1px solid var(--color-rule, rgb(128 128 128 / 0.3)); border-radius: 12px; background: var(--color-paper-2, var(--surface)); color: var(--color-ink-2); }
+.lib-page__search:focus-within { border-color: var(--color-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 24%, transparent); }
+.lib-page__search input { flex: 1; min-width: 0; min-height: 40px; border: 0; outline: 0; background: transparent; color: var(--color-ink); font: inherit; font-size: 0.95rem; }
+.lib-page__note { margin: var(--space-lg, 24px) 0; padding: 28px 18px; border-radius: 14px; background: color-mix(in srgb, var(--color-ink) 4%, transparent); color: var(--color-muted, var(--muted)); text-align: center; }
+.lib-page__note--error { display: grid; justify-items: center; gap: 12px; color: var(--color-danger); }
+.lib-page__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.lib-page__card { display: grid; gap: 10px; align-content: start; min-width: 0; padding: 10px; border: 1px solid var(--color-rule, rgb(128 128 128 / 0.25)); border-radius: 16px; background: var(--color-paper-2, var(--surface)); }
+.lib-page__thumb { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; overflow: hidden; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--color-ink) 6%, transparent); cursor: pointer; padding: 0; text-decoration: none; }
+.lib-page__thumb:disabled { cursor: default; }
+.lib-page__thumb img, .lib-page__img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-page__thumb .private-media-status { display: grid; place-items: center; width: 100%; height: 100%; padding: 10px; font-size: 0.82rem; color: var(--color-muted); text-align: center; }
+.lib-page__thumb--doc { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 12px; box-sizing: border-box; text-align: left; background: color-mix(in srgb, var(--color-paper-3) 45%, var(--surface)); cursor: pointer; }
+.lib-page__doc-header { display: flex; align-items: center; justify-content: space-between; width: 100%; color: var(--color-muted); }
+.lib-page__doc-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em; background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent-text, var(--color-accent)); }
+.lib-page__excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; margin: 6px 0 0; font-size: 0.8rem; line-height: 1.45; color: var(--color-ink-2); white-space: pre-wrap; word-break: break-word; }
+.lib-page__doc-prompt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; margin: 6px 0 0; font-size: 0.8rem; color: var(--color-muted); }
+.lib-page__missing { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px; color: var(--color-muted, var(--muted)); font-size: 0.84rem; text-align: center; }
+.lib-page__meta { display: grid; gap: 2px; min-width: 0; font-size: 0.85rem; color: var(--color-muted, var(--muted)); }
+.lib-page__meta strong { overflow: hidden; color: var(--color-ink); font-size: 0.95rem; text-overflow: ellipsis; white-space: nowrap; }
+.lib-page__prompt { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow-wrap: anywhere; }
+.lib-page__warn { color: var(--color-danger); }
+.lib-page__actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.lib-page__action { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--color-ink) 6%, transparent); color: var(--color-ink); font: 600 0.84rem/1 var(--font-body); text-decoration: none; cursor: pointer; }
+.lib-page__action:hover { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+.lib-page__action--danger:hover { background: color-mix(in srgb, var(--color-danger) 14%, transparent); color: var(--color-danger); }
+.lib-page__more { display: grid; place-items: center; margin-top: var(--space-lg, 24px); }
+.lib-page__viewer img, .lib-page__viewer-img { display: block; max-width: 100%; max-height: 62vh; margin-inline: auto; border-radius: 12px; object-fit: contain; }
+.lib-page__viewer-img-wrap { display: grid; place-items: center; width: 100%; }
+.lib-page__viewer-doc { display: grid; gap: 12px; margin: 12px 0; }
+.lib-page__viewer-doc-meta { display: flex; align-items: center; gap: 10px; font-size: 0.88rem; color: var(--color-muted); }
+.lib-page__viewer-text-box { max-height: 48vh; overflow-y: auto; padding: 14px; border-radius: 8px; background: color-mix(in srgb, var(--color-ink) 4%, transparent); border: 1px solid var(--color-rule); font-family: var(--font-mono, monospace); font-size: 0.85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; color: var(--color-ink); margin: 0; }
+.lib-page__viewer-empty { margin: 16px 0; font-size: 0.9rem; color: var(--color-muted); }
+.lib-page__remove-name { margin: 12px 0 0; overflow-wrap: anywhere; font-weight: 600; }
+@media (max-width: 520px) { .lib-page__action { min-height: 44px; } .lib-page__filter { min-height: 44px; } }

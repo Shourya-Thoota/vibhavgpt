@@ -1,5 +1,9 @@
-export const productModeFromPath = (path) => /^\/app\/study\/?$/.test(path) ? "study" : /^\/app\/image\/?$/.test(path) ? "image" : "chat";
-export const productPath = (mode, conversationId) => `${mode === "study" ? "/app/study" : mode === "image" ? "/app/image" : "/app/chat"}${conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : ""}`;
+// Build (owner request, 2026-11-14) is the coding workspace: chats with VibhavGPT Tecton, Pro and up.
+export const productModeFromPath = (path) => /^\/app\/study\/?$/.test(path) ? "study" : /^\/app\/image\/?$/.test(path) ? "image" : /^\/app\/build\/?$/.test(path) ? "build" : "chat";
+export const productPath = (mode, conversationId) => `${mode === "study" ? "/app/study" : mode === "image" ? "/app/image" : mode === "build" ? "/app/build" : "/app/chat"}${conversationId ? `?conversation=${encodeURIComponent(conversationId)}` : ""}`;
+/** The model Build always uses, and the plans that include it. */
+export const BUILD_MODEL = "tecton";
+export const buildIncluded = (tier) => ["pro", "max", "paid"].includes(String(tier ?? "").toLowerCase());
 export const STUDY_ACTIONS = [
   { label: "Explain this", prompt: "Explain the main concept in the selected study material, using a worked example and a short check for understanding." },
   { label: "Make flashcards", prompt: "Make 6 question-and-answer flashcards from the selected study material. Keep one concept per card." },
@@ -9,10 +13,10 @@ export const STUDY_ACTIONS = [
 ];
 
 export const STUDY_TAGLINES = [
-  "Welcome to Study, where understanding sticks.",
-  "Study mode: built for real learning, not just answers.",
-  "Let's actually learn this, not just get through it.",
-  "Study smarter, not just faster.",
-  "Here to help it click, not just get it done.",
+  "What are you studying?",
+  "Which topic is next?",
+  "What should we study today?",
+  "Paste your notes to begin.",
+  "What do you want to learn?",
 ];
 export const STUDY_STARTERS = ["Explain a topic", "Flashcards", "Quiz me", "Summary", "Study plan"];

@@ -1,0 +1,106 @@
+/* The Plans page, decluttered: the title and the period switch, four plain plans (price, purpose, principal allowance, one action), and everything
+   longer behind "Compare all features". Scoped under main.pricing so it wins over the older layered plan styles without !important, and built
+   from existing tokens only. Nothing here hides information: the comparison is a native <details>, keyboard and screen-reader operable. */
+
+main.pricing .plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15.5rem), 1fr));
+  gap: var(--space-md, 16px);
+  align-items: stretch;
+}
+
+/* A plan is a quiet column, not a lifted card: one hairline, no shadow, no hover movement. */
+main.pricing .plans .plan {
+  padding: var(--space-lg, 20px);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  gap: 0;
+}
+main.pricing .plans .plan:hover { transform: none; box-shadow: none; }
+main.pricing .plans .plan[data-featured] { background: transparent; border-color: var(--line); }
+/* The one marker that matters: which plan this account is on. */
+main.pricing .plans .plan[data-current] { border-color: var(--accent); box-shadow: none; }
+
+main.pricing .plan__name { font-size: 1rem; font-weight: 600; }
+main.pricing .plan__price { margin-top: 10px; }
+main.pricing .plan__equivalent { margin: 2px 0 0; font-size: 0.82rem; color: var(--muted); }
+main.pricing .plan__blurb { margin: 12px 0 0; font-size: 0.9rem; color: var(--muted); }
+main.pricing .plan__allowance {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+/* The action sits at the bottom of every card, so the four line up whatever the text above is. */
+main.pricing .plans .plan > .btn,
+main.pricing .plans .plan > .plan__current { margin-top: auto; }
+main.pricing .plans .plan > .plan__allowance + .btn,
+main.pricing .plans .plan > .plan__allowance + .plan__current { margin-top: 16px; }
+main.pricing .plans .plan { display: flex; flex-direction: column; }
+main.pricing .plans .plan .btn { min-height: var(--hit-min, 44px); }
+
+/* Compare all features: one quiet line that opens the table. */
+main.pricing details.compare {
+  margin-top: var(--space-xl, 32px);
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+}
+main.pricing .compare__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--hit-min, 44px);
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+main.pricing .compare__summary::-webkit-details-marker { display: none; }
+main.pricing .compare__summary::after {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 160ms ease;
+}
+main.pricing details.compare[open] > .compare__summary::after { transform: rotate(-135deg); }
+main.pricing .compare__summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
+main.pricing details.compare[open] > .compare__scroll { margin-top: 8px; }
+@media (prefers-reduced-motion: reduce) { main.pricing .compare__summary::after { transition: none; } }
+
+/* The Guarantee keeps its approved wording and its heading; it is only set quietly: no box, no border, a small heading, one link. */
+main.pricing aside.pricing__guarantee {
+  max-width: 68ch;
+  margin: var(--space-lg, 24px) 0 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+main.pricing aside.pricing__guarantee h2 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+main.pricing aside.pricing__guarantee p { margin: 4px 0 0; font-size: 0.88rem; line-height: 1.55; color: var(--muted); }
+main.pricing aside.pricing__guarantee a { display: inline-flex; align-items: center; min-height: var(--hit-min, 44px); font-size: 0.88rem; color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+/* The period switch and the saving read as one line, wrapping cleanly on a phone. */
+main.pricing .pricing__period { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+main.pricing .pricing__saving { font-size: 0.85rem; color: var(--muted); }
+
+/* Side by side, the purpose line reserves the same room in every plan, so the allowance and the action line up across the row. */
+@media (min-width: 1000px) {
+  main.pricing .plan__blurb { min-height: 4.6em; }
+}
+
+/* No container behind the four plans: each plan sits directly on the page background, in both skies. */
+main.pricing .plans.rate-card { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }

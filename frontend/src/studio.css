@@ -24,7 +24,7 @@
 /* --- Plate ---------------------------------------------------------------- */
 
 .studio-plate {
-  width: min(100%, 920px);
+  width: min(100%, 1040px);
   margin: 0 auto;
   padding: var(--space-lg) var(--space-lg) var(--space-md);
   border: var(--rule-fine) solid var(--color-rule-2);
@@ -201,7 +201,7 @@
 .studio-ideas__list strong { display: block; color: var(--color-ink); font-size: 0.88rem; font-weight: 600; }
 .studio-ideas__list small { display: block; color: var(--color-muted); font-size: 0.78rem; }
 
-.studio-error { width: min(100%, 920px); margin: var(--space-sm) auto 0; }
+.studio-error { width: min(100%, 1040px); margin: var(--space-sm) auto 0; }
 
 /* --- Shelf ---------------------------------------------------------------- */
 
@@ -211,9 +211,11 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
-  width: min(100%, 1180px);
+  width: min(100%, 1040px);
   margin: var(--space-xl) auto var(--space-sm);
 }
+.studio-shelf { padding-top: var(--space-lg); border-top: var(--rule-fine) solid var(--color-rule); }
+.studio-shelf__title { flex-basis: 100%; margin: 0; color: var(--color-ink); font-size: 1.15rem; font-weight: 650; letter-spacing: -0.015em; }
 .studio-folders {
   display: flex;
   gap: var(--space-2xs);
@@ -249,7 +251,7 @@
 /* --- Gallery -------------------------------------------------------------- */
 
 .studio-gallery {
-  width: min(100%, 1180px);
+  width: min(100%, 1040px);
   margin: 0 auto;
   columns: 260px;
   column-gap: 14px;
@@ -310,8 +312,8 @@
   margin: 0;
   padding: 44px 14px 12px;
   overflow: hidden;
-  background: linear-gradient(transparent, rgb(3 10 22 / 84%));
-  color: #f4f8fc;
+  background: linear-gradient(transparent, rgb(28 16 12 / 84%));
+  color: #fffaf4;
   font-size: 0.8rem;
   line-height: 1.4;
   -webkit-box-orient: vertical;
@@ -385,7 +387,7 @@
   font-size: 0.88rem;
   text-align: center;
 }
-.studio-empty strong { color: var(--color-ink); font-family: var(--font-display); font-size: 1.4rem; font-weight: 400; }
+.studio-empty strong { color: var(--color-ink); font-family: var(--font-display); font-size: 1.4rem; font-weight: var(--display-weight); }
 .studio-more { display: flex; margin: var(--space-xs) auto 0; }
 
 .studio-spin { animation: studio-spin 900ms linear infinite; }
@@ -465,6 +467,8 @@
   .studio-plate__prompt { font-size: 1.22rem; min-height: 58px; }
   .studio-segment__label { display: none; }
   .studio-segment button { padding: 0 10px; }
+  /* Touch targets: the shape choices, the Reference and Ideas buttons and the idea categories are 44px tall on a phone. */
+  .studio-segment button, .studio-plate__ideas, .studio-plate__reference, .studio-ideas__categories button, .studio-folders button, .studio-recent { min-height: 44px; }
   .studio-style .ui-select__trigger { min-width: 0; }
   .studio-plate__spacer { display: none; }
   .studio-plate__ideas, .studio-plate__reference { order: 5; }
@@ -486,3 +490,10 @@
   .studio-tile__open img { transition: none; }
   .studio-tile:hover .studio-tile__open img { transform: none; }
 }
+
+/* A saved avatar's thumbnail in the reference menu. */
+.studio-avatar-thumb { width: 22px; height: 22px; border-radius: 50%; object-fit: cover; }
+
+/* A Free account's weekly image count: one plain line under the form. */
+.studio-allowance { width: min(100%, 1040px); margin: var(--space-sm) auto 0; color: var(--color-ink-2); font-size: var(--text-sm); }
+.studio-allowance[data-empty] { color: var(--color-ink); }

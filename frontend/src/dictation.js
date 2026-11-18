@@ -8,8 +8,16 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 // chooses to send, so nothing here touches the server.
 const NativeSpeech = registerPlugin("SpeechRecognition");
 
+// Brave has the speech recognition API but no speech service behind it (that service needs a Google key that Brave does not ship), so
+// every attempt ends in a "network" error even when the device is online. Verified in Brave: the events are start, audiostart,
+// audioend, error "network", end, with navigator.onLine true. The mic is not offered there, rather than offered and failing.
+export function isBrave() {
+  return typeof navigator !== "undefined" && Boolean(navigator.brave) && typeof navigator.brave.isBrave === "function";
+}
+
 function webRecognizer() {
   if (typeof window === "undefined") return null;
+  if (isBrave()) return null;
   // The Windows app (Electron) exposes the API, but it has no recognition
   // service behind it and every attempt fails, so the mic stays hidden there.
   if (/\bElectron\//.test(navigator.userAgent)) return null;
@@ -32,13 +40,24 @@ export function joinDictation(base, spoken) {
   return /\s$/.test(base) ? `${base}${text}` : `${base} ${text}`;
 }
 
-const ERROR_MESSAGES = {
-  "not-allowed": "Microphone access is blocked. Allow it in your browser or phone settings to speak a message.",
-  "service-not-allowed": "Speech recognition isn't available in this browser.",
-  "audio-capture": "No microphone was found.",
-  network: "Speech recognition needs an internet connection.",
-  "language-not-supported": "Speech recognition doesn't support your device language yet.",
-};
+// What each reason means, in words. The browser reports one code, "network", both for being offline and for its speech service being
+// unreachable, so the device's own online state decides which of the two it is.
+export function describeDictationError(code, { online = true, secure = true } = {}) {
+  if (!secure) return "Dictation needs a secure (HTTPS) connection to this site.";
+  switch (code) {
+    case "not-allowed": return "Microphone access is blocked. Allow it in your browser or phone settings to speak a message.";
+    case "service-not-allowed": return "This browser doesn't allow speech recognition here. Type your message, or try another browser.";
+    case "audio-capture": return "No microphone was found. Check that one is connected and chosen in your system settings.";
+    case "no-speech": return "No speech was heard. Check your microphone, then try again.";
+    case "network":
+      return online
+        ? "This browser's speech service isn't available right now, although you are online. Type your message, or try another browser."
+        : "You appear to be offline. Dictation needs a connection to your browser's speech service. Check your connection and try again.";
+    case "language-not-supported": return "Speech recognition doesn't support your device language yet.";
+    case "aborted": return "";
+    default: return "Speech recognition stopped unexpectedly. Try again.";
+  }
+}
 
 // onTranscript receives the full text heard in the current session each time
 // it changes; the caller decides how to merge it with the draft.
@@ -67,9 +86,9 @@ export function useDictation({ onTranscript, onError }) {
 
   const fail = useCallback((code) => {
     finish();
-    // Silence and a manual stop aren't errors worth showing.
-    if (code === "no-speech" || code === "aborted") return;
-    callbacks.current.onError?.(ERROR_MESSAGES[code] ?? "Speech recognition stopped unexpectedly. Try again.");
+    // A manual stop is not an error. Silence is told gently, so the person knows nothing was heard.
+    const message = describeDictationError(code, { online: typeof navigator === "undefined" || navigator.onLine !== false, secure: typeof window === "undefined" || window.isSecureContext !== false });
+    if (message) callbacks.current.onError?.(message);
   }, [finish]);
 
   const stop = useCallback(() => {

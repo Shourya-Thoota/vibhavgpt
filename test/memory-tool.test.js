@@ -37,7 +37,8 @@ test("after saving, the assistant is told to confirm what it saved in plain word
   const source = readFileSync(new URL("../src/chat/router.js", import.meta.url), "utf8");
   assert.match(source, /Saved to the user's memory under \$\{result\.label\}/);
   assert.match(source, /Don't tell them you can't, and don't send them to the Memory page to do it\./);
-  assert.match(source, /extractAndSaveFacts\(userId, content, memoryWrites\.length \? await getFacts\(userId\) : facts\)/);
+  // Extraction compares against what is saved now in the same scope (fresh after a save in this turn), never a stale copy.
+  assert.match(source, /extractAndSaveFacts\(userId, content, await getFacts\(userId, memoryTarget\), \{ target: memoryTarget, conversationId: saved\.conversationId \}\)/);
   // The read path is unchanged: the same memory prompt, built the same way.
   assert.match(source, /const memorySystemPrompt = buildMemorySystemPrompt\(baseSystemPrompt, facts\);/);
   assert.doesNotMatch(source.match(/function memoryToolResult[\s\S]*?\r?\n}\r?\n/)[0], /\u2014|\u2013/);

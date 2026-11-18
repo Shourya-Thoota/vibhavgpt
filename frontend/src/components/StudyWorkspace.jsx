@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { BookOpen, FileText, Plus, ArrowUpRight } from "lucide-react";
-import { Modal, Select } from "./ui.jsx";
+import { Banner, Modal, Select } from "./ui.jsx";
 import { STUDY_ACTIONS } from "../product-modes.js";
 
 export default function StudyWorkspace({ api, apiBase, conversationId, model, onSession, renderChat }) {
@@ -54,7 +54,7 @@ export default function StudyWorkspace({ api, apiBase, conversationId, model, on
     <div className="study-materials__title"><BookOpen size={19} /><h2>Your materials</h2><span>{materials.length}</span></div>
     <p className="study-muted">Keep your notes beside the conversation. They stay with this study session.</p>
     <button type="button" className="btn btn--secondary" disabled={uploading} onClick={() => input.current?.click()}><Plus size={16} />{uploading ? "Reading documents…" : "Add study material"}</button>
-    {error && <p className="banner banner--error" role="alert">{error}</p>}
+    {error && <Banner tone="error">{error}</Banner>}
     {materials.length > 0 ? <>
       <Select label="Study material" value={active?.id ?? ""} onChange={setSelected} options={materials.map((file) => ({ value: file.id, label: file.name }))} />
       <details className="study-excerpt" open><summary><FileText size={15} /> Extracted text</summary><pre>{active?.text}</pre><a href={`${apiBase}${active?.downloadUrl}`} target="_blank" rel="noreferrer">Open original <ArrowUpRight size={13} /></a></details>

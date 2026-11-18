@@ -1,0 +1,294 @@
+/* ==========================================================================
+   The sign-in page: one centred card on a soft, still backdrop.
+
+   The logo, a plain heading and a line, then Google, an OR divider, the Password / Email code toggle, the fields, the bot check,
+   a full-width button and the passkey as a second action. Create account is a line under the card; the four promises about the
+   account follow it. The backdrop is three blurred areas of the shared gradient's violet and a few small dots, painted once and
+   never animated.
+
+   Every rule is rooted in .auth.auth--signin (or a descendant of it), so nothing else that uses the shared auth styles changes:
+   the consent screen and the native app's security check keep auth.css exactly as it is.
+   Day and night both work from the shared tokens.
+   ========================================================================== */
+
+/* The shared two-column grid and the phone layout's pull-up under a sky panel do not apply to this page. */
+.auth.auth--signin {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "main";
+  gap: 0;
+}
+.auth.auth--signin .auth__main { grid-area: main; grid-template-rows: none; margin-top: 0; padding: 0; }
+.auth.auth--signin .auth__center { align-self: center; }
+
+.auth.auth--signin{
+  --auth-dot: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  --auth-blob-a: color-mix(in srgb, var(--color-accent) 46%, transparent);
+  --auth-blob-b: color-mix(in srgb, var(--color-accent) 34%, transparent);
+  --auth-blob-c: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: var(--space-lg) var(--space-md);
+  overflow-x: clip;
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+:root:not([data-theme="light"]) .auth.auth--signin{
+  --auth-dot: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  --auth-blob-a: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  --auth-blob-b: color-mix(in srgb, var(--color-accent) 28%, transparent);
+  --auth-blob-c: color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+/* --- The backdrop: still ------------------------------------------------- */
+
+.auth--signin .auth__backdrop{ position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.auth--signin .auth__blob{ position: absolute; border-radius: 50%; filter: blur(80px); }
+.auth--signin .auth__blob--a{ left: -10vw; top: -16vw; width: min(52vw, 46rem); aspect-ratio: 1; background: var(--auth-blob-a); }
+.auth--signin .auth__blob--b{ right: -12vw; top: 20vh; width: min(44vw, 38rem); aspect-ratio: 1; background: var(--auth-blob-b); }
+.auth--signin .auth__blob--c{ left: 28%; bottom: -22vw; width: min(50vw, 44rem); aspect-ratio: 1; background: var(--auth-blob-c); }
+.auth--signin .auth__dots{
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 2.5px at 11% 24%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 2px at 19% 62%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 3px at 27% 14%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 2px at 73% 18%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 3px at 84% 47%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 2px at 90% 78%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 2.5px at 64% 86%, var(--auth-dot) 96%, transparent),
+    radial-gradient(circle 2px at 8% 88%, var(--auth-dot) 96%, transparent);
+}
+
+/* --- The column ------------------------------------------------------------ */
+
+.auth--signin .auth__main{
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  min-width: 0;
+}
+.auth--signin .auth__top{ display: flex; justify-content: center; }
+.auth--signin .auth__center{
+  display: grid;
+  gap: var(--space-md);
+  width: min(100%, 25rem);
+  min-width: 0;
+}
+
+/* --- The card -------------------------------------------------------------- */
+
+.auth--signin .auth__card{
+  position: relative;
+  display: grid;
+  gap: var(--space-md);
+  padding: var(--space-lg) var(--space-lg) var(--space-md);
+  border: var(--rule-card) solid var(--color-rule);
+  border-radius: 20px;
+  background: var(--color-paper-raised);
+  box-shadow: 0 18px 50px -22px rgb(70 48 160 / 0.32), 0 2px 8px rgb(0 0 0 / 0.05);
+  animation: auth-settle var(--dur-long) var(--ease-out) both;
+}
+.auth--signin .auth__logo{ display: flex; justify-content: center; }
+
+/* Each step mounts fresh (keyed), so it crossfades in with a small rise. */
+.auth--signin .auth__step{
+  display: grid;
+  gap: var(--space-md);
+  min-width: 0;
+  animation: auth-step var(--dur-long) var(--ease-out) both;
+}
+
+.auth--signin .auth__head{ display: grid; gap: var(--space-2xs); text-align: center; }
+.auth--signin .auth__title{
+  font-family: "Google Sans", var(--font-display);
+  font-size: 1.85rem;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.auth--signin .auth__subtitle{
+  color: var(--color-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+/* --- Form ------------------------------------------------------------------ */
+
+.auth--signin .auth__form{ display: grid; gap: var(--space-sm); }
+.auth--signin .auth__form .ui-field{ gap: var(--space-2xs); }
+.auth--signin .ui-field__label{ color: var(--color-ink); font-size: var(--text-sm); font-weight: 500; }
+.auth--signin .ui-field__row{ display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-sm); }
+.auth--signin .ui-field__row .ui-field__label{ margin: 0; }
+
+.auth--signin .input,
+.auth--signin .ui-select__trigger{
+  min-height: 2.75rem;
+  border-radius: 12px;
+}
+.auth--signin .input--code{
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-lg);
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+/* A leading icon sits inside the field's left edge. */
+.auth--signin .input-affix--lead .input{ padding-left: 2.6rem; }
+.auth--signin .input-affix__icon{
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+.auth--signin .input-affix:focus-within .input-affix__icon{ color: var(--color-ink); }
+.auth--signin .input-affix__button{ border-radius: var(--radius-icon); }
+.auth--signin .input:focus-visible{ outline: 2px solid var(--color-focus); outline-offset: 1px; }
+
+.auth--signin .auth__forgot{
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+}
+.auth--signin .auth__forgot:hover:not(:disabled){ text-decoration: underline; text-underline-offset: 3px; }
+.auth--signin .auth__forgot:focus-visible{ outline: 2px solid var(--color-focus); outline-offset: 3px; border-radius: 4px; }
+.auth--signin .auth__resend{ justify-self: start; }
+
+.auth--signin .btn{ border-radius: 12px; }
+.auth--signin .btn--lg{ min-height: 2.75rem; }
+.auth--signin .btn:active:not(:disabled){ transform: translateY(1px); }
+.auth--signin .btn--primary{ transition: background-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
+.auth--signin .btn:focus-visible{ outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.auth--signin .auth__submit{ gap: var(--space-xs); }
+.auth--signin .auth__google, .auth--signin .auth__passkey{ gap: var(--space-xs); }
+/* The social sign-in buttons (Slice 8): Google's button, once per configured provider, stacked with the form's own spacing. */
+.auth--signin .auth__provider{ gap: var(--space-xs); min-height: var(--hit-min); }
+.auth--signin .auth__social{ display: grid; gap: var(--space-sm); }
+
+.auth--signin .checkbox{ align-items: flex-start; line-height: 1.5; }
+.auth--signin .checkbox input{ border-radius: var(--radius-mark); }
+.auth--signin .auth__consent{ color: var(--color-muted); font-size: var(--text-xs); line-height: 1.55; }
+
+/* The bot check, in a box of its own. */
+.auth--signin .turnstile{ overflow: hidden; border-radius: 12px; }
+.auth--signin .turnstile[data-configured]{ min-height: 4.125rem; }
+.auth--signin .turnstile iframe{ border-radius: 12px; max-width: 100%; }
+.auth--signin .auth__captcha-error{ display: grid; gap: var(--space-xs); }
+.auth--signin .auth__captcha-error .btn{ justify-self: start; }
+
+.auth--signin .note{ margin-top: 0; border-radius: 12px; }
+
+/* OR, between Google and the form. */
+.auth--signin .auth__divider{
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.auth--signin .auth__divider::before,
+.auth--signin .auth__divider::after{
+  flex: 1;
+  height: var(--rule-fine);
+  background: var(--color-rule);
+  content: "";
+}
+
+/* Password / Email code. */
+.auth--signin .auth__method.ui-segmented{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  padding: 3px;
+  border: var(--rule-card) solid var(--color-rule);
+  border-radius: 12px;
+  background: var(--color-paper-3);
+}
+.auth--signin .auth__method .ui-segmented__option{
+  justify-content: center;
+  min-height: 2.25rem;
+  border-radius: 9px;
+  font-size: var(--text-sm);
+  transition: color var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+.auth--signin .auth__method .ui-segmented__option[aria-checked="true"]{
+  background: var(--color-paper-raised);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.auth--signin .auth__back{ justify-self: center; }
+
+/* Create account / Sign in, under the card. */
+.auth--signin .auth__switchline{
+  text-align: center;
+  color: var(--color-ink-2);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+.auth--signin .auth__switchlink{
+  min-height: 2.75rem;
+  padding: 0 var(--space-2xs);
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.auth--signin .auth__switchlink:hover{ text-decoration: underline; text-underline-offset: 3px; }
+.auth--signin .auth__switchlink:focus-visible{ outline: 2px solid var(--color-focus); outline-offset: 2px; border-radius: 6px; }
+
+/* --- Dialogs opened from these pages (scoped; other dialogs unchanged) --- */
+.auth--signin .ui-modal{
+  border-radius: 20px;
+  border: var(--rule-card) solid var(--color-rule);
+  background: var(--color-paper-raised);
+  animation: auth-step var(--dur-long) var(--ease-out) both;
+}
+.auth--signin .ui-modal__title{
+  font-family: "Google Sans", var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+.auth--signin .ui-modal__actions{ gap: var(--space-xs); }
+
+/* --- Phones ---------------------------------------------------------------- */
+
+@media (max-width: 30rem) {
+  .auth.auth--signin{ padding: clamp(1rem, 4vh, 2rem) var(--space-sm); place-items: center; }
+  .auth--signin .auth__card{ gap: var(--space-sm); padding: var(--space-md) var(--space-md) var(--space-sm); }
+  .auth--signin .auth__step{ gap: var(--space-sm); }
+  .auth--signin .auth__title{ font-size: 1.7rem; }
+  /* Inputs are never smaller than 16px on a phone, so the browser does not zoom into them. */
+  .auth .input, .auth--signin .ui-select__trigger{ font-size: 16px; }
+}
+
+/* Reduced motion: the shared rule in auth.css is less specific than the rules above, so it is restated here for this page. */
+@media (prefers-reduced-motion: reduce) {
+  .auth--signin .auth__card,
+  .auth--signin .auth__step,
+  .auth--signin .ui-modal { animation-name: auth-fade; }
+  .auth--signin .btn:active:not(:disabled) { transform: none; }
+}

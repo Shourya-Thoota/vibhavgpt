@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ScanSearch, Wand2 } from "lucide-react";
+import { ScanSearch, Wand2, X } from "lucide-react";
 import { Segmented } from "./ui.jsx";
 import "../writing-tools.css";
 
@@ -9,8 +9,8 @@ import "../writing-tools.css";
 // need, reporting the widget's height so nothing is clipped, is handled here.
 export const WIDGET_ORIGIN = "https://widgets.cleverhumanizer.ai";
 export const WIDGETS = [
-  { tab: "detector", id: "95f9d2d141d74ec580880c266b813f7b", title: "AI Detector" },
-  { tab: "humanizer", id: "1e5f37671c4f49c696409a6a12345c5f", title: "AI Humanizer" },
+  { tab: "detector", id: "95f9d2d141d74ec580880c266b813f7b", title: "AI Detector", summary: "Paste a passage to check it for patterns common in AI-written text." },
+  { tab: "humanizer", id: "1e5f37671c4f49c696409a6a12345c5f", title: "AI Humanizer", summary: "Paste a passage to rewrite it so it reads more naturally." },
 ];
 export const embedUrl = (id) => `${WIDGET_ORIGIN}/embed/${id}?theme=light`;
 const INITIAL_HEIGHT = 600;
@@ -57,16 +57,35 @@ function WidgetFrame({ widget, visible }) {
 // `initialTab` picks the tool it opens on, for shortcuts like the composer's + menu.
 export default function StudyWritingTools({ onBack, initialTab = "detector" }) {
   const [tab, setTab] = useState(initialTab === "humanizer" ? "humanizer" : "detector");
+  const active = WIDGETS.find((widget) => widget.tab === tab) ?? WIDGETS[0];
+  // Until a tool's frame has loaded, a line above its card says so, rather
+  // than leaving a blank card with no explanation.
+  const section = useRef(null);
+  const [loaded, setLoaded] = useState(() => new Set());
+  useEffect(() => {
+    const cleanups = [...(section.current?.querySelectorAll(".writing-tools-widget-wrapper") ?? [])].map((wrapper) => {
+      const frame = wrapper.querySelector("iframe");
+      const onLoad = () => setLoaded((current) => (current.has(wrapper.dataset.tab) ? current : new Set(current).add(wrapper.dataset.tab)));
+      frame?.addEventListener("load", onLoad);
+      return () => frame?.removeEventListener("load", onLoad);
+    });
+    return () => cleanups.forEach((cleanup) => cleanup());
+  }, []);
   return (
-    <section className="writing-tools" aria-label="Writing Tools">
-      {/* One utility bar: Back on the left, the two tools on the right. */}
+    <section ref={section} className="writing-tools" aria-label="Writing Tools">
+      {/* One utility bar: Close on the left, the two tools on the right. */}
       <header className="writing-tools__bar">
-        {onBack && <button type="button" className="btn btn--secondary writing-tools__back" onClick={onBack}><ArrowLeft size={15} />Back to Study</button>}
+        {onBack && <button type="button" className="btn btn--secondary writing-tools__back" onClick={onBack} aria-label="Close Writing tools"><X size={15} aria-hidden="true" />Close</button>}
         <Segmented label="Writing tool" value={tab} onChange={setTab} options={[
           { value: "detector", label: "AI Detector", icon: <ScanSearch size={15} /> },
           { value: "humanizer", label: "AI Humanizer", icon: <Wand2 size={15} /> },
         ]} />
       </header>
+      <div className="writing-tools__head">
+        <h2>{active.title}</h2>
+        <p>{active.summary}</p>
+      </div>
+      {!loaded.has(tab) && <p className="writing-tools__loading" role="status">Loading the {active.title}…</p>}
       {WIDGETS.map((widget) => <WidgetFrame key={widget.tab} widget={widget} visible={tab === widget.tab} />)}
       <p className="writing-tools__notice">Writing tools run via Clever AI. Text processed through these tools is handled according to provider guidelines and does not affect your VibhavGPT chat history.</p>
     </section>

@@ -26,14 +26,14 @@ test("the thinking drawer and Thought for X s appear only with real thinking", (
   // Live: no thinking text, no block.
   assert.match(trace, /if \(live\) \{\n\s*if \(!hasText\) return null;/);
   // Finished: no thinking text and no seconds, nothing at all.
-  assert.match(trace, /if \(seconds === null && !hasText\) return null;/);
+  assert.match(trace, /if \(!hasText && \(seconds === null \|\| Number\(seconds\) < 1\)\) return null;/);
   // Text present: an expandable "Thought for X s" control, in the same orb
   // pill as the live thinking status.
   assert.match(trace, /aria-expanded=\{open\}/);
   assert.match(trace, /<button type="button" className="thinking-tool__toggle" aria-expanded=\{open\}/);
   assert.match(trace, /const restingOrb = <span className="thinking-tool__orb" aria-hidden="true"><i \/><i \/><i \/><\/span>;/);
   assert.doesNotMatch(trace, /data-active/, "the finished orb is at rest");
-  assert.match(trace, /const label = seconds === null \? "Thought" : thoughtLabel\(seconds\);/);
+  assert.match(trace, /const label = seconds === null \|\| Number\(seconds\) < 1 \? "Thought" : thoughtLabel\(seconds\);/);
   // The live block and the finished tag are both driven only by streamed thinking.
   assert.match(app, /\{liveReasoning && !streamText && <ReasoningTrace text=\{liveReasoning\} live \/>\}/);
   assert.match(app, /\{liveReasoning && streamText && <ReasoningTrace text=\{liveReasoning\} seconds=\{liveThought\} \/>\}/);

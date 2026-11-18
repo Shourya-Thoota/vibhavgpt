@@ -4,4 +4,10 @@
     <string name="title_activity_main">VibhavGPT</string>
     <string name="package_name">com.pansophy.vibhavgpt</string>
     <string name="custom_url_scheme">com.pansophy.vibhavgpt</string>
+    <string name="shortcut_new_chat_short">Chat</string>
+    <string name="shortcut_new_chat_long">New Chat</string>
+    <string name="shortcut_new_image_short">Image</string>
+    <string name="shortcut_new_image_long">New Image</string>
+    <string name="shortcut_new_build_short">Build</string>
+    <string name="shortcut_new_build_long">New Build</string>
 </resources>

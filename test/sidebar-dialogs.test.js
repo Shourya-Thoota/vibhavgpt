@@ -2,11 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 
-// Dialogs opened from the sidebar (New project, folders, Move chat) cover the
+// Dialogs opened from the sidebar (New notebook, folders, Move chat) cover the
 // whole window, centred over a dimmed backdrop. They are position: fixed, so
 // no ancestor in the sidebar may become their containing block: a
 // backdrop-filter, filter, transform, perspective, contain or will-change on
-// the sidebar box confined the New project dialog to the sidebar.
+// the sidebar box confined the New notebook dialog to the sidebar.
 const read = (path) => readFileSync(new URL(`../frontend/src/${path}`, import.meta.url), "utf8");
 const CONTAINING = /(?:^|[\s;{])(?:backdrop-filter|filter|perspective|contain|will-change)\s*:|(?:^|[\s;{])transform\s*:(?!\s*none\b)/;
 
@@ -18,7 +18,7 @@ test("the sidebar box never becomes the containing block for its dialogs", () =>
       const onSidebar = selectors.split(",").some((selector) => /^\.sidebar(?:\[data-open="true"\])?$/.test(selector.trim()));
       // The phone drawer slides in with a transform while closed; once open
       // (the only time its dialogs can open) it is transform: none.
-      const closedDrawer = sheet === "styles.css" && /translateX\(-102%\)/.test(body);
+      const closedDrawer = sheet === "styles.css" && /translateX\(-100%\)/.test(body);
       if (onSidebar && !closedDrawer) assert.doesNotMatch(body, CONTAINING, `${sheet}: ${selectors.trim()} { ${body.trim()} }`);
     }
   }
@@ -29,7 +29,7 @@ test("the sidebar box never becomes the containing block for its dialogs", () =>
 
 test("the shared dialog is a centred, full-window overlay that closes on Escape or a backdrop click and submits on Enter", () => {
   const css = read("styles.css");
-  assert.match(css, /\.ui-scrim \{[^}]*position: fixed;[^}]*inset: 0;[^}]*z-index: 100;[^}]*display: grid;[^}]*place-items: center;[^}]*backdrop-filter: blur\(3px\);/);
+  assert.match(css, /\.ui-scrim \{[^}]*position: fixed;[^}]*inset: 0;[^}]*z-index: var\(--z-modal\);[^}]*display: grid;[^}]*place-items: center;[^}]*backdrop-filter: blur\(3px\);/);
   const ui = read("components/ui.jsx");
   const modal = ui.slice(ui.indexOf("export function Modal("), ui.indexOf("export function Modal(") + 2600);
   assert.match(modal, /if \(event\.key === "Escape"\) onClose\(\);/);
@@ -40,7 +40,7 @@ test("the shared dialog is a centred, full-window overlay that closes on Escape 
 
 test("the New project dialog names its field and focuses it", () => {
   const library = read("components/ConversationLibrary.jsx");
-  assert.match(library, /<Field label=\{dialog\?\.kind === "project" \? "Project name" : "Folder name"\}>\s*<input className="input" autoFocus maxLength=\{80\}/);
-  assert.match(library, /dialog\?\.kind === "project" \? "Create project" : "Create folder"/);
+  assert.match(library, /<Field label="Project name">\s*<input className="input" autoFocus maxLength=\{80\}/);
+  assert.match(library, /"Create project"/);
   assert.match(library, /<button type="button" className="btn btn--quiet" onClick=\{closeDialog\}>Cancel<\/button>/);
 });

@@ -1,9 +1,11 @@
 import { canonicalModelKey, TOKEN_MODEL_NAMES } from "../../frontend/src/token-quotas.js";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or, sql } from "drizzle-orm";
+import { KEY_FACT_PATTERN } from "./context-window.js";
 import { db } from "../db/client.js";
 import { attachments, conversations, messages } from "../db/schema.js";
 import { removeFiles } from "../uploads/service.js";
 import { appendStudyNote } from "./study-results.js";
+import { normalizeModelKey, safeNonVesperAssistantModelKeys, safeNonVesperConversationModelKeys, vesperModelKeys } from "./model-keys.js";
 
 const wholeSeconds = (value) => Number.isSafeInteger(value) && value >= 0 ? value : null;
 
@@ -70,6 +72,48 @@ export class InvalidCursorError extends Error {
   constructor() {
     super("Invalid cursor.");
     this.name = "InvalidCursorError";
+  }
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Checks whether a conversation has ever used Vulcan, either currently or in any
+// prior assistant reply, scoped strictly to the conversation owner.
+// An existence check that never loads message content.
+export async function hasHistoricalVesperUse(userId, conversationId) {
+  if (!conversationId || !userId || typeof conversationId !== "string" || !UUID_PATTERN.test(conversationId)) return false;
+  try {
+    const vesperKeys = vesperModelKeys();
+    const safeAssistantKeys = safeNonVesperAssistantModelKeys();
+    const safeConversationKeys = safeNonVesperConversationModelKeys();
+    const [match] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.userId, userId),
+          or(
+            inArray(sql`btrim(lower(${conversations.model}), E' \t\r\n')`, vesperKeys),
+            sql`coalesce(btrim(lower(${conversations.model}), E' \t\r\n'), '') not in (${sql.join(safeConversationKeys.map((k) => sql`${k}`), sql`, `)})`,
+            sql`exists (
+              select 1 from ${messages}
+              where ${messages.conversationId} = ${conversations.id}
+                and btrim(lower(${messages.metadata}->>'model'), E' \t\r\n') in (${sql.join(vesperKeys.map((k) => sql`${k}`), sql`, `)})
+            )`,
+            sql`exists (
+              select 1 from ${messages}
+              where ${messages.conversationId} = ${conversations.id}
+                and ${messages.role} = 'assistant'
+                and coalesce(btrim(lower(${messages.metadata}->>'model'), E' \t\r\n'), '') not in (${sql.join(safeAssistantKeys.map((k) => sql`${k}`), sql`, `)})
+            )`
+          )
+        )
+      )
+      .limit(1);
+    return Boolean(match);
+  } catch {
+    return true;
   }
 }
 
@@ -143,7 +187,25 @@ export async function loadConversation(userId, conversationId) {
     .from(attachments)
     .where(eq(attachments.conversationId, conversation.id));
 
-  return { conversation, history: presentMessages(recentHistory.reverse(), attachmentRows) };
+  // Older than the newest 80: only what the person said that later turns must keep honouring (corrections, preferences, standing
+  // instructions), at most 30 of them, looked for in the 400 messages just before the window. Bounded, owner-scoped, and read fresh each time.
+  let earlierKeyMessages = [];
+  if (recentHistory.length === 80) {
+    const oldest = recentHistory[0];
+    const older = await db
+      .select(MESSAGE_COLUMNS)
+      .from(messages)
+      .where(and(eq(messages.conversationId, conversation.id), eq(messages.role, "user"), lt(messages.createdAt, oldest.createdAt)))
+      .orderBy(...NEWEST_FIRST)
+      .limit(400);
+    earlierKeyMessages = older
+      .filter((row) => typeof row.content === "string" && KEY_FACT_PATTERN.test(row.content))
+      .slice(0, 30)
+      .reverse()
+      .map((row) => ({ id: row.id, role: "user", content: row.content }));
+  }
+
+  return { conversation, history: presentMessages(recentHistory.reverse(), attachmentRows), earlierKeyMessages };
 }
 
 // One page of visible history: the newest messages, or with "before" (the id
@@ -188,6 +250,17 @@ export async function loadConversationPage(userId, conversationId, { before = nu
   return { conversation, history, hasMore, nextCursor: hasMore ? history[0].id : null };
 }
 
+// Temporary chats last 24 hours. Swept for one owner whenever their chat list is read, a bounded batch at a time, through the normal
+// delete so their files go too. They never held memory, so nothing else needs cleaning up.
+export const TEMPORARY_CHAT_HOURS = 24;
+export async function purgeExpiredTemporaryConversations(userId) {
+  const expired = await db.select({ id: conversations.id }).from(conversations)
+    .where(and(eq(conversations.userId, userId), eq(conversations.temporary, true), lt(conversations.createdAt, new Date(Date.now() - TEMPORARY_CHAT_HOURS * 3_600_000))))
+    .limit(25);
+  for (const row of expired) await deleteConversation(userId, row.id);
+  return expired.length;
+}
+
 export async function listConversations(userId) {
   const rows = await db
     .select({
@@ -200,7 +273,8 @@ export async function listConversations(userId) {
       updatedAt: conversations.updatedAt,
     })
     .from(conversations)
-    .where(and(eq(conversations.userId, userId), eq(conversations.archived, false)))
+    // Temporary chats are never listed.
+    .where(and(eq(conversations.userId, userId), eq(conversations.archived, false), eq(conversations.temporary, false)))
     .orderBy(desc(conversations.updatedAt))
     // Room for chats filed in projects and folders, which stay visible in
     // the sidebar however old they are.
@@ -270,31 +344,45 @@ export function makeTitle(content) {
 // message with it. A first message creates its conversation here. A retry of
 // the conversation's last message, still unanswered, reuses that message
 // instead of adding it again.
-export async function saveUserMessage({ userId, conversationId, modelKey, content, mode }) {
+export async function saveUserMessage({ userId, conversationId, modelKey, content, mode, temporary = false }) {
+  const isVesper = normalizeModelKey(modelKey) === "vesper";
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
     if (!id) {
       const [created] = await tx
         .insert(conversations)
-        .values({ userId, title: makeTitle(content), model: modelKey, ...(mode ? { mode } : {}) })
+        .values({ userId, title: makeTitle(content), model: modelKey, ...(mode ? { mode } : {}), ...(temporary ? { temporary: true } : {}) })
         .returning({ id: conversations.id });
       id = created.id;
     } else {
       const [last] = await tx
-        .select({ id: messages.id, role: messages.role, content: messages.content })
+        .select({ id: messages.id, role: messages.role, content: messages.content, metadata: messages.metadata })
         .from(messages)
         .where(eq(messages.conversationId, id))
         .orderBy(desc(messages.createdAt), sql`case when ${messages.role} = 'assistant' then 0 else 1 end`)
         .limit(1);
       if (last?.role === "user" && last.content === content) {
-        await tx.update(messages).set({ metadata: {} }).where(eq(messages.id, last.id));
+        const nextMetadata = (last.metadata && typeof last.metadata === "object") ? { ...last.metadata } : {};
+        delete nextMetadata.replyStatus;
+        delete nextMetadata.requestId;
+        const existingIsVesper = typeof nextMetadata.model === "string" && normalizeModelKey(nextMetadata.model) === "vesper";
+        if (existingIsVesper || isVesper) {
+          nextMetadata.model = "vesper";
+        }
+        await tx.update(messages).set({ metadata: nextMetadata }).where(eq(messages.id, last.id));
         return { conversationId: id, messageId: last.id, reused: true };
       }
     }
     const [saved] = await tx
       .insert(messages)
-      .values({ conversationId: id, role: "user", content, createdAt: new Date() })
+      .values({
+        conversationId: id,
+        role: "user",
+        content,
+        createdAt: new Date(),
+        ...(isVesper ? { metadata: { model: "vesper" } } : {}),
+      })
       .returning({ id: messages.id });
     return { conversationId: id, messageId: saved.id, reused: false };
   });
@@ -322,7 +410,9 @@ export async function recordStudyResult(userId, conversationId, messageId, note)
 
 export async function markReplyMissing(messageId, replyStatus, requestId) {
   await db.update(messages)
-    .set({ metadata: { replyStatus, requestId } })
+    .set({
+      metadata: sql`coalesce(${messages.metadata}, '{}'::jsonb) || jsonb_build_object('replyStatus', ${replyStatus}::text, 'requestId', ${requestId}::text)`,
+    })
     .where(and(eq(messages.id, messageId), sql`not exists (
       select 1 from messages answer
       where answer.conversation_id = messages.conversation_id and answer.role = 'assistant' and answer.created_at > messages.created_at
@@ -334,7 +424,7 @@ export async function markReplyMissing(messageId, replyStatus, requestId) {
 // message's missing-reply mark cleared). Without it, both are saved together.
 // The reply records replyModel, which is the conversation's model unless the
 // reply came from elsewhere (an image, or a document, which records none).
-export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "", imageContext = null, replyModel = modelKey }) {
+export async function saveExchange({ userId, conversationId, modelKey, userContent, reply, attachmentIds = [], mode, sources = [], activitySummary = [], thoughtSeconds = null, userMessageId = null, imagePrompt = "", imageContext = null, replyModel = modelKey, temporary = false }) {
   modelKey = canonicalModelKey(modelKey);
   return db.transaction(async (tx) => {
     let id = conversationId;
@@ -349,6 +439,7 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
           // Set mode only on creation. Existing conversations retain their
           // mode even if a client sends a different workspace flag.
           ...(mode ? { mode } : {}),
+          ...(temporary ? { temporary: true } : {}),
         })
         .returning({ id: conversations.id });
       id = created.id;
@@ -374,16 +465,28 @@ export async function saveExchange({ userId, conversationId, modelKey, userConte
     if (userMessageId) {
       const [userRow] = await tx
         .update(messages)
-        .set({ metadata: {} })
+        .set({
+          metadata: sql`coalesce(${messages.metadata}, '{}'::jsonb) - 'replyStatus' - 'requestId'`,
+        })
         .where(and(eq(messages.id, userMessageId), eq(messages.conversationId, id)))
         .returning({ id: messages.id, role: messages.role, content: messages.content });
       if (!userRow) throw new Error("The message being answered is no longer in this conversation.");
       const [assistant] = await tx.insert(messages).values(assistantRow).returning({ id: messages.id, role: messages.role, content: messages.content });
       saved = [userRow, assistant];
     } else {
+      const isVesper = normalizeModelKey(modelKey) === "vesper";
       saved = await tx
         .insert(messages)
-        .values([{ conversationId: id, role: "user", content: userContent, createdAt: userCreatedAt }, assistantRow])
+        .values([
+          {
+            conversationId: id,
+            role: "user",
+            content: userContent,
+            createdAt: userCreatedAt,
+            ...(isVesper ? { metadata: { model: "vesper" } } : {}),
+          },
+          assistantRow,
+        ])
         .returning({ id: messages.id, role: messages.role, content: messages.content });
     }
 

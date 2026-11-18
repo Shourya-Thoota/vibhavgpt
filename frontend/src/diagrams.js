@@ -5,12 +5,16 @@
 
 export const DIAGRAM_LANGUAGE = "mermaid";
 
-// "strict" makes mermaid strip scripts and event handlers from labels.
+// "strict" makes mermaid strip scripts and event handlers from labels; htmlLabels false renders native SVG text rather than foreignObject.
 export const MERMAID_CONFIG = Object.freeze({
   startOnLoad: false,
   securityLevel: "strict",
   theme: "base",
   fontFamily: "inherit",
+  htmlLabels: false,
+  flowchart: {
+    htmlLabels: false,
+  },
 });
 
 // The theme's own colours, resolved to real colour values (mermaid can't

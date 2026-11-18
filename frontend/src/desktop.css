@@ -27,14 +27,6 @@ html[data-desktop] .home-frame { margin-top: var(--desktop-title-bar-h); height:
 .is-desktop-app { --desktop-spring: cubic-bezier(0.34, 1.56, 0.64, 1); }
 
 @media (prefers-reduced-motion: no-preference) {
-  /* The welcome planet leans toward the pointer and its glow swells (its
-     opacity belongs to the existing glow-pulse, so the swell is a scale). */
-  .is-desktop-app .opening { perspective: 900px; }
-  .is-desktop-app .opening__planet { transition: scale 520ms var(--desktop-spring), rotate 620ms var(--desktop-spring); }
-  .is-desktop-app .opening__planet::before { transition: scale 620ms var(--desktop-spring); }
-  .is-desktop-app .opening__planet:hover { scale: 1.06; rotate: -1 1 0 12deg; }
-  .is-desktop-app .opening__planet:hover::before { scale: 1.22; }
-
   /* The sidebar answers with a spring: its existing hover moves overshoot
      and settle, buttons press in, and their icons give a small wiggle. */
   .is-desktop-app .sidebar__link,

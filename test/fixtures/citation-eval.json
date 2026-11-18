@@ -1,0 +1,44 @@
+{
+  "about": "A small citation evaluation set. Sources are real Tavily search results retrieved on 2026-11-15 (URL, title and a short excerpt of the returned snippet, trimmed). Each candidate reply was written for this set; every cited claim was checked by reading the excerpt, and the verdict is recorded with the reason. 'automated' is what groundCitations' support check does with the claim; 'manual' is whether the cited excerpt really supports it. Where they differ, the case shows a limit of the automated check.",
+  "retrievedAt": "2026-11-15",
+  "cases": [
+    {
+      "question": "How tall is the Eiffel Tower?",
+      "sources": [
+        { "title": "Eiffel Tower - Wikipedia", "url": "https://en.wikipedia.org/wiki/Eiffel_Tower", "content": "The tower is 330 metres (1,083 ft) tall, about the same height as an 81-storey building, and the tallest structure in Paris. Completed 31 March 1889. Architectural 300 m (984 ft)." },
+        { "title": "Eiffel Tower | History, Height, & Facts", "url": "https://www.britannica.com/topic/Eiffel-Tower-Paris-France", "content": "Built: 1887–89. Height: 330 meters (1,083 feet). Weight: 10,100 tons. The tower stands 300 meters (984 feet) high... the TV antenna atop the tower gives it a total elevation of 330 meters (1,083 feet)." }
+      ],
+      "claims": [
+        { "sentence": "The Eiffel Tower is 330 metres tall to the tip of its antenna [1][2].", "manual": "supported", "automated": "kept", "why": "Both excerpts give 330 m, and Britannica attributes the 330 m total to the antenna." },
+        { "sentence": "Its architectural height is 300 metres [1].", "manual": "supported", "automated": "kept", "why": "Wikipedia's excerpt lists 'Architectural 300 m'." },
+        { "sentence": "It weighs about 7,300 tonnes [2].", "manual": "unsupported", "automated": "removed", "why": "Britannica's excerpt says 10,100 tons; 7,300 appears in neither excerpt." },
+        { "sentence": "It is the most romantic monument in Europe [1].", "manual": "unsupported", "automated": "kept", "why": "No excerpt says this. It has no number, so the automated check cannot judge it: a known limit." }
+      ]
+    },
+    {
+      "question": "What is the exact speed of light in a vacuum?",
+      "sources": [
+        { "title": "Speed of light - Wikipedia", "url": "https://en.wikipedia.org/wiki/Speed_of_light", "content": "The speed of light in vacuum is a universal physical constant denoted c, exactly equal to 299792458 m/s. It is exact because, by international agreement, a metre is defined as the length of the path travelled by light in vacuum during a time interval of 1/299792458 second." },
+        { "title": "How fast does light travel? | The speed of light | Space", "url": "https://www.space.com/15830-light-speed.html", "content": "The speed of light traveling through a vacuum is exactly 299,792,458 meters (983,571,056 feet) per second. That's about 186,282 miles per second." }
+      ],
+      "claims": [
+        { "sentence": "Light in a vacuum travels at exactly 299,792,458 metres per second [1][2].", "manual": "supported", "automated": "kept", "why": "Both excerpts give the value; the comma-free form in [1] matches once commas are normalised." },
+        { "sentence": "That is about 186,282 miles per second [2].", "manual": "supported", "automated": "kept", "why": "Space.com's excerpt gives 186,282 miles per second." },
+        { "sentence": "Ole Romer first estimated it in 1676 [1].", "manual": "unsupported", "automated": "removed", "why": "Historically true, but this excerpt does not say it, so [1] must not be cited for it." }
+      ]
+    },
+    {
+      "question": "How tall is Mount Everest, and is the figure disputed?",
+      "sources": [
+        { "title": "8,848.86 metres. That's the height of Mt Everest now", "url": "https://kathmandupost.com/national/2020/12/08/it-s-official-mount-everest-is-8-848-86-metres-tall", "content": "In 1999 an American survey... Their finding of 29,035 feet (8,850 metres) was accepted by the society... In 2005, the Chinese State Bureau of Surveying and Mapping re-measured the peak... and declared 8,844.43 metres to be the Everest rock-height." },
+        { "title": "Mount Everest", "url": "https://en.wikipedia.org/wiki/Mount_Everest", "content": "Its height was most recently measured in 2020 through a joint survey by Nepalese and Chinese authorities as 8,848.86 m. An argument arose between China and Nepal as to whether the official height should be the rock height (8,844 m, China) or the snow height (8,848 m, Nepal). On 8 December 2020, it was jointly announced that the new official height is 8,848.86 metres." }
+      ],
+      "claims": [
+        { "sentence": "Nepal and China jointly announced an official height of 8,848.86 metres on 8 December 2020 [2].", "manual": "supported", "automated": "kept", "why": "Wikipedia's excerpt states the figure and the announcement date." },
+        { "sentence": "Before that, the two countries disagreed: China used the rock height of 8,844 metres and Nepal the snow height of 8,848 metres [2].", "manual": "supported", "automated": "kept", "why": "The excerpt describes exactly this disagreement; it is the conflicting-sources case the reply should surface, not hide." },
+        { "sentence": "A 2005 survey measured 8,850 metres [1].", "manual": "unsupported", "automated": "kept", "why": "Misattributed: the excerpt gives 8,850 m for the 1999 American survey and 8,844.43 m for 2005. Both numbers appear in the excerpt, so the automated check keeps it: a known limit." },
+        { "sentence": "Everest grows about 44 millimetres a year [1][2].", "manual": "unsupported", "automated": "removed", "why": "Neither excerpt mentions a growth rate." }
+      ]
+    }
+  ]
+}

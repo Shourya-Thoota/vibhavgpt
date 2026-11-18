@@ -24,7 +24,7 @@ export function AccountBillingMenu({ api, userId }) {
   const summary = subscriptionSummary(state.subscription);
   return <>
     <div className="account-menu__billing" role="status">
-      <span>{summary.plan} plan{summary.provider ? ` · ${summary.provider}` : ""}</span>
+      <span>{summary.plan} plan</span>
       <span>{summary.status}</span>
     </div>
   </>;

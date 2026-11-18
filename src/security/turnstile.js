@@ -20,8 +20,10 @@ function reportFailure({ path, reason, errorCodes, hostname, status }) {
   });
 }
 
-function firstForwardedIp(request) {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+// The client address Railway appended: the last X-Forwarded-For entry. Earlier entries are whatever the client sent and can name anyone
+// (security audit, 2026-11-16); this matches Express's "trust proxy" 1, which the rate limits use.
+export function clientIpFromForwarded(request) {
+  return request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || undefined;
 }
 
 export const turnstilePlugin = {
@@ -45,7 +47,7 @@ export const turnstilePlugin = {
         secret: config.turnstileSecretKey,
         response: token,
       };
-      const remoteIp = firstForwardedIp(request);
+      const remoteIp = clientIpFromForwarded(request);
       if (remoteIp) payload.remoteip = remoteIp;
       const verification = await fetch(siteVerifyUrl, {
         method: "POST",

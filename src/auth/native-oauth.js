@@ -1,16 +1,17 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import express from "express";
 import { fromNodeHeaders } from "better-auth/node";
+import { SOCIAL_PROVIDER_LABELS } from "./social-providers.js";
 
-// Google sign-in from the Capacitor app.
+// Social sign-in (Google, and since Slice 8 any configured provider) from the Capacitor app.
 //
 // The app's WebView cannot finish OAuth itself: Google's page opens in an
 // external browser, so the callback arrives in a browser that never saw the
 // WebView's state cookie and Better Auth rejects it (state_security_mismatch).
 // Instead the whole OAuth round trip runs in one external browser:
 //
-//   1. WebView  POST /start {verifierHash}   -> proxy URL (plants state cookie, then Google)
-//   2. Browser  Google -> /api/auth/callback/google -> GET /finish?handoff=…
+//   1. WebView  POST /:provider/start {verifierHash} -> proxy URL (plants state cookie, then the provider)
+//   2. Browser  provider -> /api/auth/callback/:provider -> GET /finish?handoff=…
 //   3. /finish  moves the fresh session cookies off the browser into a
 //               single-use code and redirects to vibhavgpt://account/auth?code=…
 //   4. WebView  POST /exchange {code, verifier} -> the same cookies, set here
@@ -91,26 +92,32 @@ function returnToApp(res, params) {
   return res.redirect(302, url.toString());
 }
 
-export function createNativeOAuthRouter({ auth, authBaseUrl, limiter }) {
+// `providers`: the social providers that are set up (src/auth/social-providers.js). Any other name is refused before anything starts.
+export function createNativeOAuthRouter({ auth, authBaseUrl, limiter, providers = ["google"] }) {
   const router = express.Router();
   router.use(limiter);
+  const offered = new Set(providers);
 
-  router.post("/google/start", express.json(), async (req, res, next) => {
+  // /google/start, as installed apps call it, is one of these.
+  router.post("/:provider/start", express.json(), async (req, res, next) => {
     try {
+      const provider = String(req.params.provider ?? "");
+      if (!offered.has(provider)) return res.status(404).json({ error: "That sign-in option is not available.", code: "provider_not_available" });
+      const label = SOCIAL_PROVIDER_LABELS[provider] ?? "That";
       const verifierHash = req.body?.verifierHash;
       if (typeof verifierHash !== "string" || !HASH_PATTERN.test(verifierHash)) {
-        return res.status(400).json({ error: "Google sign-in could not be started. Please try again." });
+        return res.status(400).json({ error: `${label} sign-in could not be started. Please try again.` });
       }
       const handoff = token();
       await storeJson(auth, `native-oauth-handoff:${handoff}`, { verifierHash }, HANDOFF_TTL_MS);
 
       const finishUrl = `${authBaseUrl}/api/native-auth/finish?handoff=${handoff}`;
       const { url } = await auth.api.signInSocial({
-        body: { provider: "google", callbackURL: finishUrl, errorCallbackURL: finishUrl, disableRedirect: true },
+        body: { provider, callbackURL: finishUrl, errorCallbackURL: finishUrl, disableRedirect: true },
         headers: fromNodeHeaders(req.headers),
       });
       // The expo plugin's proxy sets the state cookie in the browser that
-      // will receive the callback, then forwards to Google.
+      // will receive the callback, then forwards to the provider.
       const proxy = new URL(`${authBaseUrl}/api/auth/expo-authorization-proxy`);
       proxy.searchParams.set("authorizationURL", url);
       return res.status(200).json({ url: proxy.toString() });
@@ -160,7 +167,7 @@ export function createNativeOAuthRouter({ auth, authBaseUrl, limiter }) {
       const expected = Buffer.from(grant?.verifierHash ?? "");
       const actual = Buffer.from(valid ? sha256(verifier) : "");
       if (!grant || expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
-        return res.status(400).json({ error: "Google sign-in expired. Please try again." });
+        return res.status(400).json({ error: "Sign-in expired. Please try again." });
       }
 
       const attributes = new Map((await transferableCookies(auth)).map((cookie) => [cookie.name, cookie.attributes]));

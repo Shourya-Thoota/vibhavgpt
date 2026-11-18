@@ -211,6 +211,160 @@
       "when": 1792713600000,
       "tag": "0030_onboarding_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793232000000,
+      "tag": "0033_shadow_cost_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793318400000,
+      "tag": "0034_model_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793404800000,
+      "tag": "0035_catalog_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793491200000,
+      "tag": "0036_allowance_reservations",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793577600000,
+      "tag": "0037_profile_pictures",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1793664000000,
+      "tag": "0038_chat_search_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793750400000,
+      "tag": "0039_account_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1793836800000,
+      "tag": "0040_conversation_use_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793923200000,
+      "tag": "0041_saved_avatars",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1794009600000,
+      "tag": "0042_flatten_folders_into_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1794096000000,
+      "tag": "0043_user_connectors_and_approvals",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1794182400000,
+      "tag": "0044_user_skills",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1794268800000,
+      "tag": "0045_connector_enabled",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1794355200000,
+      "tag": "0046_scoped_memory",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1794441600000,
+      "tag": "0047_chat_capacity_leases",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1794528000000,
+      "tag": "0048_marketplace_charges",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1794614400000,
+      "tag": "0049_connector_account_owners",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1794700800000,
+      "tag": "0050_sidebar_hidden_items",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1794787200000,
+      "tag": "0051_build_conversations",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1794873600000,
+      "tag": "0052_build_projects",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1794960000000,
+      "tag": "0053_image_watermark_opt_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1795046400000,
+      "tag": "0054_account_agreements",
+      "breakpoints": true
     }
   ]
 }

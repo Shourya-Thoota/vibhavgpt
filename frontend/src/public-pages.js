@@ -1,3 +1,6 @@
+import { normalizeCarryMode } from "./credits-policy.js";
+import { PUBLIC_CREDITS_MODE, creditsPricingFaq } from "./credits-copy.js";
+
 export const SITE_ORIGIN = "https://vibhavgpt.com";
 export const BRAND_IMAGE = `${SITE_ORIGIN}/brand/vibhavgpt-icon-512.png`;
 export const DELETION_PLAN_NOTICE = "Cancel your plan before deleting your account. Deletion is blocked while a web plan is active. Pansophy LLC is not responsible for subscriptions that were not canceled.";
@@ -9,13 +12,13 @@ export const PUBLIC_PAGES = {
     description: "Chat, create images and study with VibhavGPT, a private AI workspace for ideas, learning and everyday questions. No ads or data sales. Made by Vibhav Thoota.",
   },
   "/pricing": {
-    label: "Pricing", title: "VibhavGPT Pricing: Compare Free, Plus and Pro Plans",
-    description: "Compare VibhavGPT Free, Plus and Pro plans, monthly or yearly billing, model allowances, image creation and document generation. Made by Vibhav Thoota.",
+    label: "Pricing", title: "VibhavGPT Pricing: Compare Free, Plus, Pro, and Max Plans",
+    description: "Compare VibhavGPT Free, Plus, Pro, and Max plans, monthly or yearly billing, model allowances, image creation and document generation. Made by Vibhav Thoota.",
     faq: [
-      ["Which plan should I choose?", "Start with Free if you want to try AI chat and Study before subscribing. Plus gives you more room for everyday use and includes image and document generation. Pro offers larger allowances and access to the flagship model for difficult work. Compare the model access and allowances above with the work you expect to do; a paid plan still has usage limits."],
-      ["How do token allowances reset?", "Both the messages you send and the responses you receive count as tokens. Monthly token allowances reset on the first day of each calendar month at 00:00 UTC. A separate rolling five-hour cap applies to each model. Usage becomes available again as older tokens leave that window. The Usage page shows consumption, including pending reservations, so check it before starting a long request."],
+      ["Which plan should I choose?", "Start with Free if you want to try AI chat, Study and 2 images a week before subscribing. Plus gives you more room for everyday use and includes image and document generation. Pro offers larger allowances and access to the flagship model for difficult work. Max provides the highest allowances for high-volume work and advanced models. Compare the model access and allowances above with the work you expect to do; a paid plan still has usage limits."],
+      ["How do allowances reset?", "Free includes up to 15 AI requests in any 24-hour period, subject to a shared $0.25 included allowance each UTC calendar month. Lumen and Study share this allowance, and one message or action can use more than one AI request. Plus and Pro count both the messages you send and the responses you receive as tokens. A separate rolling five-hour cap applies to each model on those plans. Usage becomes available again as older tokens leave that window. The Usage page shows the allowance for your plan."],
       ["Can I change or cancel my plan?", "You can manage a web subscription in Plan and billing. Choosing yearly billing changes the billing period; the table shows the plan price and the yearly saving. Cancellation stops renewal, while access continues through the paid period. If a subscription was bought in the Android app, its billing details and management follow that subscription rather than a new web purchase."],
-      ["Do Flex Credits remove chat limits?", "No. Chat and Study token caps still apply when you have Flex Credits. Credits are for eligible generation features beyond the included allowance; they do not unlock paid features on Free. Read the comparison and your account's billing information before buying so you know which allowances are included and which extra generations use credits."],
+      ["Do image & document credits remove chat limits?", "No. Image & document credits (previously Flex Credits) only pay for extra documents on Plus, 1 credit each after the 20 a month. They don't add Chat or Study usage, and images can't be bought beyond your plan's allowance. Pro and Max have unlimited documents. Read the plans above before buying so you know which allowances are included."],
     ],
   },
   "/terms": {
@@ -30,7 +33,7 @@ export const PUBLIC_PAGES = {
     label: "Guarantee", title: "The VibhavGPT Guarantee: Privacy and Control of Your Data",
     description: "Pansophy LLC promises no training on your VibhavGPT chats, no data sales, no ads, and control to export or delete your account data. Made by Vibhav Thoota.",
     faq: [
-      ["Does the Guarantee apply to every plan?", "Yes. Pansophy LLC operates VibhavGPT, and these four promises apply whether you use Free, Plus or Pro. Paying for a larger allowance changes what you can use, not the promise about training, selling data or showing ads. The Guarantee is included in our Terms of Service; read those terms alongside the Privacy Policy for the complete account and service rules."],
+      ["Does the Guarantee apply to every plan?", "Yes. Pansophy LLC operates VibhavGPT, and these four promises apply whether you use Free, Plus, Pro, or Max. Paying for a larger allowance changes what you can use, not the promise about training, selling data or showing ads. The Guarantee is included in our Terms of Service; read those terms alongside the Privacy Policy for the complete account and service rules."],
       ["Does no training mean my messages are never processed?", "Your messages and relevant context must be processed to produce a response. Service providers also support hosting, account security and other necessary operations. No training is a promise about how your chats are used, not a promise that inference happens without processing them. Our Privacy Policy explains the categories of data and providers involved and the purposes for that processing."],
       ["How can I keep a copy or leave the service?", "Use Settings, then Your data, to export your account data before deletion. The account-deletion page explains the sign-in and email routes, what leaves active systems and what may remain in restricted backups or billing records. Cancel your plan before deleting your account. Deletion cannot be undone, so save any conversations or files you want to keep first."],
     ],
@@ -55,10 +58,10 @@ export const PUBLIC_PAGES = {
     ],
   },
   "/sources": {
-    label: "Sources", title: "VibhavGPT Sources: Public Source Code and YouTube Channel",
-    description: "Read the public VibhavGPT source code on GitHub or visit Vibhav Thoota's YouTube channel, with both links on one page from Pansophy LLC. Made by Vibhav Thoota.",
+    label: "Sources", title: "VibhavGPT Sources: Public Source Code and Social Links",
+    description: "Read the public VibhavGPT source code on GitHub and find VibhavGPT on YouTube, Instagram, X, Bluesky, Reddit, Threads and GitHub. Made by Vibhav Thoota.",
     faq: [
-      ["What is linked from this page?", "Two places outside VibhavGPT: the public source code of VibhavGPT on GitHub, and Vibhav Thoota's YouTube channel on YouTube. Each opens in a new tab, so this page stays open for you to return to. VibhavGPT does not embed either site here and adds no tracking to these links. They are sent without a referrer, so those sites are not told you came from VibhavGPT, and you do not need a VibhavGPT account to open either one."],
+      ["Where do the links on this page go?", "To GitHub, for the public source code and the official releases, and to VibhavGPT's profiles on YouTube, Instagram, X, Bluesky, Reddit, Threads and GitHub. Each link opens in a new tab, so this page stays open for you to return to. VibhavGPT does not embed any of these sites here and adds no tracking to the links. They are sent without a referrer, so those sites are not told you came from VibhavGPT, and you do not need a VibhavGPT account to open any of them."],
       ["Which license covers the source code?", "The public source of VibhavGPT is published under the AGPL-3.0 license, and the repository's license file has the full text. Read the license before you copy, change or run the code yourself, because it sets the conditions for sharing your changes."],
       ["Who makes VibhavGPT?", "VibhavGPT is made by Vibhav Thoota and operated by Pansophy LLC. For help with your account or the service, email support@pansophy.com and describe what you were trying to do, so the reply can be specific."],
       ["Where are the Android and Windows apps?", "On the Apps page, which lists the official Android and Windows apps with install steps and direct downloads. You can also use VibhavGPT in any modern browser with the same account, so installing an app is optional."],
@@ -85,6 +88,13 @@ export const PUBLIC_PAGES = {
     ],
   },
 };
+
+// The pricing FAQ for a credits mode, or the existing answers when there is none.
+// The static pages are built ahead of time, so the mode comes from the build
+// variable (PUBLIC_CREDITS_MODE), which stays unset until credits are released.
+const LEGACY_PRICING_FAQ = PUBLIC_PAGES["/pricing"].faq;
+export const pricingFaqFor = (creditsMode = null) => (normalizeCarryMode(creditsMode) ? creditsPricingFaq(LEGACY_PRICING_FAQ, creditsMode) : LEGACY_PRICING_FAQ);
+PUBLIC_PAGES["/pricing"].faq = pricingFaqFor(PUBLIC_CREDITS_MODE);
 
 export function publicPagePath(pathname) {
   const path = pathname.replace(/\/index\.html$/, "").replace(/\.html$/, "").replace(/\/$/, "") || "/";

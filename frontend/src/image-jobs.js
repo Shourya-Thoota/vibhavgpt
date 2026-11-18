@@ -34,7 +34,7 @@ export const imageJobs = {
   start(api, { body, kind = "create", shape = "square", now = Date.now }) {
     if (state.job?.status === "generating") return null;
     const id = nextId++;
-    set({ job: { id, kind, shape, prompt: body?.prompt ?? "", hadReference: Boolean(body?.referenceAttachmentId), startedAt: now(), status: "generating", images: [], referenceApplied: null, error: "" } });
+    set({ job: { id, kind, shape, prompt: body?.prompt ?? "", hadReference: Boolean(body?.referenceAttachmentId || body?.referenceAvatarId), startedAt: now(), status: "generating", images: [], referenceApplied: null, error: "" } });
     api("/api/generation/image", { method: "POST", body: JSON.stringify(body) })
       .then((result) => update(id, { status: "done", images: Array.isArray(result?.images) ? result.images : [], referenceApplied: result?.referenceApplied ?? null }))
       .catch((error) => update(id, { status: "failed", error: error?.message || "The image couldn't be created. Try again." }));

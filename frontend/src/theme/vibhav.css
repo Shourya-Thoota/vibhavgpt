@@ -38,283 +38,543 @@
 /* --- 1. Shared tokens ---------------------------------------------------- */
 
 :root {
-  /* Spacing: the only lengths a layout may use. Vary them inside a layout. */
-  --space-3xs: 0.125rem;
-  --space-2xs: 0.25rem;
-  --space-xs: 0.5rem;
-  --space-sm: 0.75rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2.5rem;
-  --space-2xl: 4rem;
-  --space-3xl: 6.5rem;
-  --space-4xl: 10rem;
-  --space-5xl: 13rem;
-  --section-gap: 6.5rem;
-  --section-head-gap: 1.5rem;
+   /* Spacing: the only lengths a layout may use. Vary them inside a layout. */
+   --space-3xs: 0.125rem;
+   --space-2xs: 0.25rem;
+   --space-xs: 0.5rem;
+   --space-sm: 0.75rem;
+   --space-md: 1rem;
+   --space-lg: 1.5rem;
+   --space-xl: 2.5rem;
+   --space-2xl: 4rem;
+   --space-3xl: 6.5rem;
+   --space-4xl: 10rem;
+   --space-5xl: 13rem;
+   --section-gap: 6.5rem;
+   --section-head-gap: 1.5rem;
 
-  /* Shape: Vellum-soft. Controls (buttons, tabs, chips, toggles, inputs,
+   /* Shape: Vellum-soft. Controls (buttons, tabs, chips, toggles, inputs,
      dropdown triggers) take 14px; cards and panels (including the composer,
      sheets and message bubbles) take 18px. Soft, never a 999px blob: on a
      control taller than 28px the ends stay visibly cornered. */
-  --radius-card: 18px;
-  --radius-pill: 14px;
-  --radius-input: 14px;
-  /* Vibhav extensions. Logo and icon tiles (24 to 40px squares) take a
+   --radius-card: 20px;
+   --radius-pill: 12px;
+   --radius-input: 12px;
+   /* Vibhav extensions. Logo and icon tiles (24 to 40px squares) take a
      proportional 10px; inline marks (inline code, kbd, favicons, small
      thumbnails inside a row) take 6px so they never balloon into pills. */
-  --radius-icon: 10px;
-  --radius-mark: 6px;
-  /* Dots, avatars, switch knobs, circular icon buttons and planet orbs are
+   --radius-icon: 10px;
+   --radius-mark: 6px;
+   /* Menus, pickers and popovers (Slice 6): one surface, one row. The panel takes the control radius; a row inside it is inset by
+     the panel padding, so it takes a smaller radius to stay concentric. Rows are 40px on a desktop and 44px (hit-min) on a phone. */
+   --radius-menu: var(--radius-input);
+   --radius-menu-row: 8px;
+   --menu-pad: 4px;
+   --menu-row: 40px;
+   --menu-min-width: 232px;
+   /* A menu's entrance: from its trigger's side, this far, on a gentle spring-like ease with a slight overshoot; and its rows' nudge. */
+   --menu-shift: 8px;
+   --menu-nudge: 2px;
+   --menu-enter: 200ms;
+   --menu-exit: 120ms;
+   --menu-nudge-dur: 100ms;
+   --ease-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+   /* A Settings or Extensions row is at least this tall; a status chip, and the icon inside it. */
+   --row-min: 4rem;
+   --chip-min: 1.375rem;
+   --icon-xs: 13px;
+   /* Content column measure for help text and answers (characters). */
+   --measure-read: 62ch;
+   /* Dots, avatars, switch knobs, circular icon buttons and planet orbs are
      circles, not pills, so they never inherit the pill radius. */
-  --radius-round: 50%;
-  /* The thinking indicator's two organic shapes: a morphing activity mark,
+   --radius-round: 50%;
+   /* The thinking indicator's two organic shapes: a morphing activity mark,
      not a corner radius. */
-  --shape-blob-a: 38% 62% 58% 42%;
-  --shape-blob-b: 45% 55% 36% 64%;
+   --shape-blob-a: 38% 62% 58% 42%;
+   --shape-blob-b: 45% 55% 36% 64%;
 
-  /* Rules: border weights. */
-  --rule-hair: 0.5px;
-  --rule-fine: 1px;
-  --rule-card: 1px;
+   /* Rules: border weights. */
+   --rule-hair: 0.5px;
+   --rule-fine: 1px;
+   --rule-card: 1px;
 
-  /* Layers. Nothing in the product goes above --z-tooltip. */
-  --z-base: 1;
-  --z-raised: 10;
-  --z-dropdown: 100;
-  --z-sticky: 200;
-  --z-sticky-nav: 300;
-  --z-modal: 400;
-  --z-toast: 500;
-  --z-tooltip: 600;
+   /* Layers. Nothing in the product goes above --z-tooltip. */
+   --z-base: 1;
+   --z-raised: 10;
+   --z-dropdown: 100;
+   --z-sticky: 200;
+   --z-sticky-nav: 300;
+   --z-modal: 400;
+   --z-popover: 450;  /* menus and pickers list over a dialog they were opened from, below toasts */
+   --icon-stroke: 1.75;
+   --z-toast: 500;
+   --z-tooltip: 600;
 
-  /* Type families, by key. Prata carries display and the wordmark, Hanken
-     Grotesk carries body, Geist Mono is the outlier for labels and figures.
-     All three are self-hosted (public/fonts/v1/fonts.css). */
-  --font-display: "Prata", Georgia, "Times New Roman", serif;
-  --font-body: "Hanken Grotesk", ui-sans-serif, sans-serif;
-  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+   /* Type families: the platform's system face (SF Pro on Apple devices,
+     Segoe UI on Windows, Roboto on Android), which already carries optical
+     sizing and tracking tables, and nothing to download. Hierarchy comes from
+     weight, size, leading and size-specific tracking (--tracking-*), not from
+     making headings larger. Geist Mono stays self-hosted for code. */
+   --font-display: "Google Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+   --display-weight: 550;
+   --display-tracking: -0.015em;
+   /* Tracking by size: tighter as type grows, slightly open when small. */
+   --tracking-display: -0.015em;
+   --tracking-title: -0.014em;
+   --tracking-body: 0;
+   --tracking-small: 0.006em;
+   --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+   --font-mono: ui-monospace, "SF Mono", "Geist Mono", Menlo, Consolas, monospace;
 
-  /* Type scale. Display sizes are fluid; the rest are fixed steps. */
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-md: 1.125rem;
-  --text-lg: 1.375rem;
-  --text-xl: 1.75rem;
-  --text-2xl: 2.25rem;
-  --text-3xl: 2.75rem;
-  --text-display: clamp(3rem, 5.5vw + 1rem, 5.75rem);
-  --text-display-s: clamp(2rem, 3vw + 1rem, 3rem);
+   /* Type scale. Display sizes are fluid; the rest are fixed steps. */
+   --text-xs: 0.75rem;
+   --text-sm: 0.875rem;
+   --text-base: 1rem;
+   --text-md: 1.125rem;
+   --text-lg: 1.375rem;
+   --text-xl: 1.75rem;
+   --text-2xl: 2.25rem;
+   --text-3xl: 2.75rem;
+   --text-display: clamp(3rem, 5.5vw + 1rem, 5.75rem);
+   --text-display-s: clamp(2rem, 3vw + 1rem, 3rem);
 
-  /* Leading and tracking, from the type styles in tokens.json. */
-  --leading-display: 1.02;
-  --leading-snug: 1.18;
-  --leading-body: 1.45;
-  --leading-read: 1.6;
-  --tracking-display: -0.025em;
-  --tracking-label: 0.12em;
+   /* Leading and tracking, from the type styles in tokens.json. */
+   --leading-display: 1.02;
+   --leading-snug: 1.18;
+   --leading-body: 1.45;
+   --leading-read: 1.6;
+   --tracking-display: -0.025em;
+   --tracking-label: 0.12em;
 
-  /* Layout. */
-  --page-max: 76rem;
-  --page-gutter: clamp(1.25rem, 4vw, 3rem);
-  --measure: 62ch;
-  --banner-height: 44px;
-  /* Vibhav extension: the chat reading column, fixed by the Vellum shell. */
-  --chat-column: 700px;
-  /* Vibhav extension: the workspace sidebar's open width. The collapsed
+   /* Layout. */
+   --page-max: 76rem;
+   --page-gutter: clamp(1.25rem, 4vw, 3rem);
+   --measure: 62ch;
+   --banner-height: 44px;
+   /* Vibhav extension: the chat reading column, fixed by the Vellum shell. */
+   --chat-column: 700px;
+   /* Vibhav extension: the workspace sidebar's open width. The collapsed
      rail overrides it locally (.workspace[data-collapsed]). */
-  --sidebar-w: 268px;
-  /* Vibhav extension: the workspace sidebar. The current shell's width; the
+   --sidebar-w: 268px;
+   /* Vibhav extension: the workspace sidebar. The current shell's width; the
      Vellum rail-plus-Chats layout replaces it in the chat-shell phase. */
-  --sidebar-w: 268px;
+   --sidebar-w: 268px;
 
-  /* Motion. Three durations, three curves; no bounce or elastic anywhere.
+   /* Motion. Three durations, three curves; no bounce or elastic anywhere.
      Exits run about 75% of the matching enter. */
-  --dur-micro: 120ms;
-  --dur-short: 220ms;
-  --dur-long: 420ms;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+   --dur-micro: 120ms;
+   --dur-short: 220ms;
+   --dur-long: 420ms;
+   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+   /* Orbital clarity motion: one token per kind of movement. Press feedback
+     is immediate; menus and sheets travel from their trigger; content
+     changes are short fades; story sequences are the only long motion. */
+   --dur-press: 90ms;
+   --dur-menu: 180ms;
+   --dur-sheet: 320ms;
+   --dur-content: 240ms;
+   --dur-story: 700ms;
+   --ease-glide: cubic-bezier(0.22, 1, 0.36, 1);
+   --press-scale: 0.97;
+   /* The smallest a tap target is: 44px, with --space-xs (8px) kept between neighbours. */
+   --hit-min: 44px;   /* a touch target is a physical size: it must not shrink with the desktop type scale */
+   --gap-hit: 8px;    /* the least space between two neighbouring controls, for the same reason */
+   /* Focus: a solid ring, 2px wide and 2px off the control. List pages: the narrow column. A service logo in a list row. */
+   --ring-width: 2px;
+   --ring-offset: 2px;
+   --page-narrow: 54rem;
+   --logo-md: 1.75rem;
+   /* A switch: track, knob, the knob's inset from the track edge, and how far it travels. */
+   --switch-width: 2.5rem;
+   --switch-height: 1.5rem;
+   --switch-knob: 1rem;
+   --switch-inset: 3px;
+   --switch-travel: 1rem;
+   /* How much ink a control takes on when pointed at and when pressed (an overlay's opacity), and a spinner's turn. */
+   --veil-hover: 0.07;
+   --veil-press: 0.12;
+   /* The same veils as colours, for a row or control tint over any surface. */
+   --tint-hover: color-mix(in srgb, var(--color-ink) 7%, transparent);
+   --tint-press: color-mix(in srgb, var(--color-ink) 12%, transparent);
+   --veil-fill: 0.14;
+   --dur-spin: 840ms;
+   /* Material: blur and saturation for the glass levels (per-sky tints are
+     --glass-1 for bars and the composer, --glass-2 for menus and sheets).
+     A glass surface is its tint under --glass-sheen (a restrained inner
+     highlight), edged with --glass-edge and lifted by --glass-shadow.
+     The --lg-* set (per sky, below) is the newer material, tuned by weight:
+     -s for small controls (chips, tabs), -m for bars (navigation, composer),
+     -l for panels (menus, sheets). Each weight has a tint and a backdrop
+     filter; all share a specular rim (--lg-rim, drawn as a 1px masked ring)
+     and --lg-shadow (inner highlight, inner glow, hairline, contact and
+     depth shadows). Heavier surfaces read as thicker: more blur, more tint. */
+   --material-blur: 22px;
+   --material-saturate: 180%;
 
-  /* Derived accent tints. They read --color-accent, so a universe or sky
+   /* Derived accent tints. They read --color-accent, so a universe or sky
      change retints them with no extra rules. */
-  --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
-  --color-accent-line: color-mix(in srgb, var(--color-accent) 32%, var(--color-rule));
+   --color-accent-soft: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
+   --color-accent-line: color-mix(in srgb, var(--color-accent) 32%, var(--color-rule));
 }
 
-/* --- 2. Deep Space (dark) ------------------------------------------------ */
+/* Gloss follows the chosen accent. The page ground stays warm ivory or
+   charcoal; the accent is the control, not the sky. The highlight stays in
+   the top fifth so the label keeps contrast. */
+:root {
+   --gloss-primary: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 86%, #fff8f3) 0%, var(--color-accent) 28%, color-mix(in srgb, var(--color-accent) 78%, #1c1612) 100%);
+   --gloss-primary-hover: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 74%, #fff8f3) 0%, var(--color-accent) 24%, color-mix(in srgb, var(--color-accent) 70%, #1c1612) 100%);
+   --gloss-primary-edge: inset 0 1px 0 rgb(255 248 243 / 32%), inset 0 -1px 0 rgb(28 22 18 / 14%), 0 1px 2px rgb(40 24 16 / 18%), 0 6px 16px -6px color-mix(in srgb, var(--color-accent) 42%, transparent);
+   --gloss-secondary: linear-gradient(180deg, #fffaf4, #f3eadf);
+   --gloss-secondary-edge: inset 0 1px 0 rgb(255 250 244 / 90%), 0 0 0 0.5px rgb(60 48 40 / 22%), 0 1px 2px rgb(40 28 18 / 6%);
+   --input-inset: inset 0 1px 2px rgb(40 28 18 / 8%);
+}
 
-/* Dark is also the un-themed default, so a paint before the boot script runs
-   shows the night sky rather than a light flash. */
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+   --gloss-secondary: linear-gradient(180deg, #3a322c, #2a241f);
+   --gloss-secondary-edge: inset 0 1px 0 rgb(255 244 232 / 12%), 0 0 0 0.5px rgb(20 14 10 / 60%), 0 1px 2px rgb(12 8 6 / 40%);
+   --input-inset: inset 0 1px 2px rgb(12 8 6 / 45%);
+}
+
+/* --- 2. Night (dark) ------------------------------------------------------ */
+
+/* Orbital clarity, night side: deep neutral grounds (not a navy wallpaper),
+   warm light ink, one mineral accent. Dark is also the un-themed first
+   paint, so nothing flashes bright before the boot script runs. */
 :root,
 :root[data-theme="dark"] {
-  color-scheme: dark;
+   color-scheme: dark;
 
-  /* Paper steps: page → cards → wells and hovered rows. */
-  --color-paper: #071227;
-  --color-paper-2: #0c1c33;
-  --color-paper-3: #12253e;
-  /* Vibhav extensions to the ladder: the canvas under the shell, a fourth
-     step for selected rows, and the surface menus and dialogs sit on. */
-  --color-paper-deep: #04101f;
-  --color-paper-4: #1a3350;
-  --color-paper-raised: #152a47;
+   --color-paper: #120f0d;
+   --color-paper-2: #1e1a17;
+   --color-paper-3: #2a241f;
+   --color-paper-deep: #161311;
+   --color-paper-4: #3a322c;
+   --color-paper-raised: #221e1a;
 
-  /* Ink ladder, strongest first. Neutral sits between ink-2 and muted;
-     faint (Vibhav extension) is the quietest text step, still 6.7:1 here. */
-  --color-ink: #f4f8fc;
-  --color-ink-2: #c3d2e3;
-  --color-neutral: #aebfd2;
-  --color-muted: #9aadc2;
-  --color-faint: #8b9db0;
+   /* Night wash: warm charcoal with restrained peach and rose. The accent
+      is a small pool, not the sky, so Orbit cyan cannot turn the page navy. */
+   --page-wash:
+      radial-gradient(68rem 42rem at 8% -8%, color-mix(in srgb, #e7b89a 18%, transparent), transparent 64%),
+      radial-gradient(52rem 36rem at 96% 6%, color-mix(in srgb, #d7a3a8 14%, transparent), transparent 62%),
+      radial-gradient(36rem 24rem at 72% 0%, color-mix(in srgb, var(--color-accent) 12%, transparent), transparent 70%),
+      linear-gradient(180deg, #1c1815 0%, #14110f 52%, #0d0d10 100%);
+   --page-wash-calm:
+      radial-gradient(48rem 26rem at 50% -12%, color-mix(in srgb, #e7c2ae 10%, transparent), transparent 72%),
+      linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 6%, #181512) 0%, color-mix(in srgb, var(--color-accent) 4%, #120f0d) 100%);
+   --wash-stage: #1c1816;
 
-  /* Rules are ink at low alpha, not white: a hairline keeps the sky's hue.
-     rule-2 is 1.8:1 on paper: a divider weight, never a control's only
-     boundary (controls use --color-muted or stronger). */
-  --color-rule: rgb(244 248 252 / 10%);
-  --color-rule-2: rgb(244 248 252 / 20%);
+   /* The accent used as text (links, tags, letters on a tint), not as a fill: lighter at night, so it keeps 4.5:1
+     on its own tint and on the wash. The accent itself is unchanged, and white on it is still the button's. */
+   --color-accent-text: color-mix(in srgb, var(--color-accent) 78%, #fff8f3);
+   --wash-fade: #100e0c;
+   /* flat stand-in for the calm wash, for overlay fades that end in transparent */
 
-  --color-accent-ink: #04101f;
+   --color-ink: #f6f1ea;
+   --color-ink-2: #e7ddd2;
+   --color-neutral: #d4c6b8;
+   /* Secondary greys pass AA (4.5:1) as text on every dark ground here, up to
+     #3a3a3c; Apple's own #8e8e93 does not. */
+   --color-muted: #cbbbaa;
+   --color-faint: #b7a594;
 
-  /* Status. Always paired with a word or icon; colour never carries the
-     meaning alone. */
-  --color-positive: #79dcad;
-  --color-positive-soft: #0f2a24;
-  --color-danger: #ff8f7d;
-  --color-danger-soft: #2c1a17;
-  --color-warn-soft: #2a2314;
+   --color-rule: rgb(120 96 80 / 42%);
+   --color-rule-2: rgb(168 136 112 / 48%);
 
-  /* Depth. Cards get none on dark; depth reads from the paper steps. The
-     other steps exist for floating layers (menus, dialogs, sheets) only. */
-  --shadow-card: none;
-  --shadow-sm: 0 1px 2px rgb(2 8 18 / 45%);
-  --shadow-md: 0 8px 24px -8px rgb(2 8 18 / 60%);
-  --shadow-lg: 0 26px 60px -22px rgb(2 8 18 / 75%);
-  --shadow-pop: 0 20px 50px -16px rgb(2 8 18 / 70%);
+   --color-accent-ink: #ffffff;
 
-  /* Cosmic decoration that is not a surface. */
-  --color-planet-shadow: rgb(2 8 18 / 15%);
-  --color-star: rgb(244 248 252 / 40%);
-  --color-star-bright: rgb(244 248 252 / 60%);
-  --color-sheen: rgb(244 248 252 / 16%);
-  --color-scrim: rgb(2 8 18 / 62%);
-  --color-planet-venus: #e8bc75;
-  --color-planet-mars: #e6a17c;
-  /* The deep blue of the sky washes behind the workspace. Decoration only:
-     never a control, a text colour, or a second accent. */
-  --color-sky-blue: #2c63e8;
+   --color-positive: #30d158;
+   --color-positive-soft: #0f2a17;
+   --color-danger: #ff6961;
+   --color-danger-soft: #2e1311;
+   --color-warn-soft: #2e2610;
+   /* Warning as text or an icon: 8:1 on the dark paper and 7:1 on its soft tint. */
+   --color-warn: #f0b94a;
 
-  /* Universe palettes for this sky. --color-accent is chosen from these in
-     section 4. Each is 6.7:1 or better on --color-paper
-     (Nebula is the lowest at 6.75:1) and 4.9:1 or better on accent-soft. */
-  --color-accent-cerulean: #5fd0e1;
-  --color-accent-cerulean-hover: #79dce8;
-  --color-accent-nebula: #9b8cff;
-  --color-accent-nebula-hover: #b0a4ff;
-  --color-accent-ember: #ffad87;
-  --color-accent-ember-hover: #ffc2a3;
-  --color-accent-pine: #79dcad;
-  --color-accent-pine-hover: #94e6c0;
-  --color-accent-amber: #f0c674;
-  --color-accent-amber-hover: #f5d492;
+   --shadow-card: 0 0 0 0.5px rgb(255 255 255 / 6%);
+   --shadow-sm: 0 1px 2px rgb(0 0 0 / 50%);
+   --shadow-md: 0 10px 28px -10px rgb(0 0 0 / 70%);
+   --shadow-lg: 0 30px 70px -26px rgb(0 0 0 / 85%);
+   --shadow-pop: 0 22px 56px -18px rgb(0 0 0 / 80%);
+   /* Menus and popovers: lifted just off the page, with a hairline so the edge holds on dark paper. */
+   --shadow-menu: 0 0 0 0.5px rgb(255 255 255 / 9%), 0 12px 32px -10px rgb(0 0 0 / 65%);
+
+   /* Planetary light: an atmosphere at a horizon's edge and the grazing
+     light along a terminator. Decoration only, never a control colour. */
+   --color-atmosphere: #e0b197;
+   --color-terminator: rgb(255 255 255 / 50%);
+   --color-planet-shadow: rgb(4 5 6 / 18%);
+   --color-star: transparent;
+   --color-star-bright: transparent;
+   --color-sheen: rgb(255 255 255 / 10%);
+   --color-scrim: rgb(0 0 0 / 55%);
+   --color-planet-venus: #e2bd80;
+   --color-planet-mars: #e3a582;
+   --color-sky-blue: #2f4a63;
+
+   /* Glass: two levels for chrome that floats over content. */
+   --glass-1: rgb(48 40 34 / 54%);
+   --glass-2: rgb(42 34 28 / 78%);
+   --glass-edge: rgb(255 255 255 / 12%);
+   --glass-highlight: rgb(255 255 255 / 9%);
+   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 7%), rgb(255 255 255 / 0%) 46%);
+   --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 14%), inset 0 0 0 1px rgb(255 255 255 / 3%), 0 1px 2px rgb(0 0 0 / 40%), 0 14px 36px -12px rgb(0 0 0 / 70%);
+   --glass-solid: #221e1a;
+   /* Material, by weight (see the note under "Material" in section 1). */
+   --lg-tint-s: rgb(62 50 42 / 42%);
+   --lg-tint-m: rgb(48 38 32 / 58%);
+   --lg-tint-l: rgb(40 32 26 / 82%);
+   --lg-filter-s: blur(8px) saturate(160%) brightness(1.08);
+   --lg-filter-m: blur(14px) saturate(170%) brightness(1.04);
+   --lg-filter-l: blur(26px) saturate(150%);
+   --lg-rim: linear-gradient(160deg, rgb(255 255 255 / 42%), rgb(255 255 255 / 7%) 32%, transparent 55%, rgb(255 255 255 / 5%) 76%, rgb(255 255 255 / 26%));
+   --lg-shadow: inset 0 1px 1px rgb(255 255 255 / 14%), inset 0 0 14px rgb(255 255 255 / 4%), 0 0 0 0.5px rgb(0 0 0 / 55%), 0 2px 6px -1px rgb(0 0 0 / 35%), 0 12px 30px -10px rgb(0 0 0 / 65%);
+
+   --color-accent-cerulean: #0a84ff;
+   --color-accent-cerulean-hover: #409cff;
+   --color-accent-nebula: #ab9fff;
+   --color-accent-nebula-hover: #c0b7ff;
+   --color-accent-ember: #f0a585;
+   --color-accent-ember-hover: #f5bda4;
+   --color-accent-pine: #86d4b0;
+   --color-accent-pine-hover: #a2e0c3;
+   --color-accent-amber: #e8c47c;
+   --color-accent-amber-hover: #f0d499;
 }
 
-/* --- 3. Daybreak (light) ------------------------------------------------- */
+/* --- 3. Day (light) -------------------------------------------------------- */
 
-/* Not white: the grounds keep a cool blue cast so the planets still read as
-   sky. Elevation inverts here: a soft shadow does what paper steps do in
-   the dark. */
+/* Day side (owner decision, 2026-11-14): clean white, neutral greys for subtle fills, borders and hover, near-black neutral ink, and the
+   selected accent on controls only. No warm paper tint anywhere in the light theme. Every text colour keeps at least 4.5:1 on white and
+   on the lightest grey fill. */
 :root[data-theme="light"] {
-  color-scheme: light;
+   color-scheme: light;
 
-  --color-paper: #eef2f9;
-  --color-paper-2: #fcfdff;
-  --color-paper-3: #f2f6fc;
-  --color-paper-deep: #e4eaf4;
-  --color-paper-4: #e7eefa;
-  --color-paper-raised: #fcfdff;
+   --color-paper: #ffffff;
+   --color-paper-2: #ffffff;
+   --color-paper-3: #f4f4f5;
+   --color-paper-deep: #f7f7f8;
+   --color-paper-4: #e9e9eb;
+   --color-paper-raised: #ffffff;
+   /* Secondary buttons: white to a light neutral grey, with neutral edges (the shared default is ivory). */
+   --gloss-secondary: linear-gradient(180deg, #ffffff, #f4f4f5);
+   --gloss-secondary-edge: inset 0 1px 0 rgb(255 255 255 / 90%), 0 0 0 0.5px rgb(24 24 27 / 20%), 0 1px 2px rgb(24 24 27 / 6%);
+   --input-inset: inset 0 1px 2px rgb(24 24 27 / 7%);
 
-  --color-ink: #0c1a2e;
-  --color-ink-2: #35475e;
-  --color-neutral: #3f5064;
-  --color-muted: #4a596b;
-  --color-faint: #586a80;
+   /* Day: plain white. */
+   --page-wash: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+   --page-wash-calm: linear-gradient(180deg, #ffffff 0%, #ffffff 100%);
+   --wash-stage: #ffffff;
 
-  --color-rule: rgb(12 26 46 / 11%);
-  --color-rule-2: rgb(12 26 46 / 19%);
+   /* The accent as text: a little deeper by day, so links keep 4.5:1 over the wash's pools. */
+   --color-accent-text: color-mix(in srgb, var(--color-accent) 86%, #18181b);
+   --wash-fade: #ffffff;
 
-  --color-accent-ink: #f8fbff;
+   --color-ink: #18181b;
+   --color-ink-2: #3f3f46;
+   --color-neutral: #3f3f46;
+   /* Neutral like Apple's secondary labels but darker: theirs (#8a8a8e,
+     #6c6c70) fall below AA on the grouped greys (#e5e5ea to #ebebf0). These
+     pass 4.5:1 as text on every light ground here. */
+   --color-muted: #52525b;
+   --color-faint: #5f5f67;
 
-  --color-positive: #0f7a52;
-  --color-positive-soft: #e3f5ec;
-  --color-danger: #c23d24;
-  --color-danger-soft: #fdeae5;
-  --color-warn-soft: #fbf2da;
+   --color-rule: rgb(24 24 27 / 12%);
+   --color-rule-2: rgb(24 24 27 / 24%);
 
-  --shadow-card: 0 1px 2px rgb(16 31 51 / 7%);
-  --shadow-sm: 0 1px 2px rgb(16 31 51 / 7%);
-  --shadow-md: 0 8px 24px -8px rgb(16 31 51 / 15%);
-  --shadow-lg: 0 26px 60px -22px rgb(16 31 51 / 26%);
-  --shadow-pop: 0 20px 50px -16px rgb(16 31 51 / 20%);
+   --color-accent-ink: #ffffff;
 
-  --color-planet-shadow: rgb(16 31 51 / 18%);
-  --color-star: rgb(12 26 46 / 22%);
-  --color-star-bright: rgb(12 26 46 / 34%);
-  --color-sheen: rgb(252 253 255 / 70%);
-  --color-scrim: rgb(20 32 52 / 34%);
-  --color-planet-venus: #b07d1d;
-  --color-planet-mars: #bc5526;
-  --color-sky-blue: #6f95e6;
+   --color-positive: #1b7c34;
+   --color-positive-soft: #e3f5e8;
+   --color-danger: #c80014;
+   --color-danger-soft: #fde8ea;
+   --color-warn-soft: #fdf3dc;
+   /* Warning as text or an icon: 5.6:1 on the day paper and 5.8:1 on its soft tint. */
+   --color-warn: #8a5200;
 
-  /* The dark-sky accents are pastels tuned for navy; on paper they fail
-     contrast, so each has a deeper twin. Each light value is the lightest
-     point on its hue that clears 4.5:1 as text on paper, as text on
-     --color-accent-soft, and as a fill under --color-accent-ink. */
-  --color-accent-cerulean: #0c6a7d;
-  --color-accent-cerulean-hover: #0b5d6e;
-  --color-accent-nebula: #5b45d6;
-  --color-accent-nebula-hover: #503dbc;
-  --color-accent-ember: #9f431e;
-  --color-accent-ember-hover: #8c3b1a;
-  --color-accent-pine: #0e6f4b;
-  --color-accent-pine-hover: #0c6242;
-  --color-accent-amber: #7e5908;
-  --color-accent-amber-hover: #6f4e07;
+   --shadow-card: 0 1px 2px rgb(0 0 0 / 4%), 0 6px 20px -10px rgb(0 0 0 / 10%);
+   --shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+   --shadow-md: 0 10px 28px -12px rgb(0 0 0 / 16%);
+   --shadow-lg: 0 30px 70px -28px rgb(0 0 0 / 24%);
+   --shadow-pop: 0 22px 56px -20px rgb(0 0 0 / 22%);
+   --shadow-menu: 0 1px 2px rgb(0 0 0 / 6%), 0 10px 28px -12px rgb(0 0 0 / 18%);
+
+   --color-atmosphere: #e7b89a;
+   --color-terminator: rgb(0 0 0 / 35%);
+   --color-planet-shadow: rgb(40 34 24 / 16%);
+   --color-star: transparent;
+   --color-star-bright: transparent;
+   --color-sheen: rgb(255 255 255 / 75%);
+   --color-scrim: rgb(0 0 0 / 28%);
+   --color-planet-venus: #a9761c;
+   --color-planet-mars: #b4532a;
+   --color-sky-blue: #9fb6cc;
+
+   --glass-1: rgb(255 255 255 / 50%);
+   --glass-2: rgb(255 255 253 / 74%);
+   --glass-edge: rgb(255 255 255 / 72%);
+   --glass-highlight: rgb(255 255 255 / 80%);
+   --glass-sheen: linear-gradient(180deg, rgb(255 255 255 / 42%), rgb(255 255 255 / 0%) 52%);
+   --glass-shadow: inset 0 1px 0 rgb(255 255 255 / 95%), inset 0 -1px 0 rgb(23 24 28 / 4%), 0 0 0 0.5px rgb(23 24 28 / 12%), 0 1px 2px rgb(40 34 24 / 8%), 0 12px 32px -10px rgb(40 34 24 / 22%);
+   --glass-solid: var(--color-paper-2);
+   --lg-tint-s: rgb(255 255 255 / 30%);
+   --lg-tint-m: rgb(255 255 255 / 52%);
+   --lg-tint-l: rgb(255 255 255 / 80%);
+   --lg-filter-s: blur(8px) saturate(170%) brightness(1.05);
+   --lg-filter-m: blur(14px) saturate(180%) brightness(1.06);
+   --lg-filter-l: blur(26px) saturate(160%) brightness(1.04);
+   --lg-rim: linear-gradient(160deg, rgb(255 255 255 / 96%), rgb(255 255 255 / 18%) 32%, rgb(255 255 255 / 4%) 55%, rgb(255 255 255 / 14%) 76%, rgb(255 255 255 / 70%));
+   --lg-shadow: inset 0 1px 1px rgb(255 255 255 / 90%), inset 0 -1px 1px rgb(0 0 0 / 4%), inset 0 0 14px rgb(255 255 255 / 30%), 0 0 0 0.5px rgb(60 60 67 / 18%), 0 2px 6px -1px rgb(0 0 0 / 8%), 0 12px 30px -10px rgb(0 0 0 / 18%);
+
+   --color-accent-cerulean: #0066cc;
+   --color-accent-cerulean-hover: #0059b3;
+   --color-accent-nebula: #554ab8;
+   --color-accent-nebula-hover: #463d9c;
+   --color-accent-ember: #a3451e;
+   --color-accent-ember-hover: #8c3b1a;
+   --color-accent-pine: #0e6f4b;
+   --color-accent-pine-hover: #0c6242;
+   --color-accent-amber: #7e5908;
+   --color-accent-amber-hover: #6f4e07;
+}
+
+/* Glass gives way to solid surfaces where transparency would cost
+   legibility or isn't supported. */
+@media (prefers-reduced-transparency: reduce) {
+
+   :root,
+   :root[data-theme] {
+      --glass-1: var(--glass-solid);
+      --glass-2: var(--glass-solid);
+      --glass-sheen: none;
+      --glass-edge: var(--color-rule-2);
+      --material-blur: 0px;
+      --lg-tint-s: var(--glass-solid);
+      --lg-tint-m: var(--glass-solid);
+      --lg-tint-l: var(--glass-solid);
+      --lg-filter-s: none;
+      --lg-filter-m: none;
+      --lg-filter-l: none;
+      --lg-rim: var(--color-rule-2);
+      --lg-shadow: var(--shadow-sm);
+   }
+}
+
+@media (prefers-contrast: more) {
+
+   :root,
+   :root[data-theme] {
+      --glass-1: var(--glass-solid);
+      --glass-2: var(--glass-solid);
+      --glass-sheen: none;
+      --material-blur: 0px;
+      --color-rule: var(--color-rule-2);
+      --glass-edge: var(--color-muted);
+      --lg-tint-s: var(--glass-solid);
+      --lg-tint-m: var(--glass-solid);
+      --lg-tint-l: var(--glass-solid);
+      --lg-filter-s: none;
+      --lg-filter-m: none;
+      --lg-filter-l: none;
+      --lg-rim: var(--color-rule-2);
+      --lg-shadow: var(--shadow-sm);
+      --lg-rim: var(--color-muted);
+   }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+   :root,
+   :root[data-theme] {
+      --glass-1: var(--glass-solid);
+      --glass-2: var(--glass-solid);
+      --glass-sheen: none;
+      --glass-edge: var(--color-rule-2);
+      --lg-tint-s: var(--glass-solid);
+      --lg-tint-m: var(--glass-solid);
+      --lg-tint-l: var(--glass-solid);
+      --lg-filter-s: none;
+      --lg-filter-m: none;
+      --lg-filter-l: none;
+      --lg-rim: var(--color-rule-2);
+      --lg-shadow: var(--shadow-sm);
+   }
+}
+
+/* The explicit "Solid surfaces" appearance setting does the same. */
+:root[data-effects="solid"],
+:root[data-effects="solid"][data-theme] {
+   --glass-1: var(--glass-solid);
+   --glass-2: var(--glass-solid);
+   --glass-sheen: none;
+   --glass-edge: var(--color-rule-2);
+   --material-blur: 0px;
+   --lg-tint-s: var(--glass-solid);
+   --lg-tint-m: var(--glass-solid);
+   --lg-tint-l: var(--glass-solid);
+   --lg-filter-s: none;
+   --lg-filter-m: none;
+   --lg-filter-l: none;
+   --lg-rim: var(--color-rule-2);
+   --lg-shadow: var(--shadow-sm);
 }
 
 /* --- 4. Universes -------------------------------------------------------- */
 
-/* The universe picks which accent is THE accent. Because these read the
-   per-sky palette above, switching sky retints the accent with no extra
-   rule. Orbit cyan is the default and the un-themed first paint. */
+/* The universe picks which accent is THE accent. Mars copper is the
+   un-themed first paint. Orbit cyan remains available when chosen.
+   Night accents that are light (the default copper, plus nebula, pine and
+   amber) use dark ink on the button. Orbit cyan stays light enough that
+   white text keeps contrast. */
+:root {
+   --color-accent: var(--color-accent-ember);
+   --color-accent-hover: var(--color-accent-ember-hover);
+}
+
+/* Night copper is a light peach, so the label is dark. Day copper is deep
+   enough for white. Orbit cyan keeps white in both modes. */
 :root,
+:root[data-theme="dark"],
+:root:not([data-theme="light"]) {
+   --color-accent-ink: #1c1612;
+}
+
+:root[data-theme="light"],
 :root[data-accent="cerulean"] {
-  --color-accent: var(--color-accent-cerulean);
-  --color-accent-hover: var(--color-accent-cerulean-hover);
+   --color-accent-ink: #ffffff;
 }
+
+:root[data-accent="cerulean"] {
+   --color-accent: var(--color-accent-cerulean);
+   --color-accent-hover: var(--color-accent-cerulean-hover);
+}
+
 :root[data-accent="nebula"] {
-  --color-accent: var(--color-accent-nebula);
-  --color-accent-hover: var(--color-accent-nebula-hover);
+   --color-accent: var(--color-accent-nebula);
+   --color-accent-hover: var(--color-accent-nebula-hover);
 }
+
 :root[data-accent="ember"] {
-  --color-accent: var(--color-accent-ember);
-  --color-accent-hover: var(--color-accent-ember-hover);
+   --color-accent: var(--color-accent-ember);
+   --color-accent-hover: var(--color-accent-ember-hover);
 }
+
 :root[data-accent="pine"] {
-  --color-accent: var(--color-accent-pine);
-  --color-accent-hover: var(--color-accent-pine-hover);
+   --color-accent: var(--color-accent-pine);
+   --color-accent-hover: var(--color-accent-pine-hover);
 }
+
 :root[data-accent="amber"] {
-  --color-accent: var(--color-accent-amber);
-  --color-accent-hover: var(--color-accent-amber-hover);
+   --color-accent: var(--color-accent-amber);
+   --color-accent-hover: var(--color-accent-amber-hover);
 }
 
 :root {
-  /* Focus follows the accent: 6.7:1 or better on Deep Space paper and
+   /* Focus follows the accent: 6.7:1 or better on Deep Space paper and
      5.5:1 or better on Daybreak paper for every universe. */
-  --color-focus: var(--color-accent);
+   --color-focus: var(--color-accent);
 }
 
 /* --- 5. Legacy aliases --------------------------------------------------- */
@@ -324,72 +584,112 @@
    is defined. As each page is rebuilt it switches to the schema names, and
    an alias is deleted once nothing reads it. */
 :root {
-  /* Surfaces */
-  --paper: var(--color-paper);
-  --paper-deep: var(--color-paper-deep);
-  --surface: var(--color-paper-2);
-  --surface-2: var(--color-paper-3);
-  --surface-3: var(--color-paper-4);
-  --surface-raised: var(--color-paper-raised);
+   /* Surfaces */
+   --paper: var(--color-paper);
+   --paper-deep: var(--color-paper-deep);
+   --surface: var(--color-paper-2);
+   --surface-2: var(--color-paper-3);
+   --surface-3: var(--color-paper-4);
+   --surface-raised: var(--color-paper-raised);
 
-  /* Text */
-  --ink: var(--color-ink);
-  --ink-2: var(--color-ink-2);
-  --muted: var(--color-muted);
-  --faint: var(--color-faint);
+   /* Text */
+   --ink: var(--color-ink);
+   --ink-2: var(--color-ink-2);
+   --muted: var(--color-muted);
+   --faint: var(--color-faint);
 
-  /* Rules */
-  --line: var(--color-rule);
-  --line-strong: var(--color-rule-2);
+   /* Rules */
+   --line: var(--color-rule);
+   --line-strong: var(--color-rule-2);
 
-  /* Accent */
-  --accent: var(--color-accent);
-  --accent-hover: var(--color-accent-hover);
-  --accent-ink: var(--color-accent-ink);
-  --accent-soft: var(--color-accent-soft);
-  --accent-line: var(--color-accent-line);
-  /* Retained only until the pages that still glow are rebuilt: glow is not
+   /* Accent */
+   --accent: var(--color-accent);
+   --accent-hover: var(--color-accent-hover);
+   --accent-ink: var(--color-accent-ink);
+   --accent-soft: var(--color-accent-soft);
+   --accent-line: var(--color-accent-line);
+   /* Retained only until the pages that still glow are rebuilt: glow is not
      a depth cue in this system. */
-  --accent-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
+   --accent-glow: color-mix(in srgb, var(--color-accent) 22%, transparent);
 
-  /* Status */
-  --positive: var(--color-positive);
-  --positive-soft: var(--color-positive-soft);
-  --danger: var(--color-danger);
-  --danger-soft: var(--color-danger-soft);
-  --warn-soft: var(--color-warn-soft);
+   /* Status */
+   --positive: var(--color-positive);
+   --positive-soft: var(--color-positive-soft);
+   --danger: var(--color-danger);
+   --danger-soft: var(--color-danger-soft);
+   --warn-soft: var(--color-warn-soft);
 
-  /* Decoration */
-  --planet-shadow: var(--color-planet-shadow);
-  --star: var(--color-star);
-  --star-bright: var(--color-star-bright);
-  --sheen: var(--color-sheen);
-  --scrim: var(--color-scrim);
-  --planet-venus: var(--color-planet-venus);
-  --planet-mars: var(--color-planet-mars);
+   /* Decoration */
+   --planet-shadow: var(--color-planet-shadow);
+   --star: var(--color-star);
+   --star-bright: var(--color-star-bright);
+   --sheen: var(--color-sheen);
+   --scrim: var(--color-scrim);
+   --planet-venus: var(--color-planet-venus);
+   --planet-mars: var(--color-planet-mars);
 
-  /* Radius. The old six-step scale collapses onto the theme's: the two
+   /* Radius. The old six-step scale collapses onto the theme's: the two
      small steps were controls and take the control radius, every panel
      step takes the card radius, and the old fully-round pill becomes the
      theme's 14px pill. */
-  --r-xs: var(--radius-input);
-  --r-sm: var(--radius-pill);
-  --r-md: var(--radius-card);
-  --r-lg: var(--radius-card);
-  --r-xl: var(--radius-card);
-  --r-pill: var(--radius-pill);
+   --r-xs: var(--radius-input);
+   --r-sm: var(--radius-pill);
+   --r-md: var(--radius-card);
+   --r-lg: var(--radius-card);
+   --r-xl: var(--radius-card);
+   --r-pill: var(--radius-pill);
 
-  /* Motion. The overshooting curves (--spring, --bounce) resolve to the
+   /* Motion. The overshooting curves (--spring, --bounce) resolve to the
      plain entering curve: no bounce or elastic easing on UI. */
-  --t-fast: var(--dur-micro);
-  --t-base: var(--dur-short);
-  --t-slow: var(--dur-long);
-  --t-enter: var(--dur-long);
-  --ease: var(--ease-out);
-  --spring: var(--ease-out);
-  --bounce: var(--ease-out);
+   --t-fast: var(--dur-micro);
+   --t-base: var(--dur-short);
+   --t-slow: var(--dur-long);
+   --t-enter: var(--dur-long);
+   --ease: var(--ease-out);
+   --spring: var(--ease-out);
+   --bounce: var(--ease-out);
 
-  /* Type */
-  --font-ui: var(--font-body);
-  --font-logo: var(--font-display);
+   /* Type */
+   --font-ui: var(--font-body);
+   --font-logo: var(--font-display);
 }
+
+/* The page wash. The root keeps the flat paper colour (the first paint, and what shows if the layer
+   is ever missing); one fixed, static layer behind the page carries the gradient. Shells and the
+   body are transparent so there is no seam between them: every page sits on the same wash. Fixed
+   means it is painted once and never moves with scrolling, which keeps scrolling cheap and the
+   gradient continuous from the top of a long page to the bottom. Chat and Study, where people
+   read and type, get the calmer variant. */
+body::before {
+   content: "";
+   position: fixed;
+   inset: 0;
+   z-index: -1;
+   pointer-events: none;
+   background: var(--page-wash);
+}
+
+body:has(.workspace)::before { background: var(--page-wash-calm); }
+
+/* The shells that used to paint their own flat canvas now let the wash through. :root is repeated
+   because the page and app stylesheets load in no fixed order and some scope their canvas by theme
+   ("orbital.css" gives the workspace a plain one at (0,2,0)); this out-ranks all of them without
+   !important. Cards, menus, dialogs and inputs keep their own solid or glass surfaces, so they stay
+   distinguishable from the wash. */
+:root:root:root body,
+:root:root:root .workspace,
+:root:root:root .legal,
+:root:root:root .boot,
+:root:root:root .auth,
+:root:root:root .survey,
+:root:root:root .pricing-page,
+:root:root:root .shell,
+:root:root:root .apps-page {
+   background-color: transparent;
+   background-image: none;
+}
+
+/* Under the wash, a dark root stays black so the first paint cannot flash light.
+   Day uses the warm paper, which is what shows if the wash has not painted yet. */
+html { background-color: #000; }
+html[data-theme="light"] { background-color: var(--color-paper); }

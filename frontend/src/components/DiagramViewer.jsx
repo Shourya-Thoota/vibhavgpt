@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Check, Code, Copy, Maximize2, Minus, Plus, RotateCcw } from "lucide-react";
+import DOMPurify from "dompurify";
 import { Modal } from "./ui.jsx";
 import { mermaidThemeVariables, MERMAID_CONFIG } from "../diagrams.js";
 import "../diagrams.css";
@@ -83,6 +84,31 @@ export default function DiagramViewer({ source, settled = true, fallback = null 
   const [copied, setCopied] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const panStartRef = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  const handlePanStart = (e) => {
+    if (zoom <= 1) return;
+    setIsPanning(true);
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+    panStartRef.current = { x: clientX, y: clientY, panX: pan.x, panY: pan.y };
+  };
+
+  const handlePanMove = (e) => {
+    if (!isPanning || zoom <= 1) return;
+    const clientX = e.clientX ?? e.touches?.[0]?.clientX ?? 0;
+    const clientY = e.clientY ?? e.touches?.[0]?.clientY ?? 0;
+    setPan({
+      x: panStartRef.current.panX + (clientX - panStartRef.current.x),
+      y: panStartRef.current.panY + (clientY - panStartRef.current.y),
+    });
+  };
+
+  const handlePanEnd = () => {
+    setIsPanning(false);
+  };
 
   // Redraw in the new colours when the sky or the accent changes.
   useEffect(() => watchAppearance(setAppearance), []);
@@ -123,7 +149,7 @@ export default function DiagramViewer({ source, settled = true, fallback = null 
         <button type="button" className="diagram-viewer__action" onClick={copy}>
           {copied ? <Check size={14} strokeWidth={2.3} /> : <Copy size={14} strokeWidth={1.9} />} {copied ? "Copied" : "Copy source"}
         </button>
-        <button type="button" className="diagram-viewer__action" disabled={state.status !== "ready"} onClick={() => { setZoom(1); setFullscreen(true); }}>
+        <button type="button" className="diagram-viewer__action" disabled={state.status !== "ready"} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); setFullscreen(true); }}>
           <Maximize2 size={14} strokeWidth={1.9} /> Full screen
         </button>
       </div>
@@ -136,10 +162,23 @@ export default function DiagramViewer({ source, settled = true, fallback = null 
           <button type="button" className="diagram-viewer__action" aria-label="Zoom out" disabled={zoom <= 0.5} onClick={() => setZoom((value) => Math.max(0.5, value - 0.25))}><Minus size={14} /></button>
           <span className="diagram-viewer__zoom-level" aria-live="polite">{Math.round(zoom * 100)}%</span>
           <button type="button" className="diagram-viewer__action" aria-label="Zoom in" disabled={zoom >= 3} onClick={() => setZoom((value) => Math.min(3, value + 0.25))}><Plus size={14} /></button>
-          <button type="button" className="diagram-viewer__action" onClick={() => setZoom(1)}><RotateCcw size={14} /> Reset</button>
+          <button type="button" className="diagram-viewer__action" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}><RotateCcw size={14} /> Reset</button>
         </div>
-        <div className="diagram-viewer__stage">
-          <SvgFrame className="diagram-viewer__zoomed" svg={state.svg} style={{ scale: String(zoom) }} />
+        <div
+          className="diagram-viewer__stage"
+          onMouseDown={handlePanStart}
+          onMouseMove={handlePanMove}
+          onMouseUp={handlePanEnd}
+          onMouseLeave={handlePanEnd}
+          onTouchStart={handlePanStart}
+          onTouchMove={handlePanMove}
+          onTouchEnd={handlePanEnd}
+          style={{
+            cursor: zoom > 1 ? (isPanning ? "grabbing" : "grab") : "default",
+            userSelect: isPanning ? "none" : "auto",
+          }}
+        >
+          <SvgFrame className="diagram-viewer__zoomed" svg={state.svg} style={{ scale: String(zoom), translate: `${pan.x}px ${pan.y}px` }} />
         </div>
       </Modal>
     </figure>
@@ -170,9 +209,118 @@ export function DiagramFailed({ fallback }) {
   );
 }
 
-// Mermaid's own sanitised output (securityLevel "strict") placed in the page.
+const FORBIDDEN_TAGS = Object.freeze([
+  "script",
+  "foreignObject",
+  "iframe",
+  "embed",
+  "object",
+  "audio",
+  "video",
+  "form",
+  "input",
+  "textarea",
+  "select",
+  "button",
+]);
+
+const DOMPURIFY_CONFIG = Object.freeze({
+  USE_PROFILES: { svg: true, svgFilters: true },
+  FORBID_TAGS: FORBIDDEN_TAGS,
+  FORBID_ATTR: [],
+  ALLOW_DATA_ATTR: false,
+});
+
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#([0-9]+);?/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/&colon;/gi, ":")
+    .replace(/&tab;/gi, "\t")
+    .replace(/&newline;/gi, "\n");
+}
+
+function normalizeScheme(url) {
+  return decodeHtmlEntities(url).replace(/[\u0000-\u0020\s]+/g, "").toLowerCase();
+}
+
+function filterSvgMarkup(svg) {
+  let cleaned = svg.replace(/[\u0000]/g, "");
+
+  for (const tag of FORBIDDEN_TAGS) {
+    const pairRegex = new RegExp(`<\\s*${tag}\\b[^>]*>[\\s\\S]*?<\\s*\\/\\s*${tag}\\s*>`, "gi");
+    cleaned = cleaned.replace(pairRegex, "");
+    const singleRegex = new RegExp(`<\\s*${tag}\\b[^>]*\\/?>`, "gi");
+    cleaned = cleaned.replace(singleRegex, "");
+  }
+
+  // Strip animations targeting href, xlink:href, or event handlers
+  cleaned = cleaned.replace(/<\s*(?:animate|set|animateTransform|animateMotion)\b[^>]*\battributeName\s*=\s*["']?\s*(?:(?:[\w-]+:)?href|on\w+)[^>]*\/?>/gi, "");
+
+  // Clean <style> blocks: remove @import and external url(...)
+  cleaned = cleaned.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (match, css) => {
+    const cleanedCss = css
+      .replace(/@import\b[^;]*;?/gi, "")
+      .replace(/url\s*\(\s*["']?\s*(?!#)[^"')]*["']?\s*\)/gi, "none");
+    return `<style>${cleanedCss}</style>`;
+  });
+
+  // Strip all inline event handlers on any element (onload, onclick, onerror, onmouseover, onbegin, etc.)
+  cleaned = cleaned.replace(/\s+on[a-z0-9_-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+
+  // Handle namespaced & standard URLs on <a>, <use>, <image>, <feImage>
+  cleaned = cleaned.replace(/<\s*([a-zA-Z0-9_-]+)\b([^>]*)>/gi, (fullMatch, tag, attrs) => {
+    const lowerTag = tag.toLowerCase();
+    if (FORBIDDEN_TAGS.includes(lowerTag)) return "";
+
+    let newAttrs = attrs.replace(/(?:^|\s+)((?:[a-zA-Z0-9_-]+:)?href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, (attrMatch, attrName, val1, val2, val3) => {
+      const val = val1 ?? val2 ?? val3 ?? "";
+      const norm = normalizeScheme(val);
+
+      if (norm.startsWith("javascript:") || norm.startsWith("vbscript:") || norm.startsWith("data:text/html") || norm.startsWith("data:image/svg+xml")) {
+        return lowerTag === "a" ? ' href="#"' : "";
+      }
+
+      if (lowerTag === "use" || lowerTag === "image" || lowerTag === "feimage") {
+        return val.trim().startsWith("#") ? ` ${attrName}="${val}"` : "";
+      }
+
+      if (lowerTag === "a") {
+        return val.trim().startsWith("#") ? ` href="${val}"` : ' href="#"';
+      }
+
+      return ` ${attrName}="${val}"`;
+    });
+
+    return `<${tag}${newAttrs}>`;
+  });
+
+  // Remove empty <image> and <feImage> tags that have no href left or were pointing to external urls
+  cleaned = cleaned.replace(/<\s*(?:image|feimage)\b(?![^>]*\bhref\b)[^>]*\/?>/gi, "");
+
+  return cleaned;
+}
+
+// Strips scripts, foreignObject, inline event handlers, hostile URLs and external resources from diagram SVG.
+export function sanitizeDiagramSvg(rawSvg) {
+  if (typeof rawSvg !== "string") return "";
+  const trimmed = rawSvg.trim();
+  if (!trimmed) return "";
+
+  try {
+    if (typeof window !== "undefined" && DOMPurify && DOMPurify.isSupported) {
+      const purified = DOMPurify.sanitize(trimmed, DOMPURIFY_CONFIG);
+      return filterSvgMarkup(purified);
+    }
+    return filterSvgMarkup(trimmed);
+  } catch {
+    return "";
+  }
+}
+
+// Mermaid's sanitized output (securityLevel "strict" plus strict SVG filtering) placed in the page.
 function SvgFrame({ svg, className, style }) {
   const ref = useRef(null);
-  useEffect(() => { if (ref.current) ref.current.innerHTML = svg; }, [svg]);
+  useEffect(() => { if (ref.current) ref.current.innerHTML = sanitizeDiagramSvg(svg); }, [svg]);
   return <div ref={ref} className={className} style={style} />;
 }

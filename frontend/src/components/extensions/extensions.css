@@ -1,0 +1,389 @@
+/* ==========================================================================
+   Extensions Hub Styles
+   Consistent planetary styling for Connectors, Plugins, and Skills.
+   ========================================================================== */
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Section controls */
+
+.service-logo {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Badges */
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+.status-badge--connected {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.status-badge--warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.status-badge--available {
+  background: var(--surface-2, rgba(0, 0, 0, 0.05));
+  color: var(--color-ink-muted, #6b7280);
+}
+
+/* Modal */
+
+.skill-dialog {
+  max-width: 560px;
+  width: 100%;
+}
+
+.skill-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 0 0;
+}
+
+.textarea-instructions {
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+  line-height: 1.45;
+}
+
+.field-hint {
+  font-size: 12px;
+  color: var(--color-ink-subtle, #9ca3af);
+  margin-top: 4px;
+  display: block;
+}
+
+/* Skill Import & Dropzone */
+
+.skill-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+  border: 2px dashed var(--color-rule, rgba(0, 0, 0, 0.15));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-paper-2, #ffffff) 96%, transparent);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+  gap: 10px;
+}
+
+.skill-dropzone--dragging {
+  border-color: var(--color-accent, #a3451e);
+  background: color-mix(in srgb, var(--color-accent, #a3451e) 8%, var(--color-paper-2, #ffffff));
+}
+
+.skill-dropzone__icon {
+  color: var(--color-ink-subtle, #9ca3af);
+}
+
+.skill-dropzone--dragging .skill-dropzone__icon {
+  color: var(--color-accent, #a3451e);
+}
+
+.skill-dropzone__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-ink, #111827);
+  margin: 0;
+}
+
+.skill-dropzone__formats {
+  font-size: 13px;
+  color: var(--color-ink-muted, #6b7280);
+  margin: 0;
+}
+
+.skill-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--color-ink) 4%, transparent);
+  border-radius: 10px;
+  border: 1px solid var(--color-rule, rgba(0, 0, 0, 0.1));
+}
+
+.skill-preview-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.skill-preview-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-ink-subtle, #9ca3af);
+}
+
+.skill-preview-val {
+  font-size: 14px;
+  color: var(--color-ink, #111827);
+  font-weight: 500;
+}
+
+.skill-preview-instructions {
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 12px;
+  padding: 8px 12px;
+  background: var(--color-paper-2, #ffffff);
+  border-radius: 6px;
+  border: 1px solid var(--color-rule, rgba(0, 0, 0, 0.08));
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.skill-resources-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--color-accent);
+}
+
+.skill-conflict-alert {
+  padding: 14px 16px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skill-conflict-alert__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #b45309;
+}
+
+.skill-conflict-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.skill-conflict-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Compact Connectors List (Plain Names, Crisp Logos, Direct Controls)
+   ========================================================================== */
+
+.connectors-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.connector-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--color-paper-2, #ffffff);
+  border: 1px solid var(--color-rule, rgba(0, 0, 0, 0.08));
+  box-shadow: var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.04));
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.connector-row:hover {
+  border-color: var(--color-rule-2, rgba(0, 0, 0, 0.14));
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.06));
+}
+
+.connector-row__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.connector-row__logo {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-ink, #111827) 4%, var(--color-paper-2, #ffffff));
+  border: 1px solid var(--color-rule, rgba(0, 0, 0, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.connector-row__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.connector-row__name-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.connector-row__name {
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--color-ink, #111827);
+}
+
+.connector-row__account {
+  font-size: 12.5px;
+  color: var(--color-ink-muted, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.connector-row__notice {
+  font-size: 12px;
+  color: #b45309;
+}
+
+.connector-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* Accessible Toggle Switch */
+
+.connector-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--color-ink, #374151);
+  padding: 6px 4px;
+  min-height: 44px;
+}
+
+.connector-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.connector-toggle__slider {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  background: var(--color-rule-2, #d1d5db);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+.connector-toggle__slider::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-paper-2);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.connector-toggle input:checked + .connector-toggle__slider {
+  background: var(--color-accent, #a3451e);
+}
+
+.connector-toggle input:checked + .connector-toggle__slider::after {
+  transform: translateX(16px);
+}
+
+.connector-toggle input:focus-visible + .connector-toggle__slider {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent, #a3451e) 25%, transparent);
+}
+
+.connector-toggle--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.connector-toggle__label {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--color-ink, #374151);
+  min-width: 55px;
+}
+
+.connector-connect-btn,
+.connector-disconnect-btn {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@media (max-width: 640px) {
+  .connector-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .connector-row__actions {
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-rule, rgba(0, 0, 0, 0.06));
+    width: 100%;
+  }
+
+  .connector-toggle,
+  .connector-connect-btn,
+  .connector-disconnect-btn {
+    min-height: 44px;
+  }
+}

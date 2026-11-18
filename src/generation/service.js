@@ -7,12 +7,21 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { attachments } from "../db/schema.js";
 import { config } from "../config.js";
+import { logUpstreamFailure } from "../chat/upstream-telemetry.js";
+import { routeAllowed } from "../chat/route-inventory.js";
 import { accessError } from "../../frontend/src/access-status.js";
 import { uploadRoot, ensureUploadDirectories } from "../uploads/service.js";
-import { cancelUsageReservation, finalizeUsage, reserveDocumentGeneration, reserveImageGeneration } from "../usage/service.js";
+import {
+  cancelUsageReservation,
+  finalizeUsage,
+  recordShadowCostEvent,
+  reserveDocumentGeneration,
+  reserveImageGeneration,
+} from "../usage/service.js";
 import { buildDocumentPlan, validateDocumentPlan, DOCUMENT_FORMATS } from "./document-plan.js";
-import { documentFilename } from "./document-filename.js";
+import { artifactFilename, requestedFilename } from "./document-filename.js";
 import { renderDocx } from "./docx-render.js";
+import { IMAGE_MODELS, imageModelOpen, imageUserHash } from "./image-models.js";
 
 export const IMAGE_CREDIT_COST = 3;
 
@@ -94,7 +103,7 @@ function imageUnavailableError() {
 // runs only once the plan check has passed, so a request the plan refuses
 // does no work first, and anything it throws refunds the reservation.
 export async function generateImage(
-  { userId, prompt, aspectRatio, size, referenceImage, preparePrompt },
+  { userId, prompt, aspectRatio, size, referenceImage, preparePrompt, imageModel = IMAGE_MODELS.prism },
   {
     reserve = reserveImageGeneration,
     finalize = finalizeUsage,
@@ -104,12 +113,17 @@ export async function generateImage(
   } = {},
 ) {
   const baseUrl = config.providerBaseUrls.paid;
-  if (!apiKey || !baseUrl || !config.imageGenerationModel) throw imageUnavailableError();
+  // The model chosen when Generate was pressed (image-models.js): its own engine and route, never another model's.
+  const engine = imageModel.engine();
+  if (!apiKey || !baseUrl || !engine || !imageModelOpen(imageModel)) throw imageUnavailableError();
   const reservation = await reserve(userId);
   try {
     const selectedAspectRatio = IMAGE_ASPECT_RATIOS[aspectRatio] ?? IMAGE_ASPECT_RATIOS.square;
+    const userHash = imageModel.sendsUserId ? imageUserHash(imageModel.id, userId) : null;
     const request = {
-      model: config.imageGenerationModel,
+      model: engine,
+      ...(imageModel.providerRouting ? { provider: { ...imageModel.providerRouting } } : {}),
+      ...(userHash ? { user: userHash } : {}),
       prompt: preparePrompt ? await preparePrompt(prompt) : prompt,
       n: 1,
       aspect_ratio: selectedAspectRatio,
@@ -127,12 +141,34 @@ export async function generateImage(
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "HTTP-Referer": "https://vibhavgpt.com", "X-Title": "VibhavGPT" },
       body: JSON.stringify(request),
     });
+    if (!response.ok) {
+      await logUpstreamFailure({ route: "image_generation", model: request?.model ?? null, response, requestBody: { messages: [{ content: String(request?.prompt ?? "") }] } });
+      throw imageUnavailableError();
+    }
     const payload = await response.json().catch(() => ({}));
     const encoded = payload?.data?.[0]?.b64_json;
     if (!response.ok || !encoded) throw imageUnavailableError();
+    const delivered = Buffer.from(encoded, "base64");
     const usage = payload?.usage || {};
     await finalize(reservation.id, { prompt_tokens: Number(usage.prompt_tokens) || 0, completion_tokens: Number(usage.completion_tokens) || 0, cost: usage.cost });
-    return { buffer: Buffer.from(encoded, "base64"), cost: usage.cost ?? null, reservation, referenceApplied: Boolean(referenceImage) };
+    void recordShadowCostEvent({
+      userId,
+      requestId: randomUUID(),
+      attemptNumber: 1,
+      operation: "image_generation",
+      modality: "image",
+      modelKey: engine || "__image__",
+      modelIdentifier: engine,
+      provider: "paid",
+      costUsd: usage.cost,
+      metadata: {
+        reservationId: reservation.id,
+        aspectRatio: selectedAspectRatio,
+        size: typeof size === "string" ? size : undefined,
+        imageModel: engine,
+      },
+    }).catch(() => {});
+    return { buffer: delivered, cost: usage.cost ?? null, reservation, referenceApplied: Boolean(referenceImage) };
   } catch {
     await cancel(reservation.id, reservation.creditReservationId).catch(() => {});
     throw imageUnavailableError();
@@ -199,11 +235,20 @@ export async function generateDocument({ userId, format, prompt, history = [], s
     const { plan, usage } = await buildPlan({ prompt, format, history, sourceContext, requestText, reuseLastReply, requestId, signal });
     const rendered = await render({ format, plan });
     await finalize(reservation.id, usage);
-    return { ...rendered, filename: format === "docx" ? documentFilename(plan, prompt) : `vibhavgpt-document${rendered.extension}`, reservation };
+    // One name rule for every format; an explicit name in the request wins, then the title, then the subject. No extra model call.
+    return { ...rendered, filename: artifactFilename({ plan, prompt, extension: rendered.extension, requestedName: requestedFilename(requestText) ?? requestedFilename(prompt) }), reservation };
   } catch (error) {
     await cancel(reservation.id, reservation.creditReservationId).catch(() => {});
     throw error;
   }
+}
+
+// A document that was made but could not be saved or stored was never delivered, so its purchased credit goes back. An included document
+// has no debit (creditReservationId is null) and nothing happens. Safe to call more than once: the refund is one row per reservation.
+// The usage row is kept (confirmedZeroUsage: false): the provider was used, and past the included number the row no longer matters.
+export async function releaseDocumentCharge(reservation, cancel = cancelUsageReservation) {
+  if (!reservation?.creditReservationId) return;
+  await cancel(reservation.id, reservation.creditReservationId, db, { confirmedZeroUsage: false });
 }
 
 export async function createStoredAttachment({ userId, conversationId, originalName, mimeType, kind, buffer, prompt = null, parentAttachmentId = null, generationMeta = {} }) {

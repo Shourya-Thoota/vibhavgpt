@@ -1,0 +1,17 @@
+/* The eligibility screen (components/EligibilityGate.jsx): one card, over the workspace or alone when the account is blocked. Tokens only. */
+.eligibility { display: grid; place-items: center; min-height: 100dvh; padding: 16px; background: var(--color-paper); color: var(--color-ink); }
+.eligibility--over { position: fixed; inset: 0; z-index: 1000; min-height: 0; background: color-mix(in srgb, var(--color-paper) 82%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.eligibility__card { display: grid; gap: 14px; width: min(100%, 440px); padding: 24px; border: 1px solid var(--color-rule); border-radius: 18px; background: var(--color-paper-2); box-shadow: var(--shadow-pop); }
+.eligibility__card h1 { font-size: 1.35rem; line-height: 1.25; }
+.eligibility__card p { color: var(--color-ink-2); line-height: 1.5; }
+.eligibility__birth { display: grid; gap: 8px; margin: 0; padding: 0; border: 0; }
+.eligibility__birth legend { padding: 0; font-weight: 600; }
+.eligibility__hint { font-size: 0.85rem; }
+.eligibility__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.eligibility__row label { display: grid; gap: 4px; font-size: 0.85rem; color: var(--color-ink-2); }
+.eligibility__row select { min-height: 44px; padding: 0 10px; border: 1px solid var(--color-rule-2); border-radius: 10px; background: var(--color-paper); color: var(--color-ink); }
+.eligibility__accept { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; }
+.eligibility__accept input { width: 20px; height: 20px; margin-top: 2px; flex: 0 0 auto; }
+.eligibility__accept a { color: var(--color-accent-text); text-decoration: underline; }
+.eligibility__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.eligibility__actions .btn { min-height: 44px; }

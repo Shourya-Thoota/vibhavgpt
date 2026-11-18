@@ -19,6 +19,37 @@ const PROTOCOL = "vibhavgpt";
 const ICON = path.join(__dirname, "build", "icon.ico");
 const SUMMON_SHORTCUT = "CommandOrControl+Shift+Space";
 
+// Launch shortcuts (the jump list, and the Android launcher's): vibhavgpt://open/app/chat, image or build. The same three paths
+// as frontend/src/keyboard-shortcuts.js LAUNCH_SHORTCUTS; anything else is ignored.
+const LAUNCH_SHORTCUTS = Object.freeze([
+  Object.freeze({ action: "new-chat", title: "New Chat", description: "Start a new chat", path: "/app/chat" }),
+  Object.freeze({ action: "new-image", title: "New Image", description: "Create a new image", path: "/app/image" }),
+  Object.freeze({ action: "new-build", title: "New Build", description: "Start a new build", path: "/app/build" }),
+]);
+const LAUNCH_HOST = "open";
+const launchLink = (path) => `${PROTOCOL}://${LAUNCH_HOST}${path}`;
+
+function launchShortcutFor(link) {
+  let url;
+  try { url = new URL(link); } catch { return null; }
+  if (url.protocol !== `${PROTOCOL}:` || url.hostname !== LAUNCH_HOST || url.search || url.hash || url.username || url.password) return null;
+  return LAUNCH_SHORTCUTS.find((shortcut) => shortcut.path === url.pathname) ?? null;
+}
+
+// The workspace's keyboard shortcuts (frontend/src/keyboard-shortcuts.js), listed in the app menu and the tray. The page handles
+// the keys itself (it ignores them while the person types), so the menu only names them: registerAccelerator is off, and a
+// menu click sends the same action to the page.
+const MENU_SHORTCUTS = Object.freeze([
+  Object.freeze({ action: "new-chat", label: "New Chat", accelerator: "CommandOrControl+N" }),
+  Object.freeze({ action: "new-image", label: "New Image" }),
+  Object.freeze({ action: "new-build", label: "New Build" }),
+  Object.freeze({ type: "separator" }),
+  Object.freeze({ action: "search", label: "Search Chats", accelerator: "CommandOrControl+K" }),
+  Object.freeze({ action: "toggle-sidebar", label: "Show or Hide Sidebar", accelerator: "CommandOrControl+B" }),
+  Object.freeze({ action: "settings", label: "Settings", accelerator: "CommandOrControl+," }),
+  Object.freeze({ action: "shortcuts", label: "Keyboard Shortcuts", accelerator: "CommandOrControl+/" }),
+]);
+
 // The page runs edge to edge: the title bar is a 38px strip of the page
 // itself (see preload.js), and Windows draws only the caption buttons, with
 // Snap Layouts on maximize, over its right end. The buttons have no
@@ -120,12 +151,23 @@ async function finishGoogleSignIn(returnUrl) {
   }
 }
 
-function handleProtocolArgs(argv) {
+function handleProtocolArgs(argv, { startup = false } = {}) {
   const link = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`));
   if (!link || !mainWindow) return;
   let url;
   try { url = new URL(link); } catch { return; }
   if (url.hostname === "account" && url.pathname === "/auth") void finishGoogleSignIn(url);
+  const shortcut = launchShortcutFor(link);
+  if (!shortcut || startup) return;
+  // In the open app the page starts it; anywhere else the window opens that page.
+  if (inOpenApp()) runAction(shortcut.action);
+  else { focusWindow(); mainWindow.loadURL(new URL(shortcut.path, APP_URL).toString()); }
+}
+
+// The app page that opens first: a launch shortcut's page when the app was started from the jump list, otherwise the app.
+function startUrl(argv) {
+  const shortcut = launchShortcutFor(argv.find((arg) => arg.startsWith(`${PROTOCOL}://`)) ?? "");
+  return shortcut ? new URL(shortcut.path, APP_URL).toString() : APP_URL;
 }
 
 function focusWindow() {
@@ -138,15 +180,59 @@ function focusWindow() {
   mainWindow.focus();
 }
 
+function inOpenApp() {
+  const current = mainWindow.webContents.getURL();
+  try { return isAppUrl(current) && new URL(current).pathname.startsWith("/app") && !mainWindow.webContents.isLoading(); } catch { return false; }
+}
+
 // A new chat in the open app (the page listens for the event preload.js
 // relays); from any other page, the app opens on a fresh chat.
 function newChat() {
   focusWindow();
-  const current = mainWindow.webContents.getURL();
-  let inApp = false;
-  try { inApp = isAppUrl(current) && new URL(current).pathname.startsWith("/app"); } catch { inApp = false; }
-  if (inApp && !mainWindow.webContents.isLoading()) mainWindow.webContents.send("desktop:new-chat");
+  if (inOpenApp()) mainWindow.webContents.send("desktop:new-chat");
   else mainWindow.loadURL(APP_URL);
+}
+
+// A menu or tray action. New Chat is the tray's own, unchanged (newChat). The others: in the open app the page runs them
+// (preload.js relays "desktop:shortcut"); from any other page, New Image and New Build open their page, and the rest the app.
+function runAction(action) {
+  if (action === "new-chat") { newChat(); return; }
+  focusWindow();
+  if (inOpenApp()) { mainWindow.webContents.send("desktop:shortcut", action); return; }
+  const path = LAUNCH_SHORTCUTS.find((shortcut) => shortcut.action === action)?.path;
+  mainWindow.loadURL(path ? new URL(path, APP_URL).toString() : APP_URL);
+}
+
+function menuItems() {
+  return MENU_SHORTCUTS.map((item) => (item.type === "separator" ? { type: "separator" } : {
+    label: item.label,
+    ...(item.accelerator ? { accelerator: item.accelerator, registerAccelerator: false } : {}),
+    click: () => runAction(item.action),
+  }));
+}
+
+// The application menu. The window draws no menu bar (its title bar is part of the page), so this is where the shortcuts are
+// named for Windows; development runs keep the View menu (reload, developer tools).
+function applicationMenu() {
+  return Menu.buildFromTemplate([
+    { label: "VibhavGPT", submenu: [...menuItems(), { type: "separator" }, { label: "Quit", click: () => { quitting = true; app.quit(); } }] },
+    ...(app.isPackaged ? [] : [{ role: "viewMenu" }]),
+  ]);
+}
+
+// The jump list (right-click on the taskbar button): the three launch shortcuts. Each starts a second instance with its link,
+// which hands it to the running window (second-instance), or opens the app on that page.
+function setJumpList() {
+  if (process.platform !== "win32") return;
+  const prefix = process.defaultApp ? `"${path.resolve(process.argv[1])}" ` : "";
+  app.setUserTasks(LAUNCH_SHORTCUTS.map(({ title, description, path: appPath }) => ({
+    program: process.execPath,
+    arguments: `${prefix}${launchLink(appPath)}`,
+    title,
+    description,
+    iconPath: process.execPath,
+    iconIndex: 0,
+  })));
 }
 
 function createTray() {
@@ -154,14 +240,15 @@ function createTray() {
   tray.setToolTip("VibhavGPT");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open VibhavGPT", click: focusWindow },
-    { label: "New Chat", click: newChat },
+    { type: "separator" },
+    ...menuItems(),
     { type: "separator" },
     { label: "Quit", click: () => { quitting = true; app.quit(); } },
   ]));
   tray.on("click", focusWindow);
 }
 
-function createWindow() {
+function createWindow(url = APP_URL) {
   // Size, position and maximized state carry over between launches.
   const state = windowStateKeeper({ defaultWidth: 1280, defaultHeight: 800 });
   const win = new BrowserWindow({
@@ -178,7 +265,7 @@ function createWindow() {
     titleBarStyle: "hidden",
     titleBarOverlay: TITLE_BAR_OVERLAY,
     show: false,
-    autoHideMenuBar: true,
+    autoHideMenuBar: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -221,7 +308,9 @@ function createWindow() {
     else openExternal(url);
   });
 
-  win.loadURL(APP_URL);
+  win.loadURL(url);
+  // No menu bar: the page's own header is the title bar (the application menu still names the shortcuts).
+  win.setMenuBarVisibility(false);
 }
 
 // Updates come from the latest release in Shourya-Thoota/vibhavgpt-releases
@@ -307,10 +396,11 @@ if (!app.requestSingleInstanceLock()) {
   app.on("will-quit", () => globalShortcut.unregisterAll());
 
   app.whenReady().then(() => {
-    // No menu bar in production; keep the default (reload, devtools) in dev.
-    if (app.isPackaged) Menu.setApplicationMenu(null);
-    createWindow();
+    // The shortcuts' menu (no default menu: no reload or developer tools in production).
+    Menu.setApplicationMenu(applicationMenu());
+    createWindow(startUrl(process.argv));
     createTray();
+    setJumpList();
     // Summons the window from anywhere in Windows. Another app may own the
     // shortcut already; the app works the same without it.
     globalShortcut.register(SUMMON_SHORTCUT, focusWindow);
@@ -318,7 +408,7 @@ if (!app.requestSingleInstanceLock()) {
     if (app.isPackaged) setTimeout(() => void checkForUpdates(), UPDATE_CHECK_DELAY_MS);
     // Launched by a return link while closed: the sign-in it belongs to was
     // lost with the old process, so this shows the expired message.
-    mainWindow.webContents.once("did-finish-load", () => handleProtocolArgs(process.argv));
+    mainWindow.webContents.once("did-finish-load", () => handleProtocolArgs(process.argv, { startup: true }));
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
     });

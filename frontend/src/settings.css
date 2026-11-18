@@ -32,158 +32,259 @@
 .sidebar__link { text-decoration: none; }
 
 .settings__layout {
-  display: flex;
+  display: grid;
   flex: 1;
-  flex-direction: column;
-  width: min(100%, 940px);
+  grid-template-columns: 14rem minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: clamp(var(--space-xl), 5vw, var(--space-2xl));
+  align-items: start;
+  width: min(100%, 1080px);
   margin: 0 auto;
-  /* The top edge matches the sidebar's, so the section header sits level
-     with the wordmark beside it. */
-  padding: 24px clamp(var(--space-md), 4vw, var(--space-2xl)) 0;
+  /* The top edge matches the sidebar's, so the title sits level with the
+     wordmark beside it. */
+  padding: 26px clamp(var(--space-md), 4vw, var(--space-2xl)) 0;
 }
 
-/* --- The dock ------------------------------------------------------------ */
+/* --- Section navigation --------------------------------------------------- */
 
-/* Every section sits across the top as an icon tile, in three clusters
-   (You, Experience, Privacy and security) divided by hairlines. The current
-   tile lights in the accent and an accent bar runs under it, on the dock's
-   own rule. It sits on the sky like the rest of the page, not on a panel. */
+/* On wide screens the sections are a quiet list beside the content, in
+   three named groups (Personal, Preferences & Security, Account & Billing),
+   with a Back to app action and a search bar. The current section is a
+   subtle tint step. On narrower screens the same links become one scrolling row
+   and an accessible picker above the content. */
 .settings__top {
-  margin: 0 0 var(--space-xl);
-  padding: var(--space-md) 0 0;
-  border-bottom: var(--rule-fine) solid var(--color-rule);
+  position: sticky;
+  top: 26px;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0;
+  padding: 0;
 }
 .settings__title {
-  margin: 0 0 var(--space-md);
+  margin: 0 0 var(--space-xs);
+  padding-left: 10px;
   color: var(--color-ink);
   font-family: var(--font-display);
-  font-size: 2rem;
-  font-weight: 400;
-  letter-spacing: -0.018em;
-  line-height: 1.05;
+  font-size: 1.5rem;
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 1.1;
 }
 
-.settings-dock {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.settings-dock::-webkit-scrollbar { display: none; }
-.settings-dock__group { display: grid; flex: 0 0 auto; align-content: start; gap: var(--space-2xs); padding: 0 var(--space-md); }
-.settings-dock__group:first-child { padding-left: 0; }
-.settings-dock__group + .settings-dock__group { border-left: var(--rule-fine) solid var(--color-rule); }
-.settings-dock__label { color: var(--color-faint); font-size: 0.72rem; font-weight: 600; white-space: nowrap; }
-.settings-dock__items { display: flex; gap: var(--space-3xs); }
-
-.settings-dock__item {
-  position: relative;
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  min-width: 84px;
-  padding: var(--space-xs) var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-input) var(--radius-input) 0 0;
+.settings-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin-bottom: var(--space-2xs);
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--color-ink-2);
+  font-size: 0.92rem;
+  font-weight: 550;
+  cursor: pointer;
   text-decoration: none;
-  transition: color var(--dur-micro) var(--ease-out), background-color var(--dur-micro) var(--ease-out);
+  transition: color var(--dur-press) var(--ease-out), background-color var(--dur-press) var(--ease-out);
 }
-.settings-dock__icon {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border: var(--rule-fine) solid var(--color-rule);
-  border-radius: var(--radius-input);
-  background: color-mix(in srgb, var(--color-paper-2) 85%, transparent);
+.settings-back-btn:hover {
+  background: color-mix(in srgb, var(--color-ink) 5%, transparent);
+  color: var(--color-ink);
+}
+.settings-back-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.settings-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+.settings-search__icon {
+  position: absolute;
+  left: 10px;
   color: var(--color-muted);
-  transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
+  pointer-events: none;
 }
-.settings-dock__name { font-size: 0.8rem; font-weight: 500; white-space: nowrap; }
-.settings-dock__item:hover { color: var(--color-ink); }
-.settings-dock__item:hover .settings-dock__icon { border-color: var(--color-rule-2); color: var(--color-ink); transform: translateY(-1px); }
-.settings-dock__item[aria-current="page"] { color: var(--color-ink); }
-.settings-dock__item[aria-current="page"] .settings-dock__name { font-weight: 650; }
-.settings-dock__item[aria-current="page"] .settings-dock__icon {
-  border-color: var(--color-accent-line);
-  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-paper-2));
+.settings-search__input {
+  width: 100%;
+  height: 36px;
+  padding: 0 32px 0 34px;
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-paper-2) 75%, transparent);
+  color: var(--color-ink);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color var(--dur-press) var(--ease-out);
+}
+.settings-search__input:focus {
+  border-color: var(--color-focus);
+}
+.settings-search__clear {
+  position: absolute;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-ink) 10%, transparent);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.settings-search__clear:hover {
+  color: var(--color-ink);
+}
+.settings-search__results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.settings-search__result {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-press) var(--ease-out);
+}
+.settings-search__result:hover {
+  background: color-mix(in srgb, var(--color-ink) 6%, transparent);
+}
+.settings-search__result-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.settings-search__result-desc {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+  line-height: 1.35;
+}
+.settings-search__result-meta {
+  font-size: 0.72rem;
+  font-weight: 500;
   color: var(--color-accent);
 }
-.settings-dock__item[aria-current="page"]::after {
-  content: "";
-  position: absolute;
-  right: var(--space-sm);
-  bottom: -1px;
-  left: var(--space-sm);
-  height: 2px;
-  border-radius: 2px 2px 0 0;
-  background: var(--color-accent);
+.settings-search__empty {
+  margin: var(--space-xs) 0;
+  padding: 0 10px;
+  color: var(--color-muted);
+  font-size: 0.84rem;
 }
-.settings-dock__item[data-tone="danger"] { color: color-mix(in srgb, var(--color-danger) 85%, var(--color-muted)); }
-.settings-dock__item[data-tone="danger"] .settings-dock__icon { color: color-mix(in srgb, var(--color-danger) 85%, var(--color-muted)); }
-.settings-dock__item[data-tone="danger"][aria-current="page"] { color: var(--color-danger); }
-.settings-dock__item[data-tone="danger"][aria-current="page"] .settings-dock__icon {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
-  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-paper-2));
-  color: var(--color-danger);
+
+.settings-mobile-bar {
+  display: none;
 }
-.settings-dock__item[data-tone="danger"][aria-current="page"]::after { background: var(--color-danger); }
+
+.settings-dock { display: grid; gap: var(--space-md); }
+.settings-dock__group { display: grid; gap: var(--space-2xs); }
+.settings-dock__label { padding: 0 10px; color: var(--color-muted); font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+.settings-dock__items { display: grid; gap: 1px; }
+.settings-dock__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: var(--color-ink-2);
+  font-size: 0.93rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: color var(--dur-press) var(--ease-out), background-color var(--dur-press) var(--ease-out);
+}
+/* Each section's icon sits in a small coloured tile, the way system
+   settings mark their sections, so a section is found by colour and shape
+   before its name is read. */
+.settings-dock__icon { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 7px; background: var(--tile, var(--color-accent)); color: #fffaf4; box-shadow: inset 0 1px 0 rgb(255 248 243 / 22%), 0 1px 1px rgb(28 16 12 / 8%); }
+.settings-dock__icon svg { width: 16px; height: 16px; }
+.settings-dock__item[data-section="general"], .settings-dock__item[data-section="replies"] { --tile: #9a5b45; }
+.settings-dock__item[data-section="appearance"] { --tile: #b76b58; }
+.settings-dock__item[data-section="profile"], .settings-dock__item[data-section="account"] { --tile: #8d5348; }
+.settings-dock__item[data-section="personalization"], .settings-dock__item[data-section="personality"] { --tile: #a34d5c; }
+.settings-dock__item[data-section="memory"] { --tile: #c4844a; }
+.settings-dock__item[data-section="location"] { --tile: #8a6a45; }
+.settings-dock__item[data-section="media"] { --tile: #c47a55; }
+.settings-dock__item[data-section="security"] { --tile: #6d5c54; }
+.settings-dock__item[data-section="connectors"] { --tile: #a35d52; }
+.settings-dock__item[data-section="usage"] { --tile: #b5834a; }
+.settings-dock__item[data-section="billing"] { --tile: #8f5a62; }
+.settings-dock__item[data-section="data-controls"], .settings-dock__item[data-section="your-data"] { --tile: #7d6558; }
+.settings-dock__item[data-section="delete-account"] { --tile: #c24132; }
+.settings-dock__name { white-space: nowrap; }
+.settings-dock__item:hover { background: color-mix(in srgb, var(--color-ink) 5%, transparent); color: var(--color-ink); }
+.settings-dock__item[aria-current="page"] { background: color-mix(in srgb, var(--color-ink) 8%, transparent); color: var(--color-ink); font-weight: 600; }
+.settings-dock__item[data-tone="danger"] { color: var(--color-danger); }
+.settings-dock__item[data-tone="danger"][aria-current="page"] { background: var(--color-danger-soft); }
 .settings-dock__item:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
+
+@media (max-width: 999px) {
+  .settings__layout { display: flex; flex-direction: column; }
+  /* The header and dock take the screen's width (min-width 0), so the dock scrolls within it: its sections past the edge are reached by swiping, not clipped. */
+  .settings__layout { align-items: stretch; }
+  .settings__top { position: static; width: 100%; min-width: 0; margin: 0 0 var(--space-lg); padding-bottom: var(--space-xs); border-bottom: var(--rule-fine) solid var(--color-rule); }
+  .settings__title { margin-bottom: var(--space-sm); padding-left: 0; }
+  .settings-dock { display: flex; min-width: 0; max-width: 100%; gap: var(--space-xs); overflow-x: auto; scrollbar-width: none; margin: 0 calc(-1 * var(--space-md)); padding: 0 var(--space-md) var(--space-xs); }
+  .settings-dock::-webkit-scrollbar { display: none; }
+  .settings-dock__group { display: contents; }
+  .settings-dock__label { display: none; }
+  .settings-dock__items { display: flex; gap: var(--space-xs); }
+  .settings-dock__item { flex: none; min-height: 44px; padding: 0 14px; border: var(--rule-fine) solid var(--color-rule); }
+  .settings-dock__item[aria-current="page"] { border-color: transparent; }
+}
 
 /* --- Right column: section ------------------------------------------------ */
 
-.settings__sections { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.settings__sections { display: flex; flex: 1; flex-direction: column; min-width: 0; max-width: 46rem; }
 .settings__content { min-width: 0; }
 .settings [id^="settings-"] { scroll-margin-top: var(--space-lg); }
 
-.settings-section__head {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-md);
-  margin-bottom: var(--space-xl);
-}
-.settings-section__icon {
-  display: grid;
-  flex: 0 0 auto;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  margin-top: 4px;
-  border: var(--rule-fine) solid var(--color-accent-line);
-  border-radius: var(--radius-input);
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-paper-2));
-  color: var(--color-accent);
-}
-.settings-section__head[data-tone="danger"] .settings-section__icon {
-  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
-  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-paper-2));
-  color: var(--color-danger);
-}
+.settings-section__head { margin-bottom: var(--space-xl); }
 .settings-section__head h2 {
   margin: 0;
   color: var(--color-ink);
   font-family: var(--font-display);
-  font-size: 1.7rem;
-  font-weight: 400;
-  letter-spacing: -0.012em;
-  line-height: 1.15;
+  font-size: var(--text-xl);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  line-height: 1.2;
 }
-.settings-section__head p { max-width: 60ch; margin: var(--space-2xs) 0 0; color: var(--color-muted); font-size: 0.92rem; line-height: 1.55; }
+.settings-section__head[data-tone="danger"] h2 { color: var(--color-danger); }
+.settings-section__head p { max-width: var(--measure-read); margin: var(--space-2xs) 0 0; color: var(--color-muted); font-size: var(--text-sm); line-height: 1.55; }
 
 /* --- Groups and rows ------------------------------------------------------ */
 
-.settings-stack { display: grid; gap: var(--space-xl); }
+.settings-stack { display: grid; gap: var(--space-lg); }
 
-.settings-group__head { margin-bottom: var(--space-sm); padding: 0 var(--space-2xs); }
-.settings-group__head h3 { margin: 0; color: var(--color-ink); font-size: 1rem; font-weight: 650; }
-.settings-group__head p { max-width: 62ch; margin: var(--space-3xs) 0 0; color: var(--color-muted); font-size: 0.86rem; line-height: 1.5; }
+.settings-group__head { margin-bottom: var(--space-xs); padding: 0 var(--space-2xs); }
+.settings-group__head h3 { margin: 0; color: var(--color-ink); font-size: var(--text-base); font-weight: 600; line-height: 1.4; }
+.settings-group__head p { max-width: var(--measure-read); margin: var(--space-3xs) 0 0; color: var(--color-muted); font-size: var(--text-sm); line-height: 1.5; }
 
 .settings-group__panel {
   overflow: hidden;
   border: var(--rule-fine) solid var(--color-rule);
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--color-paper-2) 78%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .settings-group[data-tone="danger"] .settings-group__panel {
   border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-rule));
@@ -195,17 +296,19 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-xs) var(--space-lg);
+  min-height: var(--row-min);
   padding: var(--space-md) var(--space-lg);
+  box-sizing: border-box;
 }
 .settings-row + .settings-row { border-top: var(--rule-fine) solid var(--color-rule); }
 .settings-row[data-stacked] { grid-template-columns: minmax(0, 1fr); }
 .settings-row__text { display: grid; gap: var(--space-3xs); min-width: 0; }
-.settings-row__label { color: var(--color-ink); font-size: 0.94rem; font-weight: 600; }
-.settings-row__description { color: var(--color-muted); font-size: 0.84rem; line-height: 1.5; }
+.settings-row__label { color: var(--color-ink); font-size: var(--text-base); font-weight: 500; line-height: 1.4; }
+.settings-row__description { max-width: var(--measure-read); color: var(--color-muted); font-size: var(--text-sm); line-height: 1.5; }
 .settings-row__description a { color: var(--color-accent); text-underline-offset: 3px; }
 .settings-row__control { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-xs); min-width: 0; }
 .settings-row[data-stacked] .settings-row__control { display: block; }
-.settings-value { color: var(--color-ink); font-size: 0.92rem; font-weight: 500; text-align: right; overflow-wrap: anywhere; }
+.settings-value { color: var(--color-ink); font-size: var(--text-sm); font-weight: 500; text-align: right; overflow-wrap: anywhere; }
 /* The desktop app's update progress, under its Version row. */
 .settings-update-status { margin: 0; padding: 0 var(--space-lg) var(--space-md); color: var(--color-muted); font-size: 0.84rem; }
 .settings-update-status[data-status="downloaded"] { color: var(--color-accent); }
@@ -225,7 +328,9 @@
 .settings-notice {
   margin: 0;
   padding: var(--space-sm) var(--space-md);
-  border-left: 2px solid var(--color-danger);
+  border: var(--rule-fine) solid color-mix(in srgb, var(--color-danger) 30%, var(--color-rule));
+  border-radius: var(--radius-input);
+  background: var(--color-danger-soft);
   color: var(--color-ink-2);
   font-size: 0.88rem;
   line-height: 1.55;
@@ -237,11 +342,7 @@
 .settings-picker { width: min(100%, 300px); }
 .settings-row:not([data-stacked]) .settings-picker { min-width: 240px; }
 .settings-picker .ui-select__trigger { height: 42px; }
-.settings-picker .ui-select__value {
-  font-family: var(--font-display);
-  font-size: 1.04rem;
-  font-weight: 400;
-}
+.settings-picker .ui-select__value { font-size: 0.98rem; font-weight: 550; }
 .ui-select__list.settings-picker__list {
   min-width: 240px;
   max-height: min(420px, calc(100dvh - 24px));
@@ -288,23 +389,7 @@
 .authenticator-enrollment { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 360px); align-items: start; gap: var(--space-lg); }
 .settings .authenticator-enrollment .qr { margin: 0; max-width: 100%; height: auto; }
 
-/* --- Footer --------------------------------------------------------------- */
-
-.settings__footer { flex-shrink: 0; margin-top: auto; padding: var(--space-2xl) 0 var(--space-xl); }
-.settings__legal {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-xs) var(--space-lg);
-  margin: 0;
-  padding-top: var(--space-lg);
-  border-top: var(--rule-fine) solid var(--color-rule);
-  font-size: 0.84rem;
-}
-.settings__legal a,
-.settings__legal button { color: var(--color-muted); text-decoration: underline; text-underline-offset: 3px; }
-.settings__legal a:hover,
-.settings__legal button:hover { color: var(--color-ink); }
-.settings__attribution { margin: var(--space-md) 0 0; color: var(--color-muted); font-size: 0.84rem; line-height: 1.5; }
+/* The footer is the shared site footer (site-footer.css, .site-footer--in-app). */
 
 /* --- Narrow --------------------------------------------------------------- */
 
@@ -321,6 +406,11 @@
   .settings__layout { padding-top: 0; }
   .settings__top { padding-top: var(--space-sm); }
   .settings__title { display: none; }
+  .settings-back-btn { min-height: 44px; padding: 0 12px; }
+  .settings-mobile-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); width: 100%; margin-bottom: var(--space-xs); }
+  .settings-back-btn--desktop { display: none; }
+  .settings-mobile-picker { flex: 1; min-height: 44px; padding: 0 12px; border: var(--rule-fine) solid var(--color-rule); border-radius: 8px; background: color-mix(in srgb, var(--color-paper-2) 90%, transparent); color: var(--color-ink); font-size: 0.94rem; font-weight: 600; }
+  .settings-search { margin-top: 8px; }
   .settings-dock__item { min-width: 72px; }
   .settings-section__head { gap: var(--space-sm); margin-bottom: var(--space-lg); }
   .settings-section__head h2 { font-size: 1.5rem; }
@@ -338,15 +428,221 @@
    group titles, and inside rows, so labels, help text and controls read as
    separate layers. Phones keep their own tighter layout above. */
 @media (min-width: 761px) {
-  .settings__top { margin-bottom: 40px; }
-  .settings__title { margin-bottom: 20px; }
-  .settings-section__head { margin-bottom: 36px; }
-  .settings-stack { gap: 40px; }
-  .settings-group__head { margin-bottom: 12px; }
-  .settings-group__head p { margin-top: 4px; }
-  .settings-row { gap: 10px 16px; padding: 16px 20px; min-height: 64px; box-sizing: border-box; }
-  .settings-row__text { gap: 4px; }
-  .settings-row__description { line-height: 1.55; }
-  .settings-group__footer { padding: 14px 20px; }
-  .settings__footer { margin-top: 48px; }
+  .settings__top { margin-bottom: var(--space-xl); }
+  .settings__title { margin-bottom: var(--space-md); }
+  .settings-section__head { margin-bottom: var(--space-xl); }
+  .settings-stack { gap: var(--space-xl); }
+  .settings-group__head { margin-bottom: var(--space-sm); }
+  .settings-row { gap: var(--space-xs) var(--space-md); padding: var(--space-md) var(--space-lg); }
+  .settings-row__text { gap: var(--space-2xs); }
+  .settings-group__footer { padding: var(--space-sm) var(--space-lg); }
+}
+
+/* --- Connectors & Plugins Settings ---------------------------------------- */
+.connectors-settings { display: flex; flex-direction: column; gap: 24px; }
+.connectors-settings__hero {
+  padding: 12px 14px;
+  background: var(--color-paper-raised);
+  border: 1px solid var(--color-rule);
+  border-radius: var(--radius-card);
+}
+.connectors-settings__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.connectors-settings__subtext {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.connectors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.connector-card {
+  padding: 20px;
+  background: var(--surface-card, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 12px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 16px;
+  backdrop-filter: blur(8px);
+}
+.connector-card[data-connected] {
+  border-color: rgba(16, 185, 129, 0.25);
+  background: var(--surface-card-connected, rgba(16, 185, 129, 0.03));
+}
+.connector-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.connector-card__header-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.connector-card__name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+.connector-card__namespace {
+  font-size: 0.75rem;
+  color: var(--text-faint, #888);
+  font-family: monospace;
+}
+.connector-card__desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+.connector-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.connector-badge--connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+.connector-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+.connector-badge--disconnected {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+.connector-card__notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #f59e0b;
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border-radius: var(--radius-sm, 6px);
+}
+.connector-card__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  padding-top: 12px;
+}
+.connector-spec-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+.connectors-pending-section {
+  padding: 20px;
+  background: rgba(245, 158, 11, 0.04);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--radius-lg, 12px);
+  margin-bottom: 8px;
+}
+.connectors-pending__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f59e0b;
+  margin: 0 0 6px 0;
+}
+.connectors-pending__desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 16px 0;
+}
+.connectors-pending__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.connectors-pending-card {
+  padding: 14px 18px;
+  background: var(--surface-card, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+}
+.connectors-pending-card__header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.connectors-pending-card__tool { font-family: monospace; font-weight: 600; }
+.connectors-pending-card__desc { font-size: 0.92rem; margin: 0 0 8px 0; font-weight: 500; }
+.connectors-pending-card__payload {
+  font-size: 0.78rem;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px;
+  border-radius: 4px;
+  overflow-x: auto;
+  max-height: 120px;
+  margin: 0 0 12px 0;
+}
+.connectors-pending-card__actions { display: flex; gap: 10px; }
+.connectors-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md, 8px);
+  font-size: 0.88rem;
+}
+.connectors-alert--success {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+.connectors-alert--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+/* --- Settings is its own page (owner request, 2026-11-14) --------------------------------------------------------------------------------
+   The app's sidebar is not squeezed in beside it: Settings takes the whole window, with its own section list on the left, a clear Back to app
+   action, and generous spacing. The sidebar comes back the moment you leave (Back to app, or any link that goes elsewhere). On a phone the
+   page's own bar (Back and the section picker) replaces the app's top bar. */
+.workspace[data-page="settings"] { grid-template-columns: minmax(0, 1fr); }
+.workspace[data-page="settings"] > .sidebar,
+.workspace[data-page="settings"] > .scrim-mobile,
+.workspace[data-page="settings"] .topbar-mobile { display: none !important; }
+.workspace[data-page="settings"] .settings__layout {
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  column-gap: clamp(40px, 6vw, 88px);
+  width: min(100%, 1180px);
+  padding: clamp(28px, 5vh, 56px) clamp(20px, 5vw, 64px) 64px;
+}
+.workspace[data-page="settings"] .settings__top { top: clamp(28px, 5vh, 56px); }
+.workspace[data-page="settings"] .settings__sections { max-width: 50rem; }
+.workspace[data-page="settings"] .settings-back-btn--desktop { align-self: flex-start; margin-bottom: var(--space-sm); font-weight: 600; }
+@media (max-width: 999px) {
+  .workspace[data-page="settings"] .settings__layout { padding: 16px clamp(16px, 4vw, 32px) 48px; }
 }

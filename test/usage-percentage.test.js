@@ -20,8 +20,12 @@ test("overall percentage divides all model usage by total monthly allowances", (
 
 test("token dashboard uses percentages and omits raw input/output and reserved counts", async () => {
   const source = await readFile(new URL("../frontend/src/App.jsx", import.meta.url), "utf8");
-  assert.match(source, /used=\{combined\.monthly\.used\} limit=\{combined\.monthly\.limit\} label="of monthly token allowances used" percentageOnly/);
-  assert.match(source, /used=\{combined\.rolling\.used\} limit=\{combined\.rolling\.limit\} label="of 5-hour token allowances used" percentageOnly/);
+  // Two cards, one per window, each from the combined counters and shown only when that window has an allowance.
+  assert.match(source, /combined\.rolling\.limit > 0 && \(\s*<UsageCard\s+title="Current usage"\s+used=\{combined\.rolling\.used\}\s+limit=\{combined\.rolling\.limit\}/);
+  assert.match(source, /combined\.monthly\.limit > 0 && \(\s*<UsageCard\s+title="This month"\s+used=\{combined\.monthly\.used\}\s+limit=\{combined\.monthly\.limit\}/);
+  assert.match(source, /<strong>\{percentage\}%<\/strong> used/, "the card says the percent used, not raw counts");
+  assert.match(source, /earliestRelease\(usage\.nextRollingTokenReleaseAt\)/, "the 5-hour reset is the server's own release time, never made up");
+  assert.match(source, /Nothing used in the last 5 hours/, "and when nothing is in the window, it says so instead of inventing a time");
   assert.doesNotMatch(source, /Tokens by model|Includes pending usage:|overallPercentage/);
   assert.match(source, /Monthly caps reset on the first day at 00:00 UTC\. The 5-hour window rolls continuously/);
   assert.doesNotMatch(source, /monthly\.input\.toLocaleString|monthly\.output\.toLocaleString|reserved\.toLocaleString/);

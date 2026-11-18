@@ -6,6 +6,9 @@ export function responseError(data = {}, status) {
   const access = accessStatus(data.access ? { ...data.access, publicMessage: data.access.message } : data);
   const error = Object.assign(new Error(access?.message ?? data.error ?? data.message ?? "Couldn't complete this request. Please try again."), {
     code: data.code, status, access,
+    ...(data.action ? { action: data.action } : {}),
+    // The included-model choices travel with an exhausted allowance, for the chat to offer.
+    ...(data.code === "allowance_exceeded" && data.allowance ? { allowance: data.allowance } : {}),
   });
   if (access && typeof window !== "undefined") window.dispatchEvent(new CustomEvent("vibhavgpt:access-status", { detail: access }));
   return error;
@@ -23,7 +26,7 @@ export function apiPath(value, base = API_BASE, origin = globalThis.location?.or
 }
 
 export function isPrivateFileUrl(value) {
-  try { return /^\/api\/(uploads|generation)\/[^/]+\/(preview|download)$/.test(apiPath(value).split("?")[0]); }
+  try { return /^\/api\/(uploads|generation|library)\/[^/]+\/(preview|download)$/.test(apiPath(value).split("?")[0]); }
   catch { return false; }
 }
 

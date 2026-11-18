@@ -1,0 +1,410 @@
+/* ==========================================================================
+   Extensions: the connector directory, the skills list, and the controls in them.
+
+   Every value is a theme token (src/theme/vibhav.css); a new value gets a token first.
+   - Rows are separated by hairline rules. No shadows, no card inside a card, no coloured stripe.
+   - The accent is spent on one filled action per screen ("Create skill") and on the focus ring.
+     Everything else is ink, the muted ink, or a rule.
+   - Only transform and opacity animate, and nothing animates under reduced motion. No transition: all.
+   - A control is at least --hit-min (44px) tall and wide, with --gap-hit (8px) between neighbours.
+   - A status is always a word. A mark appears only when it says something ("Connected", "Needs
+     permissions"); there is no "Not connected" on every row.
+
+   The eight states of .ext-btn, .ext-select__control and the skill actions:
+     default · hover · focus-visible · active · disabled · loading [aria-busy] · error [data-state=error] ·
+     success [data-state=success]
+   ========================================================================== */
+
+.extensions-page {
+  box-sizing: border-box;
+  max-width: var(--page-narrow);
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: var(--space-lg) var(--page-gutter) var(--space-2xl);
+  color: var(--color-ink);
+}
+
+/* Header ------------------------------------------------------------------ */
+.extensions-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.extensions-header__left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--gap-hit);
+  min-width: 0;
+}
+.extensions-back { margin-left: calc(var(--space-xs) * -1); }
+.extensions-title {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-title);
+  line-height: var(--leading-snug);
+  color: var(--color-ink);
+}
+.extensions-lede {
+  margin: 0;
+  max-width: var(--measure);
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+  color: var(--color-ink-2);
+}
+
+/* Tabs: text and a rule ---------------------------------------------------- */
+.extensions-tabs {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+  border-bottom: var(--rule-fine) solid var(--color-rule-2);
+}
+.extensions-tabs__tab {
+  position: relative;
+  min-height: var(--hit-min);
+  min-width: var(--hit-min);
+  padding: 0 var(--space-2xs);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-2);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.extensions-tabs__tab::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--rule-fine) * -1);
+  left: 0;
+  height: var(--ring-width);
+  background: var(--color-ink);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--dur-short) var(--ease-out);
+}
+.extensions-tabs__tab:hover { color: var(--color-ink); }
+.extensions-tabs__tab--active { color: var(--color-ink); font-weight: 600; }
+.extensions-tabs__tab--active::after { transform: scaleX(1); }
+.extensions-tabs__tab:focus-visible { outline: var(--ring-width) solid var(--color-focus); outline-offset: calc(var(--ring-offset) * -1); }
+
+/* Buttons ------------------------------------------------------------------ */
+.ext-btn {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--gap-hit);
+  min-height: var(--hit-min);
+  min-width: var(--hit-min);
+  padding: 0 var(--space-md);
+  border: var(--rule-fine) solid var(--color-muted);
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+/* Hover and press feedback is an overlay that fades, so only opacity animates. */
+.ext-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--color-ink);
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--ease-out);
+}
+.ext-btn:hover:not(:disabled)::before { opacity: var(--veil-hover); }
+.ext-btn:active:not(:disabled) { transform: scale(var(--press-scale)); }
+.ext-btn:active:not(:disabled)::before { opacity: var(--veil-press); }
+.ext-btn:focus-visible { outline: var(--ring-width) solid var(--color-focus); outline-offset: var(--ring-offset); }
+.ext-btn:disabled { border-color: var(--color-rule-2); color: var(--color-muted); cursor: not-allowed; }
+.ext-btn[aria-busy="true"] { cursor: progress; }
+.ext-btn[data-state="error"] { border-color: var(--color-danger); color: var(--color-danger); }
+.ext-btn[data-state="success"] { border-color: var(--color-positive); color: var(--color-positive); }
+
+/* Manage and the other calm actions: the label, no outline, until it is pointed at. */
+.ext-btn--quiet { border-color: transparent; }
+.ext-btn--quiet:disabled { border-color: transparent; }
+.ext-btn--text { min-width: 0; padding: 0 var(--space-xs); border-color: transparent; font-weight: 500; }
+.ext-btn--icon { padding: 0; }
+.ext-btn__chevron { transform: rotate(0deg); transition: transform var(--dur-short) var(--ease-out); }
+.ext-btn[aria-expanded="true"] .ext-btn__chevron { transform: rotate(180deg); }
+
+/* The one filled action on a screen. The accent is a fill here, never small text. */
+.ext-btn--primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+.ext-btn--primary::before { background: var(--color-accent-ink); }
+.ext-btn--primary:hover:not(:disabled)::before { opacity: var(--veil-fill); }
+.ext-btn--primary:disabled { border-color: var(--color-rule-2); background: transparent; color: var(--color-muted); }
+
+.ext-spin { animation: ext-spin var(--dur-spin) linear infinite; }
+@keyframes ext-spin { to { transform: rotate(360deg); } }
+
+/* Search and the filter ---------------------------------------------------- */
+.ext-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--gap-hit);
+  margin-bottom: var(--gap-hit);
+}
+.ext-search { position: relative; flex: 1 1 var(--space-4xl); min-width: 0; }
+.ext-search--skills { margin-bottom: var(--gap-hit); }
+.ext-search__icon {
+  position: absolute;
+  top: 50%;
+  left: var(--space-sm);
+  color: var(--color-muted);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.ext-search__input,
+.ext-select__control {
+  box-sizing: border-box;
+  min-height: var(--hit-min);
+  border: var(--rule-fine) solid var(--color-muted);
+  border-radius: var(--radius-input);
+  background: transparent;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-base);
+}
+.ext-search__input { width: 100%; padding: 0 var(--space-sm) 0 calc(var(--space-sm) + var(--space-lg)); }
+.ext-search__input::placeholder { color: var(--color-muted); opacity: 1; }
+.ext-search__input:hover,
+.ext-select__control:hover:not(:disabled) { border-color: var(--color-ink); }
+.ext-search__input:focus-visible,
+.ext-select__control:focus-visible { outline: var(--ring-width) solid var(--color-focus); outline-offset: var(--ring-offset); border-color: var(--color-ink); }
+
+.ext-select { position: relative; flex: 0 0 auto; }
+.ext-select__control {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 0 calc(var(--space-md) + var(--space-lg)) 0 var(--space-sm);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.ext-select__control option { background: var(--color-paper-2); color: var(--color-ink); }
+.ext-select__control:active:not(:disabled) { transform: scale(var(--press-scale)); }
+.ext-select__control:disabled { border-color: var(--color-rule-2); color: var(--color-muted); cursor: not-allowed; }
+.ext-select__control[aria-busy="true"] { cursor: progress; }
+.ext-select__control[aria-invalid="true"] { border-color: var(--color-danger); }
+.ext-select__control[data-state="success"] { border-color: var(--color-positive); }
+.ext-select__chevron {
+  position: absolute;
+  top: 50%;
+  right: var(--space-sm);
+  color: var(--color-ink-2);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+/* Groups and rows ----------------------------------------------------------- */
+/* A category: its name above, then its rows in one panel. The panel has its own border, so the name has no rule of its own (the two
+   lines used to meet at the panel's rounded top and read as rows stacked on rows). Groups are set apart by space. */
+.ext-group { margin-top: var(--space-xl); }
+.ext-group:first-of-type { margin-top: var(--space-lg); }
+.ext-group__title {
+  margin: 0 0 var(--space-xs);
+  padding: 0 var(--space-2xs);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-ink-2);
+}
+/* The list is a panel like a Settings group; each row is a Settings row: logo, name and status, action. Rows are at least --row-min
+   tall, divided by a hairline, and the text column can never run under the action column (minmax(0, 1fr) with the action fixed). */
+.ext-list {
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: var(--rule-fine) solid var(--color-rule);
+  border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--color-paper-2) 78%, transparent);
+  list-style: none;
+}
+.ext-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-xs) var(--space-md);
+  min-height: var(--row-min);
+  padding: var(--space-sm) var(--space-lg);
+  box-sizing: border-box;
+}
+.ext-row + .ext-row { border-top: var(--rule-fine) solid var(--color-rule); }
+.ext-row--skill { grid-template-columns: minmax(0, 1fr) auto; }
+.ext-row__logo { display: grid; place-items: center; width: var(--logo-md); height: var(--logo-md); }
+.ext-row__text { display: grid; gap: var(--space-3xs); min-width: 0; }
+.ext-row__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--gap-hit);
+  row-gap: var(--space-3xs);
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: var(--leading-snug);
+  color: var(--color-ink);
+}
+.ext-row__meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-body);
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+.ext-row__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--gap-hit); }
+.ext-row[data-enabled="false"] .ext-row__name > span:first-child { color: var(--color-ink-2); }
+
+/* A mark says something or is absent. The word carries it; the icon and colour only support it. */
+.ext-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  min-height: var(--chip-min);
+  padding: 0 var(--space-xs);
+  border: var(--rule-fine) solid var(--color-rule-2);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  vertical-align: middle;
+}
+.ext-mark svg { flex: 0 0 auto; width: var(--icon-xs); height: var(--icon-xs); }
+.ext-mark--ok svg { color: var(--color-positive); }
+.ext-mark--warn { border-color: color-mix(in srgb, var(--color-warn) 40%, var(--color-rule)); background: var(--color-warn-soft); color: var(--color-warn); }
+
+/* Manage: enable or disable, and disconnect, opened under the row. */
+.ext-row__manage {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-hit);
+  padding: var(--space-2xs) 0 0 calc(var(--logo-md) + var(--space-sm));
+}
+.ext-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--gap-hit);
+  min-height: var(--hit-min);
+  cursor: pointer;
+}
+.ext-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.ext-switch__track {
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--rule-fine) solid var(--color-muted);
+  border-radius: var(--radius-pill);
+}
+.ext-switch__track::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: var(--switch-inset);
+  width: var(--switch-knob);
+  height: var(--switch-knob);
+  margin-top: calc(var(--switch-knob) / -2);
+  border-radius: var(--radius-round);
+  background: var(--color-muted);
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+.ext-switch input:checked + .ext-switch__track { border-color: var(--color-ink); }
+.ext-switch input:checked + .ext-switch__track::after { background: var(--color-ink); transform: translateX(var(--switch-travel)); }
+.ext-switch input:focus-visible + .ext-switch__track { outline: var(--ring-width) solid var(--color-focus); outline-offset: var(--ring-offset); }
+.ext-switch input:disabled { cursor: not-allowed; }
+.ext-switch input:disabled ~ .ext-switch__text { color: var(--color-muted); }
+.ext-switch__text { font-size: var(--text-sm); font-weight: 500; color: var(--color-ink); }
+
+/* Skills ---------------------------------------------------------------------- */
+.ext-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap-hit);
+  margin-bottom: var(--gap-hit);
+}
+.ext-toolbar__title { margin: 0; font-family: var(--font-body); font-size: var(--text-md); font-weight: 600; color: var(--color-ink); }
+.ext-toolbar__actions { display: flex; flex-wrap: wrap; gap: var(--gap-hit); }
+.ext-empty {
+  display: grid;
+  gap: var(--gap-hit);
+  max-width: var(--measure);
+  padding: var(--space-sm) 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-read);
+  color: var(--color-ink-2);
+}
+.ext-empty p { margin: 0; }
+.ext-state {
+  display: flex;
+  align-items: center;
+  gap: var(--gap-hit);
+  margin: var(--space-md) 0;
+  font-size: var(--text-base);
+  color: var(--color-ink-2);
+}
+.ext-state--stacked { flex-direction: column; align-items: flex-start; }
+.ext-state p { margin: 0; }
+.ext-state__title { font-weight: 600; color: var(--color-ink); }
+
+/* The skill row's actions are the shared <Menu> (menus.css). */
+
+/* Narrow screens. A connector row keeps its one button beside the name; a skill row has two actions and a description, so its
+   actions drop under it. Everything stays 44px with 8px between neighbours. */
+@media (max-width: 30rem) {
+  .ext-row--skill { grid-template-columns: minmax(0, 1fr); }
+  .ext-row--skill .ext-row__actions { grid-column: 1 / -1; margin-top: var(--gap-hit); flex-wrap: wrap; }
+  .ext-row__manage { padding-left: 0; }
+  .ext-select { flex: 1 1 100%; }
+  .extensions-header { flex-wrap: wrap; }
+}
+
+/* Reduced motion: nothing moves. The state still changes; it just changes at once. */
+@media (prefers-reduced-motion: reduce) {
+  .ext-btn,
+  .ext-btn::before,
+  .ext-btn__chevron,
+  .ext-select__control,
+  .ext-switch__track::after,
+  .extensions-tabs__tab::after { transition: none; }
+  .ext-spin { animation: none; }
+}
+
+/* Phones: tighter side padding; the action keeps its column and the text wraps beside it. */
+@media (max-width: 600px) {
+  .ext-row { gap: var(--space-xs) var(--space-sm); padding: var(--space-sm) var(--space-md); }
+}

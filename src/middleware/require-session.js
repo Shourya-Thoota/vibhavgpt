@@ -6,7 +6,10 @@ export async function loadOptionalSession(req, _res, next) {
     const session = await auth.api.getSession({
       headers: fromNodeHeaders(req.headers),
     });
-    if (session) req.authSession = session;
+    if (session) {
+      req.authSession = session;
+      req.user = session.user;
+    }
     return next();
   } catch (error) {
     return next(error);

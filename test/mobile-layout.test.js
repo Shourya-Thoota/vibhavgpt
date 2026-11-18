@@ -58,5 +58,5 @@ test("Writing Tools stack in one column on phones", () => {
 
 test("passkey sign-in is offered only where the browser supports it", () => {
   const app = read("src/App.jsx");
-  assert.match(app, /\{passkeysSupported\(\) && \(\s*<button className="btn btn--quiet" type="button" disabled=\{busy \|\| googleBusy\} onClick=\{signInWithPasskey\}>/);
+  assert.match(app, /\{!signUp && passkeysSupported\(\) && \(\s*<button className="btn btn--secondary btn--lg btn--block auth__passkey" type="button" disabled=\{busy \|\| googleBusy\} onClick=\{signInWithPasskey\}>/);
 });

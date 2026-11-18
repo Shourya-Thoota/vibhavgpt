@@ -34,6 +34,10 @@
 	redir /terms-of-service /terms 308
 	redir /privacy-policy /privacy 308
 
+	# Settings has its own page; /settings and /settings/<section> open it (the app's route is /app/settings/<section>).
+	@settingsShortcut path_regexp settingsShortcut ^/settings(/[a-z-]*)?/?$
+	redir @settingsShortcut /app/settings{re.settingsShortcut.1} 308
+
 	# All routing decisions are grouped into explicitly ordered `handle`
 	# blocks (first match wins) rather than mixed with bare top-level
 	# directives — a bare `respond /health 200` here was silently losing to
@@ -109,7 +113,7 @@
 	# Only application routes receive the SPA document as a fallback. Public
 	# SEO pages and crawler files are real static files; unknown paths must stay
 	# missing so the custom error handler can return an actual 404.
-	@appShell path / /signup /app /app/* /onboarding /account /mobile-auth/turnstile /terms-of-service /privacy-policy
+	@appShell path / /signup /login /app /app/* /onboarding /account /mobile-auth/turnstile /terms-of-service /privacy-policy
 	handle @appShell {
 		header Cache-Control "no-cache"
 		try_files {path} {path}.html {path}/index.html /index.html

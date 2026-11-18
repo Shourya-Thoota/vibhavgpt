@@ -7,6 +7,9 @@ import { auth } from "../auth.js";
 import { expressCookieOptions } from "../auth/native-oauth.js";
 import { requireSession } from "../middleware/require-session.js";
 import { removeFiles } from "../uploads/service.js";
+import { profilePictureForExport } from "../profile/picture.js";
+import { loadPreferences } from "../profile/preferences.js";
+import { avatarsForExport } from "../avatars/avatars.js";
 
 export const accountRouter = Router();
 accountRouter.use(requireSession);
@@ -32,10 +35,18 @@ accountRouter.get("/export", async (req, res, next) => {
         db.select().from(messages).where(eq(messages.conversationId, id)).orderBy(asc(messages.createdAt)),
       ),
     );
+    // The profile picture, as the server stores it: a small WebP, here as base64 so the export stays one JSON file.
+    const picture = await profilePictureForExport(userId, db);
+    const preferences = await loadPreferences(userId, db);
+    const savedAvatarsExport = await avatarsForExport(userId, db);
     const exported = {
       exportedAt: new Date().toISOString(),
       account: { id: userId, email: req.authSession.user.email, name: req.authSession.user.name },
       profile: profile[0] ?? null,
+      profilePicture: picture,
+      savedAvatars: savedAvatarsExport,
+      // Appearance and location choices, as stored.
+      accountPreferences: preferences ? { accent: preferences.accent, imageWatermark: preferences.imageWatermark, locationMode: preferences.locationMode, locationCity: preferences.locationCity, locationRegion: preferences.locationRegion, locationCountry: preferences.locationCountry, locationTimezone: preferences.locationTimezone, updatedAt: preferences.updatedAt } : null,
       conversations: userConversations,
       messages: [...conversationMessages, ...remainingMessages.flat()],
       memory: facts,

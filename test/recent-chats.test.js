@@ -86,7 +86,8 @@ test("a long title ellipsizes in its own column before the time and the menu", (
 
 test("active, hover and focus states read clearly in every theme", () => {
   assert.match(rule(".conversation-item"), /min-height: 44px;/);
-  assert.match(css, /\.conversation-item\[data-active\] \{ background: var\(--accent-soft\); box-shadow: inset 3px 0 0 var\(--accent\); \}/);
+  // The open chat is a solid step of ink tint, the same as the active page link.
+  assert.match(css, /\.conversation-item\[data-active\] \{ background: color-mix\(in srgb, var\(--color-ink\) 8%, transparent\); \}/);
   assert.match(css, /\.conversation-item:hover:not\(\[data-active\]\) \{ background: var\(--surface-2\); \}/);
   assert.match(css, /\.conversation-item__open:focus-visible,\s*\.conversation-item__actions:focus-visible \{ outline: 2px solid var\(--color-focus\); outline-offset: -2px; \}/);
   assert.doesNotMatch(css, /\.conversation-item:hover \{ transform/, "no hover nudge that could push the row sideways out of the list");

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- Prism: an original orb for the home page's model showcase, in the lit-sphere style of the others: a pale glass sphere with a soft
+       band of spectrum across it, for VibhavGPT's image model. -->
+  <defs>
+    <radialGradient id="pr-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0.7" stop-color="#fff1fb" stop-opacity="0"/>
+      <stop offset="0.84" stop-color="#fff1fb" stop-opacity="0.16"/>
+      <stop offset="0.93" stop-color="#eef3ff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#fff1fb" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pr-body" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.3" stop-color="#e7ddff"/>
+      <stop offset="0.62" stop-color="#9b8fd6"/>
+      <stop offset="0.88" stop-color="#3c3578"/>
+      <stop offset="1" stop-color="#15122f"/>
+    </radialGradient>
+    <linearGradient id="pr-spectrum" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5f7e"/>
+      <stop offset="0.2" stop-color="#ffb347"/>
+      <stop offset="0.4" stop-color="#ffe866"/>
+      <stop offset="0.6" stop-color="#5fe0a0"/>
+      <stop offset="0.8" stop-color="#5fa8ff"/>
+      <stop offset="1" stop-color="#b07bff"/>
+    </linearGradient>
+    <radialGradient id="pr-night" cx="78%" cy="80%" r="70%">
+      <stop offset="0.35" stop-color="#0b0920" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0b0920" stop-opacity="0.78"/>
+    </radialGradient>
+    <radialGradient id="pr-rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0.9" stop-color="#fff1fb" stop-opacity="0"/>
+      <stop offset="0.985" stop-color="#fff1fb" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#fff1fb" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="pr-gloss" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="pr-disc"><circle cx="400" cy="400" r="300"/></clipPath>
+    <filter id="pr-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="18"/></filter>
+  </defs>
+  <circle cx="400" cy="400" r="392" fill="url(#pr-halo)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#pr-body)"/>
+  <g clip-path="url(#pr-disc)">
+    <g filter="url(#pr-soft)" opacity="0.62">
+      <rect x="60" y="430" width="680" height="70" fill="url(#pr-spectrum)" transform="rotate(-18 400 465)"/>
+    </g>
+  </g>
+  <circle cx="400" cy="400" r="300" fill="url(#pr-night)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#pr-rim)"/>
+  <ellipse cx="318" cy="288" rx="88" ry="56" fill="url(#pr-gloss)" transform="rotate(-28 318 288)"/>
+</svg>

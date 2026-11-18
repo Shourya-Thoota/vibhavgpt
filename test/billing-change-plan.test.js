@@ -28,6 +28,8 @@ mock.module(new URL("../src/billing/service.js", import.meta.url).href, {
     getSubscriptionDetailsForUser: spy("getSubscriptionDetailsForUser", null),
     getSubscriptionForUser: spy("getSubscriptionForUser", () => storedSubscription),
     tierForPriceLookupKey: (key) => (key.startsWith("vibhavgpt_plus_") ? "plus" : "pro"),
+    isMaxCheckoutConfigured: () => false,
+    assertCreditPurchaseAllowed: () => {},
     verifyWebhookSignature: () => { throw new Error("not used in these tests"); },
   },
 });

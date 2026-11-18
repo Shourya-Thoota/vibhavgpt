@@ -7,7 +7,7 @@ import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
 import sharp from "sharp";
 import { db } from "../db/client.js";
-import { attachments } from "../db/schema.js";
+import { attachments, buildRevisions } from "../db/schema.js";
 import { config } from "../config.js";
 import { accessStatus } from "../../frontend/src/access-status.js";
 import { getCurrentUsage } from "../usage/service.js";
@@ -21,6 +21,10 @@ export const UPLOAD_LIMITS = {
   pro: { fileBytes: 80 * 1024 * 1024, imageBytes: 20 * 1024 * 1024, messageBytes: 160 * 1024 * 1024, accountBytes: 250 * 1024 * 1024 },
 };
 UPLOAD_LIMITS.paid = UPLOAD_LIMITS.pro;
+// Max (and complimentary accounts, which resolve to Max) had no row here, so they fell back to Free's limits: 5 MB per file and 25 MB of
+// storage. The product states Max has Pro's upload limits (80 MB documents, 20 MB images per file), so Max uses Pro's row. A storage
+// allowance of Max's own is an owner decision, not set here.
+UPLOAD_LIMITS.max = UPLOAD_LIMITS.pro;
 
 const MAX_FILES = 3;
 const EXTRACTED_TEXT_LIMIT = 120_000;
@@ -159,12 +163,17 @@ export function normalizedExtractedText(text, extension) {
   return { text: compact.slice(0, EXTRACTED_TEXT_LIMIT), truncated: compact.length > EXTRACTED_TEXT_LIMIT };
 }
 
+// Everything the person stores counts towards one allowance: uploads, generated images and Build's project versions.
 async function currentStoredBytes(userId) {
   const [row] = await db
     .select({ total: sql`coalesce(sum(${attachments.sizeBytes}), 0)::bigint` })
     .from(attachments)
     .where(eq(attachments.userId, userId));
-  return Number(row?.total ?? 0);
+  const [builds] = await db
+    .select({ total: sql`coalesce(sum(${buildRevisions.totalBytes}), 0)::bigint` })
+    .from(buildRevisions)
+    .where(eq(buildRevisions.userId, userId));
+  return Number(row?.total ?? 0) + Number(builds?.total ?? 0);
 }
 
 // Removes stored files, never throwing. Returns how many could not be
@@ -240,7 +249,14 @@ export async function assertUploadQuota(userId, files, limits) {
     throw new UploadError("One or more files exceed your plan's per-file limit. Choose a smaller file.", 413, "upload-plan-limit");
   }
   const used = await currentStoredBytes(userId);
-  if (used + total > limits.accountBytes) throw new UploadError(`You've reached your ${formatMegabytes(limits.accountBytes)} MB document storage limit. Delete older chats or files and try again.`, 413, "storage-limit");
+  if (used + total > limits.accountBytes) {
+    // Two different problems, said differently: the stored files (uploads and generated images) already fill the allowance, or these new
+    // files would not fit in what is left.
+    const full = used >= limits.accountBytes;
+    throw new UploadError(full
+      ? `Your ${formatMegabytes(limits.accountBytes)} MB of file storage is full (uploads and generated images). Delete older files or chats to attach this one. Messages without files still work.`
+      : `This would go over your ${formatMegabytes(limits.accountBytes)} MB of file storage (${(Math.max(0, limits.accountBytes - used) / (1024 * 1024)).toFixed(1)} MB left). Choose a smaller file, or delete older files or chats.`, 413, "storage-limit");
+  }
 }
 
 export async function findReadyAttachments(userId, attachmentIds) {

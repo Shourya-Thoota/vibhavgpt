@@ -67,13 +67,14 @@ test("mermaid loads on demand in strict mode, and syntax it can't read falls bac
   assert.match(viewer, /const \{ default: mermaid \} = await load\(\);/);
   assert.doesNotMatch(viewer, /^import .*from "mermaid";/m);
   assert.doesNotMatch(read("frontend/src/App.jsx"), /from "mermaid"/);
-  assert.deepEqual({ ...MERMAID_CONFIG }, { startOnLoad: false, securityLevel: "strict", theme: "base", fontFamily: "inherit" });
+  assert.deepEqual({ ...MERMAID_CONFIG }, { startOnLoad: false, securityLevel: "strict", theme: "base", fontFamily: "inherit", htmlLabels: false, flowchart: { htmlLabels: false } });
   assert.match(viewer, /if \(!\(await mermaid\.parse\(source, \{ suppressErrors: true \}\)\)\) throw new Error\("invalid"\);/);
   assert.match(viewer, /if \(state\.status === "error"\) return <DiagramFailed fallback=\{fallback\} \/>;/);
   assert.match(viewer, /doc\?\.getElementById\?\.\(`d\$\{id\}`\)\?\.remove\(\);/, "mermaid's error graphic is cleared");
   assert.match(viewer, /attributeFilter: APPEARANCE_ATTRIBUTES/, "redrawn when the theme or accent changes");
   assert.match(viewer, /setZoom\(\(value\) => Math\.min\(3, value \+ 0\.25\)\)/);
   assert.ok(JSON.parse(read("frontend/package.json")).dependencies.mermaid, "a frontend dependency");
+  assert.ok(JSON.parse(read("frontend/package.json")).dependencies.dompurify, "dompurify is a frontend dependency");
 });
 
 test("diagram colours come from the theme tokens, resolved to real colours", () => {
@@ -274,3 +275,89 @@ test("diagrams are redrawn when either the sky or the accent colour changes", as
   assert.match(viewer, /useEffect\(\(\) => watchAppearance\(setAppearance\), \[\]\);/);
   assert.match(viewer, /\[source, settled, near, appearance, id\]/, "the drawing depends on the appearance");
 });
+
+test("rendered diagram SVG is sanitized against malicious scripts, foreignObject, inline handlers and unsafe links", async () => {
+  const { sanitizeDiagramSvg } = await renderViewer();
+  assert.equal(typeof sanitizeDiagramSvg, "function");
+
+  // 1. Script tag and executable code removal
+  const scriptSvg = '<svg><script>alert("xss")</script><circle r="5"/></svg>';
+  const cleanScript = sanitizeDiagramSvg(scriptSvg);
+  assert.doesNotMatch(cleanScript, /<script/i);
+  assert.doesNotMatch(cleanScript, /alert/i);
+  assert.match(cleanScript, /<circle r="5"/);
+
+  // 2. foreignObject and embedded HTML tags (form, input, div)
+  const htmlSvg = '<svg><foreignObject><div><script>alert(1)</script><form><input name="leak"/></form></div></foreignObject><g><text>label</text></g></svg>';
+  const cleanHtml = sanitizeDiagramSvg(htmlSvg);
+  assert.doesNotMatch(cleanHtml, /<foreignObject/i);
+  assert.doesNotMatch(cleanHtml, /<form/i);
+  assert.doesNotMatch(cleanHtml, /<input/i);
+  assert.match(cleanHtml, /<text>label<\/text>/);
+
+  // 3. Hostile inline event handlers (case-insensitive, whitespace variations, animation handlers)
+  const handlerSvg = '<svg onload="alert(1)"  ONCLICK = "alert(2)"><g OnMouseOver="alert(3)"><animate onbegin="alert(4)" attributeName="opacity"/><text>ok</text></g></svg>';
+  const cleanHandler = sanitizeDiagramSvg(handlerSvg);
+  assert.doesNotMatch(cleanHandler, /onload/i);
+  assert.doesNotMatch(cleanHandler, /onclick/i);
+  assert.doesNotMatch(cleanHandler, /onmouseover/i);
+  assert.doesNotMatch(cleanHandler, /onbegin/i);
+  assert.match(cleanHandler, /<text>ok<\/text>/);
+
+  // 4. Hostile namespaced URLs (xlink:href="javascript:...")
+  const namespacedSvg = '<svg xmlns:xlink="http://www.w3.org/1999/xlink"><a xlink:href="javascript:alert(1)">link</a></svg>';
+  const cleanNamespaced = sanitizeDiagramSvg(namespacedSvg);
+  assert.doesNotMatch(cleanNamespaced, /javascript:/i);
+  assert.match(cleanNamespaced, /<a href="#"/);
+
+  // 5. Encoded URL schemes (hex entity, decimal entity, newline variations, data:text/html)
+  const encodedSvg = '<svg><a href="jav&#x61;script:alert(1)">a</a><a href="jav&#10;ascript:alert(2)">b</a><a href="data:text/html,<script>alert(3)</script>">c</a></svg>';
+  const cleanEncoded = sanitizeDiagramSvg(encodedSvg);
+  assert.doesNotMatch(cleanEncoded, /javascript:/i);
+  assert.doesNotMatch(cleanEncoded, /data:text\/html/i);
+  assert.equal(cleanEncoded.match(/href="#"/g)?.length, 3);
+
+  // 6. External resource loading on image and use (only local fragment references permitted)
+  const externalSvg = '<svg><image href="https://tracker.com/leak.png"/><use href="https://evil.com/icon.svg#test"/><use href="#local-arrow"/></svg>';
+  const cleanExternal = sanitizeDiagramSvg(externalSvg);
+  assert.doesNotMatch(cleanExternal, /tracker\.com/);
+  assert.doesNotMatch(cleanExternal, /evil\.com/);
+  assert.match(cleanExternal, /<use href="#local-arrow"/);
+
+  // 7. CSS @import and external url(...) in <style>
+  const styleSvg = '<svg><style>@import url("https://evil.com/style.css"); text { fill: red; background: url("https://evil.com/bg.png"); stroke: url(#localGrad); }</style></svg>';
+  const cleanStyle = sanitizeDiagramSvg(styleSvg);
+  assert.doesNotMatch(cleanStyle, /@import/);
+  assert.doesNotMatch(cleanStyle, /https:\/\/evil\.com/);
+  assert.match(cleanStyle, /stroke: url\(#localGrad\)/);
+
+  // 8. Malformed markup and null byte injection
+  const malformedSvg = '<svg>\0<<script>>alert(1)</script><g>hello</g></svg>';
+  const cleanMalformed = sanitizeDiagramSvg(malformedSvg);
+  assert.doesNotMatch(cleanMalformed, /\0/);
+  assert.doesNotMatch(cleanMalformed, /alert/);
+  assert.match(cleanMalformed, /hello/);
+
+  // 9. Safe local fragment link and marker preservation
+  const safeSvg = '<svg><defs><marker id="arrow"></marker></defs><path marker-end="url(#arrow)"/><a href="#section">anchor</a></svg>';
+  const cleanSafe = sanitizeDiagramSvg(safeSvg);
+  assert.match(cleanSafe, /url\(#arrow\)/);
+  assert.match(cleanSafe, /href="#section"/);
+
+  // 10. Safe fallback on non-string or empty input
+  assert.equal(sanitizeDiagramSvg(null), "");
+  assert.equal(sanitizeDiagramSvg(undefined), "");
+  assert.equal(sanitizeDiagramSvg(123), "");
+  assert.equal(sanitizeDiagramSvg("   "), "");
+});
+
+test("interactive pan is supported in full-screen mode and resets with zoom", () => {
+  const viewer = read("frontend/src/components/DiagramViewer.jsx");
+  assert.match(viewer, /const \[pan, setPan\] = useState\(\{ x: 0, y: 0 \}\);/);
+  assert.match(viewer, /handlePanStart/);
+  assert.match(viewer, /handlePanMove/);
+  assert.match(viewer, /handlePanEnd/);
+  assert.match(viewer, /setPan\(\{ x: 0, y: 0 \}\)/, "pan resets when zoom resets");
+  assert.match(viewer, /translate:\s*`\$\{pan\.x\}px \$\{pan\.y\}px`/);
+});
+

@@ -233,7 +233,6 @@ export default function Onboarding({ initial, tier = "free", onFinish, onSkip, o
   return (
     <main className="survey" data-step={step.id}>
       <div className="survey__progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
-      <div className="survey__stars" aria-hidden="true" />
 
       <header className="survey__bar">
         <button type="button" className="btn btn--quiet survey__back" onClick={back} hidden={index === 0}>Back</button>
@@ -247,7 +246,7 @@ export default function Onboarding({ initial, tier = "free", onFinish, onSkip, o
         <div className="survey__screen" key={step.id}>
           {step.kind === "welcome" && (
             <div className="survey__hero">
-              <div className="survey__orb"><img src="/planets/earth.webp" alt="" /></div>
+              <div className="survey__orb" aria-hidden="true" />
               <h1 className="survey__headline survey__headline--hero">{step.headline}</h1>
               <p className="survey__subline">{step.subline}</p>
             </div>

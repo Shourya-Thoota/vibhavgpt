@@ -2,13 +2,19 @@ import { useLayoutEffect, useEffect, useRef, useState, useSyncExternalStore } fr
 import {
   ArrowUp, Download, FolderInput, FolderPlus, ImageOff, ImagePlus, Lightbulb, Lock, MoreHorizontal, Pencil, RefreshCw, Wand2, X,
 } from "lucide-react";
-import { IconButton, Menu, MenuItem, Modal, Select } from "./ui.jsx";
+import { Banner, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal, Select } from "./ui.jsx";
+import { API_BASE } from "../api.js";
 import { PrivateDownloadButton, PrivateImage } from "./PrivateMedia.jsx";
 import { generatingLabel, imageJobs, progressLabel } from "../image-jobs.js";
+import { freeImageLine } from "../image-allowance.js";
 import "../studio.css";
 
 // "Generating... X%" for the pending plate: an estimate from elapsed time
 // (see image-jobs.js), refreshed often enough to climb smoothly.
+// The branded names of the image models, for images that recorded theirs (src/generation/image-models.js).
+const IMAGE_MODEL_NAMES = Object.freeze({ prism: "VibhavGPT Prism", aura: "VibhavGPT Aura" });
+const IMAGE_MODEL_KEY = "vibhavgpt-image-model";
+
 function GeneratingPercent({ startedAt }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -94,6 +100,20 @@ function formatCreated(value) {
 
 export default function ImageWorkspace({ api }) {
   const [images, setImages] = useState([]);
+  // Image models (src/generation/image-models.js): only those the server says are available now; Prism unless the person chose another.
+  const [imageModels, setImageModels] = useState([{ id: "prism", name: "VibhavGPT Prism", default: true }]);
+  const [imageModel, setImageModelState] = useState(() => { try { return localStorage.getItem(IMAGE_MODEL_KEY) || "prism"; } catch { return "prism"; } });
+  const setImageModel = (value) => { setImageModelState(value); try { localStorage.setItem(IMAGE_MODEL_KEY, value); } catch { /* this device only */ } };
+  useEffect(() => {
+    let cancelled = false;
+    api("/api/generation/image-models").then((result) => {
+      if (cancelled || !Array.isArray(result?.models) || !result.models.length) return;
+      setImageModels(result.models);
+      // A saved choice that is no longer available goes back to the default (never to some other model silently kept).
+      setImageModelState((current) => (result.models.some((model) => model.id === current) ? current : (result.models.find((model) => model.default)?.id ?? result.models[0].id)));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
   const [nextCursor, setNextCursor] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -105,6 +125,13 @@ export default function ImageWorkspace({ api }) {
   // It is uploaded as soon as it is chosen, so a size or type problem shows
   // before Generate, and it stays for the next image until removed.
   const [reference, setReference] = useState(null);
+  // Saved avatars (Settings > Account), offered as references. One reference is used per image: that is what image creation supports.
+  const [avatars, setAvatars] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    api("/api/avatars", { cache: "no-store" }).then((result) => { if (!cancelled) setAvatars(result.avatars ?? []); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [api]);
   const [notice, setNotice] = useState("");
   const referenceInput = useRef(null);
   const [ideasOpen, setIdeasOpen] = useState(false);
@@ -136,6 +163,18 @@ export default function ImageWorkspace({ api }) {
   const scrollRef = useRef(null);
   const generating = Boolean(pending) && !variationBusy;
   const busy = Boolean(pending);
+
+  // A Free account has 2 images a week. The server counts them; this shows what is left, and stops offering what Free cannot use
+  // (a reference photo, or a variation, which is made from one).
+  const [allowance, setAllowance] = useState(null);
+  const refreshAllowance = () => api("/api/usage", { cache: "no-store" })
+    .then((usage) => setAllowance({ tier: usage.tier, remaining: usage.imagesRemaining, limit: usage.imageLimit, period: usage.imagePeriod, endsAt: usage.imagePeriodEndsAt }))
+    .catch(() => {});
+  useEffect(() => { refreshAllowance(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (job && job.status !== "generating") refreshAllowance(); }, [job?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+  const isFree = allowance?.tier === "free";
+  const allowanceLine = freeImageLine(allowance);
+  const outOfImages = isFree && Number(allowance.remaining) <= 0;
 
   useLayoutEffect(() => {
     const input = promptInput.current;
@@ -278,14 +317,14 @@ export default function ImageWorkspace({ api }) {
       shape,
       // standalone marks a brand-new conversation from the Image page (not
       // an image made mid-chat) so it lands in the Image sessions list.
-      body: { prompt: text, aspectRatio: shape, style, ...(reference?.id ? { referenceAttachmentId: reference.id } : {}), standalone: true },
+      body: { prompt: text, aspectRatio: shape, style, imageModel, ...(reference?.id ? { referenceAttachmentId: reference.id } : {}), ...(reference?.avatarId ? { referenceAvatarId: reference.avatarId } : {}), standalone: true },
     });
   }
 
   async function chooseReference(file) {
     if (!file) return;
     if (!file.type.startsWith("image/")) { setError("Choose an image file to use as a reference."); return; }
-    if (reference?.previewUrl) URL.revokeObjectURL(reference.previewUrl);
+    if (reference?.previewUrl && reference.file) URL.revokeObjectURL(reference.previewUrl);
     const previewUrl = URL.createObjectURL(file);
     setReference({ file, previewUrl, id: null, uploading: true });
     setError(""); setNotice("");
@@ -303,8 +342,15 @@ export default function ImageWorkspace({ api }) {
     }
   }
 
+  // A saved avatar replaces whatever reference was chosen before. It is sent by id; the server looks it up for this account only.
+  function chooseAvatar(avatar) {
+    if (reference?.previewUrl && reference.file) URL.revokeObjectURL(reference.previewUrl);
+    setReference({ avatarId: avatar.id, previewUrl: `${API_BASE}${avatar.imageUrl}`, name: avatar.name, file: null, id: null, uploading: false });
+    setError(""); setNotice("");
+  }
+
   function removeReference() {
-    if (reference?.previewUrl) URL.revokeObjectURL(reference.previewUrl);
+    if (reference?.previewUrl && reference.file) URL.revokeObjectURL(reference.previewUrl);
     setReference(null);
     if (referenceInput.current) referenceInput.current.value = "";
   }
@@ -331,7 +377,7 @@ export default function ImageWorkspace({ api }) {
     imageJobs.start(api, {
       kind: "variation",
       shape: image.meta?.aspectRatio ?? "square",
-      body: { prompt: image.prompt, aspectRatio: image.meta?.aspectRatio ?? "square", style: image.meta?.style ?? "", variations: 1, parentAttachmentId: image.id, referenceAttachmentId: image.id, standalone: true },
+      body: { prompt: image.prompt, aspectRatio: image.meta?.aspectRatio ?? "square", style: image.meta?.style ?? "", imageModel: image.meta?.imageModel ?? "prism", variations: 1, parentAttachmentId: image.id, referenceAttachmentId: image.id, standalone: true },
     });
   }
 
@@ -371,6 +417,18 @@ export default function ImageWorkspace({ api }) {
               ))}
             </div>
 
+            {imageModels.length > 1 && (
+              <Select
+                size="sm"
+                className="studio-model"
+                label="Image model"
+                value={imageModel}
+                onChange={setImageModel}
+                disabled={busy}
+                options={imageModels.map((model) => ({ value: model.id, label: model.name }))}
+              />
+            )}
+
             <Select
               size="sm"
               className="studio-style"
@@ -390,10 +448,27 @@ export default function ImageWorkspace({ api }) {
               aria-hidden="true"
               onChange={(event) => void chooseReference(event.target.files?.[0])}
             />
-            <button type="button" className="studio-plate__reference" disabled={busy} aria-pressed={Boolean(reference)} onClick={() => referenceInput.current?.click()}>
-              <ImagePlus size={15} strokeWidth={1.9} aria-hidden="true" />
-              {reference ? "Change reference" : "Reference"}
-            </button>
+            <Menu
+              label="Reference image"
+              placement="top"
+              align="start"
+              trigger={({ ref, open, toggle }) => (
+                <button ref={ref} type="button" className="studio-plate__reference" disabled={busy || isFree} title={isFree ? "Reference photos need Plus or Pro" : undefined} aria-pressed={Boolean(reference)} aria-haspopup="menu" aria-expanded={open} onClick={toggle}>
+                  <ImagePlus size={15} strokeWidth={1.9} aria-hidden="true" />
+                  {reference ? "Change reference" : "Reference"}
+                </button>
+              )}
+            >
+              <MenuItem icon={<ImagePlus size={16} />} description="One photo from your device" onSelect={() => referenceInput.current?.click()}>Upload a photo</MenuItem>
+              {avatars.length > 0 && <>
+                <MenuSeparator />
+                <MenuLabel>Saved avatars</MenuLabel>
+                {avatars.map((avatar) => (
+                  <MenuItem key={avatar.id} icon={<img className="studio-avatar-thumb" src={`${API_BASE}${avatar.imageUrl}`} alt="" width="22" height="22" loading="lazy" />} selected={reference?.avatarId === avatar.id} onSelect={() => chooseAvatar(avatar)}>{avatar.name}</MenuItem>
+                ))}
+              </>}
+              {avatars.length === 0 && <><MenuSeparator /><MenuLabel>No saved avatars yet. Add some in Settings.</MenuLabel></>}
+            </Menu>
 
             <span className="studio-plate__spacer" />
 
@@ -401,7 +476,7 @@ export default function ImageWorkspace({ api }) {
               <Lightbulb size={15} strokeWidth={1.9} aria-hidden="true" />
               Ideas
             </button>
-            <button type="submit" className="btn btn--primary studio-plate__create" disabled={busy || !prompt.trim() || reference?.uploading}>
+            <button type="submit" className="btn btn--primary studio-plate__create" disabled={busy || !prompt.trim() || reference?.uploading || outOfImages}>
               {generating ? <RefreshCw size={16} className="studio-spin" aria-hidden="true" /> : <ArrowUp size={16} aria-hidden="true" />}
               {createLabel}
             </button>
@@ -410,12 +485,14 @@ export default function ImageWorkspace({ api }) {
             <div className="studio-reference" role="status">
               <img src={reference.previewUrl} alt="" />
               <span className="studio-reference__text">
-                <strong>{reference.uploading ? "Uploading reference…" : "Reference image"}</strong>
-                <small>{reference.file.name}</small>
+                <strong>{reference.uploading ? "Uploading reference…" : reference.avatarId ? "Saved avatar" : "Reference image"}</strong>
+                <small>{reference.name ?? reference.file?.name}</small>
               </span>
               <IconButton className="studio-reference__remove" label="Remove reference image" disabled={busy} onClick={removeReference}><X size={15} /></IconButton>
             </div>
           )}
+
+          {allowanceLine && <p className="studio-allowance" role="status" data-empty={outOfImages || undefined}>{allowanceLine}</p>}
 
           {ideasOpen && (
             <div className="studio-ideas">
@@ -441,10 +518,11 @@ export default function ImageWorkspace({ api }) {
           )}
         </form>
 
-        {error && <p className="banner banner--error studio-error" role="alert">{error}</p>}
-        {notice && <p className="banner studio-error" role="status">{notice}</p>}
+        {error && <Banner tone="error" className="studio-error">{error}</Banner>}
+        {notice && <Banner tone="info" className="studio-error" help="This image was made from your description only: your reference image was not used for it. You can try again, or describe in your prompt what you wanted from the reference.">{notice}</Banner>}
 
         <div className="studio-shelf">
+          <h2 className="studio-shelf__title">Your images</h2>
           <nav className="studio-folders" aria-label="Image folders">
             <button type="button" aria-pressed={selectedFolder === "all"} onClick={() => setSelectedFolder("all")}>All images</button>
             <button type="button" aria-pressed={selectedFolder === "unfiled"} onClick={() => setSelectedFolder("unfiled")}>Unfiled</button>
@@ -510,7 +588,7 @@ export default function ImageWorkspace({ api }) {
       </div>
 
       <Modal open={Boolean(editing)} onClose={() => { if (!saving) setEditing(null); }} title={{ "create-folder": "New folder", "rename-folder": "Rename folder", "rename-image": "Rename image", "move-image": "Move to folder" }[editing?.kind] ?? "Organize images"} onSubmit={saveEdit}>
-        {editError && <p className="banner banner--error" role="alert">{editError}</p>}
+        {editError && <Banner tone="error">{editError}</Banner>}
         {editing?.kind === "move-image" ? <div className="studio-field">
           <span id="move-image-label">Destination folder</span>
           <Select
@@ -546,16 +624,18 @@ export default function ImageWorkspace({ api }) {
               )}
             </div>
             <div className="studio-inspector__side">
-              {error && <p className="banner banner--error" role="alert">{error}</p>}
+              {error && <Banner tone="error">{error}</Banner>}
               {inspecting.prompt && <p className="studio-inspector__prompt">{inspecting.prompt}</p>}
               <dl className="studio-inspector__meta">
                 <div><dt>Shape</dt><dd><ShapeGlyph shape={inspecting.meta?.aspectRatio ?? "square"} />{SHAPES.find((option) => option.value === (inspecting.meta?.aspectRatio ?? "square"))?.label}</dd></div>
+                {/* The model recorded with the image; every image made before models could be chosen was made by Prism. */}
+                <div><dt>Model</dt><dd>{IMAGE_MODEL_NAMES[inspecting.meta?.imageModel] ?? "VibhavGPT Prism"}</dd></div>
                 {inspecting.meta?.style && <div><dt>Style</dt><dd>{styleLabel(inspecting.meta.style)}</dd></div>}
                 {inspecting.createdAt && <div><dt>Created</dt><dd>{formatCreated(inspecting.createdAt)}</dd></div>}
               </dl>
               <div className="studio-inspector__actions">
                 <PrivateDownloadButton className="btn btn--primary" href={inspecting.downloadUrl} name={inspecting.name} onError={setError}><Download size={16} />Download</PrivateDownloadButton>
-                <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => generateVariation(inspecting)}><RefreshCw size={16} className={variationBusy ? "studio-spin" : undefined} />{variationBusy ? "Generating…" : "Generate variation"}</button>
+                {!isFree && <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => generateVariation(inspecting)}><RefreshCw size={16} className={variationBusy ? "studio-spin" : undefined} />{variationBusy ? "Generating…" : "Generate variation"}</button>}
                 <button type="button" className="btn btn--secondary" disabled={busy} onClick={() => refine(inspecting)}><Wand2 size={16} />Reuse prompt</button>
                 <div className="studio-inspector__quiet">
                   <button type="button" className="btn btn--quiet" onClick={() => openEdit("rename-image", inspecting)}><Pencil size={15} />Rename image</button>

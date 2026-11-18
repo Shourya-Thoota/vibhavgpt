@@ -38,7 +38,7 @@ export const CAPABILITY_OPTIONS = [
 // Honest about cost before the choice rather than after it: a Free account
 // picking Images is told what it actually costs on this plan.
 export const CAPABILITY_FREE_NOTES = {
-  images: "Image creation needs Plus or Pro. Flex Credits don't unlock it on Free.",
+  images: "Free includes 2 images a week. For more you need Plus or Pro; image & document credits don't add images on Free.",
 };
 
 // How much background to assume. "some" is the neutral default and adds no
@@ -58,8 +58,8 @@ export const UNIT_OPTIONS = [
 
 // The sky: Deep Space is the default; Daybreak is a deliberate choice.
 export const SKY_OPTIONS = [
-  { value: "dark", label: "Deep Space", detail: "Navy night, light ink." },
-  { value: "light", label: "Daybreak", detail: "Cool paper, dark ink." },
+  { value: "dark", label: "Deep Space", detail: "Warm night, light ink." },
+  { value: "light", label: "Daybreak", detail: "Ivory paper, dark ink." },
 ];
 
 export const PREFERRED_NAME_MAX = 40;
@@ -141,7 +141,7 @@ export const ONBOARDING_STEPS = [
     id: "welcome",
     kind: "welcome",
     headline: "Meet VibhavGPT.",
-    subline: "A few quick questions and it will feel like yours.",
+    subline: "Set your name, how replies sound and how the app looks. You can change any of it later in Settings.",
     cta: "Set up in a minute",
   },
   {

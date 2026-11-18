@@ -1,7 +1,8 @@
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import {
-  attachments, billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, subscriptions,
-  usageEvents, userProfiles, voiceLiveSessions,
+  attachments, billingCustomers, conversationGroups, conversations, creditLedger, imageFolders, memoryFacts, shadowCostLedger, subscriptions,
+  accountPreferences, profilePictures, savedAvatars, usageEvents, userProfiles, voiceLiveSessions,
+  userConnectors, pendingToolActions, userSkills, connectorAccountOwners, buildProjects, buildRevisions, accountAgreements,
 } from "../db/schema.js";
 
 /* ==========================================================================
@@ -69,10 +70,25 @@ export async function deleteAccountData(db, userId) {
     await tx.delete(conversationGroups).where(eq(conversationGroups.userId, userId));
     await tx.delete(imageFolders).where(eq(imageFolders.userId, userId));
     await tx.delete(creditLedger).where(eq(creditLedger.userId, userId));
+    // Third-party model charges (Slice 7) first: they reference the usage rows (and would cascade with them), but are named here.
+    await tx.execute(sql`delete from marketplace_charges where user_id = ${userId}`);
     await tx.delete(usageEvents).where(eq(usageEvents.userId, userId));
+    await tx.delete(shadowCostLedger).where(eq(shadowCostLedger.userId, userId));
     await tx.delete(voiceLiveSessions).where(eq(voiceLiveSessions.userId, userId));
     await tx.delete(memoryFacts).where(eq(memoryFacts.userId, userId));
+    await tx.delete(profilePictures).where(eq(profilePictures.userId, userId));
+    await tx.delete(accountPreferences).where(eq(accountPreferences.userId, userId));
+    await tx.delete(accountAgreements).where(eq(accountAgreements.userId, userId));
+    await tx.delete(savedAvatars).where(eq(savedAvatars.userId, userId));
     await tx.delete(userProfiles).where(eq(userProfiles.userId, userId));
+    await tx.delete(userConnectors).where(eq(userConnectors.userId, userId));
+    await tx.delete(connectorAccountOwners).where(eq(connectorAccountOwners.userId, userId));
+    await tx.delete(buildRevisions).where(eq(buildRevisions.userId, userId));
+    await tx.delete(buildProjects).where(eq(buildProjects.userId, userId));
+    await tx.delete(pendingToolActions).where(eq(pendingToolActions.userId, userId));
+    await tx.delete(userSkills).where(eq(userSkills.userId, userId));
+    // A reply waiting for, or holding, a chat slot (rows live seconds; none should remain once no reply is in progress).
+    await tx.execute(sql`delete from chat_capacity_leases where user_id = ${userId}`);
     await tx.delete(subscriptions).where(eq(subscriptions.userId, userId));
     await tx.delete(billingCustomers).where(eq(billingCustomers.userId, userId));
 

@@ -23,33 +23,22 @@ body { background: var(--paper); }
   .sidebar { padding-bottom: calc(14px + var(--safe-bottom)); }
 }
 .sidebar__head { padding-inline: 8px; }
-.sidebar__new { border-radius: var(--radius-pill); min-height: 46px; background: var(--accent-soft); border-color: var(--accent-line); box-shadow: none; }
-.sidebar__link { border-radius: var(--radius-pill); min-height: 42px; }
-.sidebar__link[data-active="true"] { background: var(--accent-soft); color: var(--accent); }
 .account { border-radius: var(--radius-pill); }
 .ui-select__trigger, .field input, .field textarea { border-radius: var(--radius-input); }
-.ui-select__list, .ui-menu__panel { background: var(--surface-raised); border-color: var(--line-strong); box-shadow: var(--shadow-lg); }
 .ui-modal { background: var(--surface); }
 .ui-eyebrow { color: var(--accent); letter-spacing: .16em; font-size: .67rem; }
 .chat { background: transparent; }
-.opening { padding-top: 24px; padding-bottom: 26px; width: min(100%, 760px); }
 /* The hero planet on every empty chat/study screen was left with zero
    motion while everything around it (small orbit planets, the header
    planet, the homepage's own hero orb) already drifts or spins. Float on the
    wrapper reads as the whole body gently adrift; the independent spin on the
    image itself is slow enough (220s/rev) that a non-seamless globe texture
    never shows an odd angle within a normal glance at the page. */
-.opening__planet { position: relative; width: clamp(110px, 17vh, 174px); aspect-ratio: 1; margin-bottom: 24px; animation: float 6s ease-in-out infinite; }
-.opening__planet::before { content: ''; position: absolute; inset: -30%; border-radius: var(--radius-round); background: radial-gradient(circle, var(--accent-glow), transparent 66%); }
-.opening__planet img { position: relative; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 12px 28px var(--planet-shadow)); animation: planet-spin-slow 220s linear infinite; }
 @keyframes planet-spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.opening__title { font-size: clamp(2.3rem, 4.5vw, 3.7rem); font-weight: 450; letter-spacing: -.055em; line-height: 1.12; max-width: 21ch; }
-.opening__title em { font-style: normal; }
-.opening__lede { font-size: .92rem; margin-top: 16px; }
 .starters { gap: 12px; max-width: 590px; margin-top: 30px; }
 .starter { background: color-mix(in srgb, var(--surface) 75%, transparent); padding: 17px 20px; box-shadow: none; }
 .starter:hover { background: var(--surface-2); box-shadow: none; }
-.composer-wrap { background: linear-gradient(0deg, var(--paper), color-mix(in srgb, var(--paper) 94%, transparent) 45%, transparent); padding-bottom: 24px; }
+.composer-wrap { background: linear-gradient(0deg, var(--wash-fade), color-mix(in srgb, var(--wash-fade) 94%, transparent) 45%, transparent); padding-bottom: 24px; }
 .composer { border-radius: var(--radius-card); background: var(--surface); border-color: var(--line-strong); box-shadow: var(--shadow-lg), inset 0 1px 0 var(--sheen); }
 .composer:focus-within { box-shadow: var(--shadow-lg), 0 0 0 2px var(--accent-glow); }
 .composer__send { color: var(--accent-ink); }
@@ -57,17 +46,9 @@ body { background: var(--paper); }
 .bubble--user { background: var(--surface-3); color: var(--ink); border: 1px solid var(--line-strong); border-radius: var(--radius-card) var(--radius-card) var(--radius-mark) var(--radius-card); box-shadow: none; }
 .bubble--user::after { display: none; }
 .bubble--assistant { background: transparent; border-color: transparent; box-shadow: none; padding-inline: 0; line-height: 1.8; }
-.page { padding-top: 50px; }
-.page__header { position: relative; isolation: isolate; max-width: none; min-height: 176px; padding: 28px 150px 28px 28px; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; background: radial-gradient(ellipse at right center, color-mix(in srgb, var(--orbit-color) 13%, transparent), transparent 70%), var(--surface); }
-.page__header::after { content: ''; position: absolute; z-index: -1; right: -24px; top: 50%; transform: translateY(-50%); width: 160px; height: 160px; background: var(--planet-image) center/contain no-repeat; opacity: .86; pointer-events: none; }
-.page__title { font-size: clamp(1.8rem, 3vw, 2.65rem); font-weight: 450; letter-spacing: -.045em; line-height: 1.15; }
-.page__lede { max-width: 52ch; }
-.card, .memory-group, .usage-cap, .usage-model, .metric { border-color: var(--line); box-shadow: none; background: var(--surface); border-radius: var(--radius-card); }
 .card { padding: 26px; }
 .card > h2 { font-size: 1.06rem; }
-.memory-group { overflow: hidden; }
 .memory-section { margin-top: 30px; }
-.usage-hero, .credit-purchase, .subscription { border-radius: var(--radius-card); }
 .usage-cap__reset strong { margin-left: .35em; }
 .plans { gap: 22px; }
 .plan { padding: 28px 24px; border-radius: var(--radius-card); box-shadow: none; }
@@ -79,9 +60,7 @@ body { background: var(--paper); }
 @media (max-width: 1100px) { .plans { grid-template-columns: 1fr; } .plan__blurb { min-height: 0; } }
 @media (max-width: 760px) {
   .sidebar { padding-top: 18px; }
-  .opening { padding: 24px 18px; }
-  .opening__planet { width: 100px; margin-bottom: 18px; }
-  .opening__title { font-size: 2.35rem; }
+  .opening { padding: 0 18px 14px; }
   .starters { gap: 8px; margin-top: 20px; }
   .starter { padding: 12px 16px; }
   .composer-wrap { padding: 8px 10px 12px; }
@@ -93,8 +72,5 @@ body { background: var(--paper); }
   .composer__model .ui-select__value > svg { display: none; }
   .composer__send { flex-shrink: 0; }
   .page { padding-top: 24px; }
-  .page__header { padding: 24px 26px; min-height: auto; }
-  .page__header::after { width: 125px; height: 125px; opacity: .12; right: -25px; }
   .card, .plan { padding: 22px; }
 }
-@media (prefers-reduced-motion: reduce) { .opening__planet { animation: none; } }

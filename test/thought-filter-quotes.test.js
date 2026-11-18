@@ -11,7 +11,7 @@ const { buildIdentitySystemPrompt } = await import("../src/chat/prompts.js");
 const { isSafeFact } = await import("../src/memory/service.js");
 const { derivedProviderNameTerms, providerNameTerms } = await import("../src/security/provider-names.js");
 
-const LADDER_FACT = "User operates on a model ladder (locked October 2026): Study on GPT-6 Luna, Nova on DeepSeek V4.1 Flash, Nebula on Kimi K2.6, Vesper on Grok 4.7.";
+const LADDER_FACT = "User operates on a model ladder (locked October 2026): Study on GPT-6 Luna, Nova on DeepSeek V4.1 Flash, Nebula on Kimi K2.6, Vulcan on Grok 4.7.";
 const NAME_FACT = "User wants to be addressed as Vibhav.";
 const PRIVATE = [buildIdentitySystemPrompt("nebula", { query: "What model are you" }), LADDER_FACT, NAME_FACT];
 const LEAK = "The user is asking \"What model are you\". " +
@@ -92,6 +92,14 @@ test("the configured models' and providers' names are protected, our own words a
   for (const term of ["open", "free", "flash", "api", "nova", "nebula", "vesper", "lumen", "vibhavgpt"]) assert.ok(!terms.includes(term), term);
   assert.deepEqual(providerNameTerms({ ...source, providerNameTerms: ["Acme AI"] }).slice(0, 1), ["acme ai"]);
   assert.deepEqual(derivedProviderNameTerms({}), []);
+
+  const refreshedSource = {
+    providerNameTerms: [],
+    chatModels: { nova: "anthropic/claude-haiku-5.5", nebula: "google/gemini-3.8-flash", vesper: "gpt-6.1-terra" },
+    providerBaseUrls: { direct: "https://api.openai.com/v1", paid: "https://openrouter.ai/api/v1" },
+  };
+  const refreshedTerms = derivedProviderNameTerms(refreshedSource);
+  for (const term of ["anthropic", "claude", "google", "gemini", "gemini-3.8-flash", "gpt-6.1-terra", "openai"]) assert.ok(refreshedTerms.includes(term), term);
 });
 
 test("a saved fact naming the configured models is never sent to the model", async () => {

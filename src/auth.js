@@ -11,18 +11,12 @@ import { pool } from "./db/client.js";
 import { sendOtpEmail } from "./email/service.js";
 import { EMAIL_OTP_CONFIG, TWO_FACTOR_EMAIL_OTP_CONFIG } from "./auth/otp-config.js";
 import { displayNameHooks } from "./auth/display-name-hooks.js";
+import { guardSocialSignUpEmail, socialProviderSetup } from "./auth/social-providers.js";
 
 requireAuthConfig();
 
-const socialProviders =
-  config.googleClientId && config.googleClientSecret
-    ? {
-        google: {
-          clientId: config.googleClientId,
-          clientSecret: config.googleClientSecret,
-        },
-      }
-    : undefined;
+// Google, GitHub, Microsoft and Discord, each only while both of its values are set (Slice 8: src/auth/social-providers.js).
+export const { configured: configuredSocialProviders, providers: socialProviders } = socialProviderSetup(config);
 
 const passkeyOrigin = config.passkeyOrigin ?? config.clientOrigins[0];
 const passkeyRpId = config.passkeyRpId ?? new URL(passkeyOrigin).hostname;
@@ -233,6 +227,18 @@ export const auth = betterAuth({
     passkeyTwoFactorPlugin,
   ],
   socialProviders,
-  databaseHooks: displayNameHooks,
+  // A new account from a social sign-in needs a provider-verified email; then the display-name guard, as before.
+  databaseHooks: {
+    ...displayNameHooks,
+    user: {
+      ...displayNameHooks.user,
+      create: {
+        before: async (data, context) => {
+          guardSocialSignUpEmail(data, context);
+          return displayNameHooks.user.create.before(data, context);
+        },
+      },
+    },
+  },
 });
 

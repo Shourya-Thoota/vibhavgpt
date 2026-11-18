@@ -1,0 +1,112 @@
+/* ==========================================================================
+   The app at a smaller size, with Study's tools as chips and Settings calmed.
+
+   Loaded after chat-reference.css. Three things live here:
+
+   1. Size. On a desktop the app is about 14 to 16% smaller than it was: body text is 14px (the root is 87.5%, so 1rem is 14px;
+      it was 16px), and the chat's own pixel sizes were scaled by 0.84: the greeting is 41.6px, the composer 693 by 67, the
+      sidebar 295px at 1900px. Nearly everything in the app is sized in rem, so one root size scales
+      the chat, Study, Image, conversation and Settings screens together, and every menu portaled to <body> with them. The chat
+      stylesheet is in pixels, so its desktop values were scaled by the same factor in place. Phones are left alone: their sizes
+      are set for touch. Pages without the workspace (sign-in, Pricing, the homepage) are not affected.
+   2. Study's tools: one row of compact chips under the composer, wrapping on a phone, never a column. Writing tools opens in a
+      panel under them.
+   3. Settings: plain muted icons in place of coloured tiles, and a grey selected row like the sidebar's.
+   ========================================================================== */
+
+@media (min-width: 761px) {
+  /* The sign-in page is the same size as the app it leads to. (Not every .auth screen: the consent page and the native
+     security check keep their own sizes.)
+  */
+  html:has(.workspace), html:has(.auth--signin) { font-size: 87.5%; } /* 1rem is 14px: body text */
+  /* The collapsed rail: 74px, scaled with the rest. */
+  .workspace[data-collapsed="true"] { --sidebar-w: 62px; }
+}
+
+/* --- Tokens the chips and the panel use ------------------------------------ */
+
+.workspace {
+  --ref-line: color-mix(in srgb, #1f2937 15%, transparent);
+  --ref-chip: color-mix(in srgb, var(--color-paper-2) 72%, transparent);
+}
+:root:not([data-theme="light"]) .workspace {
+  --ref-line: rgb(255 255 255 / 0.16);
+  --ref-chip: rgb(255 255 255 / 0.04);
+}
+
+/* --- Study: the tools as one row of chips ----------------------------------- */
+
+.workspace .study-starters {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  max-width: none;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.workspace .study-starters .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 14px 0 11px;
+  border: 1px solid var(--ref-line);
+  border-radius: 17px;
+  background: var(--ref-chip);
+  box-shadow: none;
+  color: var(--ref-text);
+  font-family: var(--ref-font);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.workspace .study-starters .btn:hover { background: var(--ref-composer); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--ref-line)); text-decoration: none; }
+.workspace .study-starters .btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.workspace .study-starters .btn svg { flex: 0 0 auto; width: 16px; height: 16px; color: var(--ref-label); }
+/* The one that opens a panel rather than filling the box carries the accent. */
+.workspace .study-starters .study-starters__tool { color: var(--color-accent-text); border-color: color-mix(in srgb, var(--color-accent) 35%, var(--ref-line)); }
+.workspace .study-starters .study-starters__tool svg { color: currentColor; }
+.workspace .study-starters .study-starters__tool[aria-expanded="true"] { background: color-mix(in srgb, var(--color-accent) 10%, var(--ref-composer)); }
+
+/* --- Writing tools, in place ------------------------------------------------ */
+
+.workspace .writing-tools-inline { width: 100%; margin: 20px auto 0; text-align: left; }
+.workspace .writing-tools-inline .writing-tools { padding: 0; }
+/* With the panel open the page starts higher, so the panel is not a screen below the fold. */
+.workspace .chat:has(.writing-tools-inline) { padding-top: clamp(16px, 4vh, 44px); }
+.workspace .chat:has(.writing-tools-inline) .opening__title { font-size: 28px; line-height: 36px; }
+
+/* One row, as wide as the six chips need (up to 960px), centred on the composer even where that is wider than it. */
+@media (min-width: 761px) {
+  .workspace .study-starters { width: max-content; max-width: min(960px, calc(100vw - var(--sidebar-w) - 64px)); position: relative; left: 50%; translate: -50% 0; }
+}
+
+@media (max-width: 760px) {
+  .workspace .study-starters { gap: 8px; margin-top: 18px; padding: 0 4px; }
+  /* A touch target, not a chip, on a phone. */
+  .workspace .study-starters .btn { height: 40px; min-height: 40px; border-radius: 20px; font-size: 14px; }
+}
+
+/* --- Settings: plain icons, a calm selected row -------------------------------- */
+
+.settings-dock__icon { width: 20px; height: 20px; border-radius: 0; background: transparent; box-shadow: none; color: var(--color-muted); }
+.settings-dock__icon svg { width: 18px; height: 18px; stroke-width: 1.6; }
+.settings-dock__item { gap: 11px; font-weight: 400; }
+.settings-dock__item:hover { background: color-mix(in srgb, var(--color-ink) 5%, transparent); }
+.settings-dock__item:hover .settings-dock__icon,
+.settings-dock__item[aria-current="page"] .settings-dock__icon { color: var(--color-ink); }
+/* Selected: the same quiet grey as the sidebar's, not an accent tint. */
+.settings-dock__item[aria-current="page"] { background: color-mix(in srgb, var(--color-ink) 8%, transparent); font-weight: 500; }
+.settings-dock__item[data-tone="danger"] .settings-dock__icon,
+.settings-dock__item[data-tone="danger"]:hover .settings-dock__icon { color: var(--color-danger); }
+.settings-dock__item[data-tone="danger"][aria-current="page"] { background: var(--color-danger-soft); }
+.settings-dock__label { letter-spacing: 0; text-transform: none; font-weight: 400; }
+.settings-section__head { margin-bottom: var(--space-lg); }
+.settings-section__head h2 { font-size: 1.5rem; }
+.settings-group + .settings-group { margin-top: var(--space-lg); }

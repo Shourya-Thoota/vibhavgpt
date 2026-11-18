@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <!-- Nebula: an original orb for the home page's model showcase, drawn in the lit-sphere style of the planets on this site. -->
+  <defs>
+    <radialGradient id="ne-halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0.7" stop-color="#e3f1ff" stop-opacity="0"/>
+      <stop offset="0.84" stop-color="#e3f1ff" stop-opacity="0.15"/>
+      <stop offset="0.93" stop-color="#ffe2c8" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#e3f1ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ne-body" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#fff0e0"/>
+      <stop offset="0.28" stop-color="#ffb272"/>
+      <stop offset="0.6" stop-color="#f26e1f"/>
+      <stop offset="0.88" stop-color="#8f340b"/>
+      <stop offset="1" stop-color="#361104"/>
+    </radialGradient>
+    <radialGradient id="ne-night" cx="78%" cy="80%" r="70%">
+      <stop offset="0.35" stop-color="#160601" stop-opacity="0"/>
+      <stop offset="1" stop-color="#160601" stop-opacity="0.8"/>
+    </radialGradient>
+    <radialGradient id="ne-rim" cx="50%" cy="50%" r="50%">
+      <stop offset="0.9" stop-color="#ffe2c8" stop-opacity="0"/>
+      <stop offset="0.985" stop-color="#ffe2c8" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#ffe2c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ne-gloss" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="ne-disc"><circle cx="400" cy="400" r="300"/></clipPath>
+    <filter id="ne-soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
+  </defs>
+  <circle cx="400" cy="400" r="392" fill="url(#ne-halo)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#ne-body)"/>
+  <g clip-path="url(#ne-disc)">
+    <g filter="url(#ne-soft)">
+      <path d="M130 360 C260 300 340 420 470 360 C560 320 640 360 700 330" fill="none" stroke="#fff1e2" stroke-opacity="0.45" stroke-width="34" stroke-linecap="round"/>
+      <path d="M110 470 C240 430 330 520 460 470 C570 430 640 480 710 450" fill="none" stroke="#7a2a08" stroke-opacity="0.42" stroke-width="40" stroke-linecap="round"/>
+      <path d="M150 560 C270 530 360 590 480 548 C570 520 630 548 690 530" fill="none" stroke="#ffd2a8" stroke-opacity="0.32" stroke-width="26" stroke-linecap="round"/>
+    </g>
+  </g>
+  <circle cx="400" cy="400" r="300" fill="url(#ne-night)"/>
+  <circle cx="400" cy="400" r="300" fill="url(#ne-rim)"/>
+  <ellipse cx="318" cy="288" rx="88" ry="56" fill="url(#ne-gloss)" transform="rotate(-28 318 288)"/>
+</svg>

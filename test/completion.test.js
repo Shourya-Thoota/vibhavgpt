@@ -7,7 +7,7 @@ process.env.BETTER_AUTH_SECRET = "a".repeat(48);
 const { buildActivitySummary, buildStructuredToolExchange, completeResponse, normalizeModelKey, visibleReply } = await import("../src/chat/router.js");
 const { assistantMessageMetadata, messageActivityMetadata } = await import("../src/chat/repository.js");
 
-test("Vesper is normalized as Vesper instead of falling back to Lumen", () => {
+test("Vulcan is normalized as Vulcan instead of falling back to Lumen", () => {
   assert.equal(normalizeModelKey("vesper"), "vesper");
 });
 

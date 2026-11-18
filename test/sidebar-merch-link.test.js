@@ -152,7 +152,7 @@ test("the mobile drawer shows the same Resources section, labelled", () => {
 
 test("Study and Image keep their previous placement: no Resources section, no store link, no chat-only additions", () => {
   // The old Apps section was Chat-only, and so is this one. Study and Image stay as they were:
-  // Study has New session, Writing Tools and its history; Image has its history alone.
+  // Study has New session and its history (Writing Tools open in place on the Study home, with no sidebar item); Image has its history alone.
   for (const variant of ["study", "image"]) {
     const html = render({ variant });
     assert.equal(resources(html), null, `${variant}: no Resources section`);
@@ -160,7 +160,7 @@ test("Study and Image keep their previous placement: no Resources section, no st
     assert.equal(html.includes('href="/apps"') || html.includes('href="/sources"'), false, `${variant}: no Apps or Sources link`);
   }
   assert.match(render({ variant: "study" }), /New study session/);
-  assert.match(render({ variant: "study" }), /Writing Tools/);
+  assert.doesNotMatch(render({ variant: "study" }), /Writing Tools/);
   assert.equal(render({ variant: "image" }).includes("sidebar__new"), false, "Image still has no New button of its own");
 });
 
@@ -215,9 +215,9 @@ test("source: the addresses are fixed in code, Apps and the store are flagged we
   assert.match(sidebar, /const SOURCES_PATH = "\/sources";/);
   const entries = sidebar.slice(sidebar.indexOf("const RESOURCE_LINKS = ["), sidebar.indexOf("];", sidebar.indexOf("const RESOURCE_LINKS = [")));
   assert.deepEqual([...entries.matchAll(/label: "([^"]+)"/g)].map((match) => match[1]), BROWSER_ORDER);
-  assert.match(entries, /\{ href: APPS_HUB_PATH, label: "Apps", icon: <LayoutGrid size=\{17\} strokeWidth=\{1\.9\} \/>, webOnly: true \}/);
-  assert.match(entries, /\{ href: SOURCES_PATH, label: "Sources", icon: <Code size=\{17\} strokeWidth=\{1\.9\} \/> \}/, "Sources is not webOnly: it stays in the desktop app");
-  assert.match(entries, /\{ href: MERCH_STORE_URL, label: "Merch Store", icon: <ShoppingBag size=\{17\} strokeWidth=\{1\.9\} \/>, external: true, webOnly: true/);
+  assert.match(entries, /\{ href: APPS_HUB_PATH, label: "Apps", icon: <LayoutGrid size=\{20\} strokeWidth=\{1\.6\} \/>, webOnly: true \}/);
+  assert.match(entries, /\{ href: SOURCES_PATH, label: "Sources", icon: <Code size=\{20\} strokeWidth=\{1\.6\} \/> \}/, "Sources is not webOnly: it stays in the desktop app");
+  assert.match(entries, /\{ href: MERCH_STORE_URL, label: "Merch Store", icon: <ShoppingBag size=\{20\} strokeWidth=\{1\.6\} \/>, external: true, webOnly: true/);
   assert.doesNotMatch(sidebar, /fetch\([^)]*store\.vibhavgpt|store\.vibhavgpt[^"']*\?utm|sendBeacon|analytics/i, "no requests to the store and no tracking");
   assert.doesNotMatch(sidebar, /youtube\.com|github\.com|SOURCE_REPO_URL/i, "the repository and channel addresses live on the Sources page, not here");
   const desktop = read("frontend/src/desktop-app.js");

@@ -26,6 +26,12 @@ contextBridge.exposeInMainWorld("desktopAPI", Object.freeze({
 // Tray "New Chat": the app starts one on this event (see frontend App.jsx).
 ipcRenderer.on("desktop:new-chat", () => window.dispatchEvent(new Event("desktop:new-chat")));
 
+// The app menu, tray and jump list's other actions (main.js runAction). Only these names reach the page, as plain strings.
+const SHORTCUT_ACTIONS = new Set(["new-chat", "new-image", "new-build", "search", "toggle-sidebar", "settings", "shortcuts"]);
+ipcRenderer.on("desktop:shortcut", (_event, action) => {
+  if (typeof action === "string" && SHORTCUT_ACTIONS.has(action)) window.dispatchEvent(new CustomEvent("desktop:shortcut", { detail: action }));
+});
+
 // The strip under the caption buttons drags the window; links, buttons and
 // fields stay clickable wherever they sit in it. The strip itself takes no
 // clicks, so it hides nothing on pages that do not leave room for it.

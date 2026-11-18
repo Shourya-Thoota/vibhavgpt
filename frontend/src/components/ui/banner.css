@@ -1,0 +1,73 @@
+/* ==========================================================================
+   Banner (Slice 6): the one notice for the chat column and the workspace.
+
+   Info, warning, error, success. The tone is said three ways, never by colour alone: an icon of its own shape, a word (the title, or the
+   tone's own word), and a tint. No coloured edge stripe. It sits in the message column at the column's width, so it lines up
+   with what it is about. One clear action; dismissing is a labelled icon button. Tokens only.
+   ========================================================================== */
+
+.ui-banner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-xs) var(--space-sm);
+  width: min(100%, var(--chat-column));
+  margin: 0 auto var(--space-xs);
+  padding: var(--space-sm) var(--space-sm) var(--space-sm) var(--space-md);
+  border: var(--rule-fine) solid var(--banner-edge);
+  border-radius: var(--radius-input);
+  background: var(--banner-fill);
+  color: var(--color-ink);
+  box-sizing: border-box;
+  --banner-fill: var(--color-paper-raised);
+  --banner-edge: var(--color-rule);
+  --banner-ink: var(--color-ink-2);
+}
+.ui-banner[data-tone="warning"] { --banner-fill: var(--color-warn-soft); --banner-edge: color-mix(in srgb, var(--color-warn) 30%, var(--color-rule)); --banner-ink: var(--color-warn); }
+.ui-banner[data-tone="success"] { --banner-fill: var(--color-positive-soft); --banner-edge: color-mix(in srgb, var(--color-positive) 30%, var(--color-rule)); --banner-ink: var(--color-positive); }
+.ui-banner[data-tone="error"] { --banner-fill: var(--color-danger-soft); --banner-edge: color-mix(in srgb, var(--color-danger) 30%, var(--color-rule)); --banner-ink: var(--color-danger); }
+
+.ui-banner__icon { display: inline-grid; place-items: center; width: 20px; height: 1.5rem; color: var(--banner-ink); }
+.ui-banner__icon svg { width: 18px; height: 18px; stroke-width: var(--icon-stroke); }
+/* The icon as a help control: a 44px target on touch, the same mark, a visible focus ring. */
+.ui-banner__help-toggle { position: relative; padding: 0; border: 0; border-radius: 999px; background: transparent; cursor: help; }
+.ui-banner__help-toggle::after { content: ""; position: absolute; inset: -12px; }
+.ui-banner__help-toggle:hover, .ui-banner__help-toggle[aria-expanded="true"] { color: var(--color-ink); }
+.ui-banner__help-toggle:focus-visible { outline: var(--ring-width, 2px) solid var(--color-focus); outline-offset: 2px; }
+.ui-banner__help { margin-top: var(--space-3xs); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-input); background: var(--tint-hover, var(--color-paper-3)); color: var(--color-ink); font-size: var(--text-sm); line-height: 1.5; }
+.ui-banner__help[hidden] { display: none; }
+/* A preview (hover or focus) floats above the notice: the notice keeps its size, so the icon stays under the pointer. */
+.ui-banner:has(.ui-banner__help[data-mode="peek"]:not([hidden])) { position: relative; }
+.ui-banner__help[data-mode="peek"] { position: absolute; left: var(--space-sm); right: var(--space-sm); bottom: calc(100% + 6px); z-index: 5; margin: 0; background: var(--color-paper-raised); border: var(--rule-fine) solid var(--color-rule); box-shadow: var(--shadow-pop); }
+.ui-banner__help p { margin: 0; max-width: var(--measure-read); }
+.ui-banner__help-close { margin-top: var(--space-3xs); min-height: 32px; padding: 0 var(--space-xs); border: 0; border-radius: var(--radius-input); background: transparent; color: var(--color-ink-2); font: inherit; font-size: var(--text-xs); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.ui-banner__body { display: grid; gap: var(--space-3xs); min-width: 0; padding-top: 0.125rem; }
+.ui-banner__title { margin: 0; color: var(--color-ink); font-size: var(--text-sm); font-weight: 600; line-height: 1.4; }
+.ui-banner__text { margin: 0; max-width: var(--measure-read); color: var(--color-ink-2); font-size: var(--text-sm); line-height: 1.5; overflow-wrap: anywhere; }
+.ui-banner__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2xs); }
+.ui-banner__dismiss {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-menu-row);
+  color: var(--color-muted);
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.ui-banner__dismiss svg { width: 16px; height: 16px; stroke-width: var(--icon-stroke); }
+.ui-banner__dismiss:hover { background: var(--tint-hover); color: var(--color-ink); }
+.ui-banner__dismiss:active { background: var(--tint-press); }
+.ui-banner__dismiss:focus-visible { outline: var(--ring-width) solid var(--color-focus); outline-offset: var(--ring-offset); transition: none; }
+
+/* Phones: the action moves under the text, full width, and every control is a full touch target. */
+@media (max-width: 580px) {
+  .ui-banner { grid-template-columns: auto minmax(0, 1fr) auto; padding: var(--space-sm); }
+  .ui-banner__actions { grid-column: 2 / -1; grid-row: 2; justify-content: flex-start; }
+  .ui-banner__actions .btn { min-height: var(--hit-min); }
+  .ui-banner__dismiss { grid-column: 3; grid-row: 1; width: var(--hit-min); height: var(--hit-min); margin: calc(-1 * var(--space-xs)) calc(-1 * var(--space-xs)) 0 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ui-banner { animation: ui-banner-in var(--dur-short) var(--ease-out) both; }
+}
+@keyframes ui-banner-in { from { opacity: 0; transform: translateY(calc(-1 * var(--space-2xs))); } to { opacity: 1; transform: none; } }

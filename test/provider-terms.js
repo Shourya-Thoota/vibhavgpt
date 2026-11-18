@@ -3,4 +3,6 @@
 // one case-insensitive pattern for the name-guard assertions.
 const escape = (term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/ /g, " ?");
 export const providerTerms = (process.env.PROVIDER_NAME_TERMS ?? "").split(",").map((term) => term.trim()).filter(Boolean);
-export const providerTermsPattern = new RegExp(`\\b(?:${providerTerms.map(escape).join("|")})\\b`, "i");
+export const providerTermsPattern = providerTerms.length
+  ? new RegExp(`\\b(?:${providerTerms.map(escape).join("|")})\\b`, "i")
+  : /(?!)/;

@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { updateMetadata, detailsHtml } from "./scripts/public-html.js";
@@ -9,15 +10,10 @@ import { updateMetadata, detailsHtml } from "./scripts/public-html.js";
 // - the appearance boot script (sky and universe, set before paint);
 // - the self-hosted @font-face rules, inlined so text never waits on an
 //   extra stylesheet request (the same file serves the static pages);
-// - preloads for the two faces nearly every page paints with.
+// - no font preloads: text is set in the platform's system face.
 // Files are read per transform, so editing them hot-reloads in dev.
 function appearanceHead() {
   const read = (path) => readFileSync(resolve(import.meta.dirname, path), "utf8");
-  const preload = (href) => ({
-    tag: "link",
-    attrs: { rel: "preload", href, as: "font", type: "font/woff2", crossorigin: true },
-    injectTo: "head",
-  });
   return {
     name: "vibhav-appearance-head",
     transformIndexHtml(html, context) {
@@ -25,8 +21,6 @@ function appearanceHead() {
       return { html: ["pricing", "terms", "privacy", "guarantee"].includes(name) ? updateMetadata(html, `/${name}`) : html, tags: [
         { tag: "script", children: read("src/theme/appearance-boot.js"), injectTo: "head" },
         { tag: "script", children: read("src/page-scroll-boot.js"), injectTo: "head" },
-        preload("/fonts/v1/hanken-grotesk/hanken-grotesk-latin-wght-normal.woff2"),
-        preload("/fonts/v1/prata/prata-latin-400-normal.woff2"),
         { tag: "style", children: read("public/fonts/v1/fonts.css"), injectTo: "head" },
       ] };
     },
@@ -62,11 +56,21 @@ function appearanceHead() {
 }
 
 export default defineConfig({
-  plugins: [react(), appearanceHead()],
+  // Tailwind handles only CSS that opts in with its directives (home-effects.css,
+  // for the two homepage components); every other stylesheet passes through as is.
+  plugins: [react(), tailwindcss(), appearanceHead()],
+  // "@/" is shadcn's alias for src/. The pattern needs the slash so it cannot
+  // match scoped packages such as "@capacitor/app" or "@sentry/react".
+  resolve: { alias: [{ find: /^@\//, replacement: `${resolve(import.meta.dirname, "src")}/` }] },
   server: { port: 5173, proxy: { "/api": "http://127.0.0.1:3001" } },
   build: {
+    // The static homepage cannot import the animations' script by name: its
+    // file name carries a content hash. The manifest lets the post-build step
+    // (scripts/prerender-public.js) find it, and removes the manifest after.
+    manifest: true,
     rollupOptions: {
       input: {
+        homeEffects: resolve(import.meta.dirname, "src/home-effects-boot.ts"),
         app: resolve(import.meta.dirname, "index.html"),
         pricing: resolve(import.meta.dirname, "pricing.html"),
         terms: resolve(import.meta.dirname, "terms.html"),

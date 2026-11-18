@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import {
-  BarChart3, Brain, ChevronDown, Code, CreditCard, FileText, LayoutGrid,
-  LogOut, MessageSquare, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, PenLine, Plus,
-  Settings as SettingsIcon, ShoppingBag, Sun, Trash2, X,
-} from "lucide-react";
+  BarChart3, Blocks, Brain, Code, CreditCard, FolderOpen, LayoutGrid,
+  LogOut, MessageSquare, Moon, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, PenLine, Search, SquarePen,
+  Settings as SettingsIcon, ShoppingBag, Sun, Trash2, X, Image as ImageIcon } from "lucide-react";
 import { Field, IconButton, Menu, MenuItem, MenuLabel, MenuSeparator, Modal } from "./ui.jsx";
 import { AccountBillingMenu } from "./AccountBillingMenu.jsx";
+import Avatar from "./Avatar.jsx";
 import ConversationLibrary from "./ConversationLibrary.jsx";
 import { visibleAppLinks } from "../desktop-app.js";
+
+// The VibhavGPT mark beside "VibhavGPT Tecton" in Build's sidebar (the same file as the app's brand mark).
 
 // The one page that lists the Android and Windows apps; each links on to its
 // own download page.
@@ -131,9 +133,11 @@ function ConversationHistory({ api, activeId, revision, onOpen, onNew, productMo
 }
 
 const CHAT_LINKS = () => [
-  { id: "chat", label: "Chat", icon: <MessageSquare size={17} strokeWidth={1.9} /> },
-  { id: "memory", label: "Memory", icon: <Brain size={17} strokeWidth={1.9} /> },
-  { id: "billing", label: "Plan", icon: <CreditCard size={17} strokeWidth={1.9} /> },
+  { id: "chat", label: "Chat", icon: <MessageSquare size={20} strokeWidth={1.6} /> },
+  { id: "library", label: "Library", icon: <FolderOpen size={20} strokeWidth={1.6} /> },
+  { id: "memory", label: "Memory", icon: <Brain size={20} strokeWidth={1.6} /> },
+  { id: "billing", label: "Plan", icon: <CreditCard size={20} strokeWidth={1.6} /> },
+  { id: "extensions", label: "Extensions", icon: <Blocks size={20} strokeWidth={1.6} /> },
 ];
 
 // The Resources section: three plain links to public pages, outside the app. Apps
@@ -144,9 +148,9 @@ const CHAT_LINKS = () => [
 // address inside its window. Sources stays: its two destinations are other sites,
 // which that app already sends to the system browser.
 const RESOURCE_LINKS = [
-  { href: APPS_HUB_PATH, label: "Apps", icon: <LayoutGrid size={17} strokeWidth={1.9} />, webOnly: true },
-  { href: SOURCES_PATH, label: "Sources", icon: <Code size={17} strokeWidth={1.9} /> },
-  { href: MERCH_STORE_URL, label: "Merch Store", icon: <ShoppingBag size={17} strokeWidth={1.9} />, external: true, webOnly: true, ariaLabel: "Merch Store" },
+  { id: "apps", href: APPS_HUB_PATH, label: "Apps", icon: <LayoutGrid size={20} strokeWidth={1.6} />, webOnly: true },
+  { id: "sources", href: SOURCES_PATH, label: "Sources", icon: <Code size={20} strokeWidth={1.6} /> },
+  { id: "merch", href: MERCH_STORE_URL, label: "Merch Store", icon: <ShoppingBag size={20} strokeWidth={1.6} />, external: true, webOnly: true, ariaLabel: "Merch Store" },
 ];
 
 /**
@@ -185,12 +189,18 @@ export default function Sidebar({
   newChatInGroup,
   openConversation,
   onOpenImageSession,
-  onOpenWritingTools,
-  writingToolsActive = false,
+  onSearch,
   activeConversationId,
   historyRevision,
   onSignOut,
+  // Items hidden in Settings > Appearance > Sidebar (src/profile/preferences.js SIDEBAR_ITEM_IDS). Chat, New chat, search and the account
+  // menu are never hidden.
+  hiddenItems = [],
+  // Build's own sidebar (owner request, 2026-11-15): switching back to Chat or Image.
+  onSwitchMode,
 }) {
+  const hidden = new Set(hiddenItems);
+  const isBuild = variant === "build";
   const navigate = (event, page) => {
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     event.preventDefault(); go(page);
@@ -209,18 +219,21 @@ export default function Sidebar({
     setTip({ label: target.getAttribute("data-rail-label"), top: box.top + box.height / 2, left: event.currentTarget.getBoundingClientRect().right + 6 });
   };
   const displayName = user.name?.trim() || user.email.split("@")[0];
-  const initials = displayName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-  const newLabel = variant === "study" ? "New study session" : "New chat";
+  const newLabel = variant === "study" ? "New study session" : isBuild ? "New build" : "New chat";
+  // On a fresh chat the "New chat" row is the one selected row: the Chat link below would point at the same place.
+  const newChatSelected = variant !== "image" && page === "chat" && !activeConversationId;
   const historyProps = {
-    chat: { heading: "Recent chats", emptyLabel: "Your past chats will appear here.", onOpen: openConversation },
+    chat: { heading: "Your chats", emptyLabel: "Your past chats will appear here.", onOpen: openConversation },
     study: { heading: "Study sessions", emptyLabel: "Your study sessions will appear here.", onOpen: openConversation },
     image: { heading: "Image sessions", emptyLabel: "Your image sessions will appear here.", onOpen: onOpenImageSession },
+    build: { heading: "Your builds", emptyLabel: "Your builds will appear here.", onOpen: (id) => openConversation(id, "build") },
   }[variant];
 
   return (
     <aside
       className="sidebar"
       data-open={sidebarOpen}
+      aria-label="Navigation"
       data-variant={variant}
       onMouseOver={showTip}
       onMouseLeave={() => setTip(null)}
@@ -243,30 +256,29 @@ export default function Sidebar({
       </div>
 
       {variant !== "image" && (
-        <button className="sidebar__new" type="button" onClick={newChat} {...(rail ? railProps(newLabel) : { title: newLabel })}>
-          <Plus size={17} strokeWidth={2.2} />
+        <button className="sidebar__new" type="button" data-selected={newChatSelected ? "true" : undefined} onClick={newChat} {...(rail ? railProps(newLabel) : { title: newLabel })}>
+          <SquarePen size={20} strokeWidth={1.6} />
           {!rail && <span>{newLabel}</span>}
         </button>
       )}
 
-      {variant === "study" && onOpenWritingTools && (
-        <nav className="sidebar__nav" aria-label="Study tools">
-          <button type="button" className="sidebar__link" data-active={writingToolsActive || undefined}
-            aria-current={writingToolsActive ? "page" : undefined} {...railProps("Writing Tools")} onClick={onOpenWritingTools}>
-            <PenLine size={17} strokeWidth={1.9} />
-            {!rail && <span>Writing Tools</span>}
-          </button>
-        </nav>
+      {variant !== "image" && onSearch && (
+        <button className="sidebar__link sidebar__search" type="button" aria-keyshortcuts="Control+K Meta+K" onClick={onSearch}
+          {...(rail ? railProps("Search chats") : { title: "Search chats (Ctrl+K)" })}>
+          <Search size={20} strokeWidth={1.6} />
+          {!rail && <span>{isBuild ? "Search builds" : "Search"}</span>}
+          {!rail && <kbd className="sidebar__kbd" aria-hidden="true">{/Mac|iPhone|iPad/.test(globalThis.navigator?.platform ?? "") ? "⌘K" : "Ctrl K"}</kbd>}
+        </button>
       )}
 
       {variant === "chat" && (
         <nav className="sidebar__nav">
-          {CHAT_LINKS().map((link) => (
+          {CHAT_LINKS().filter((link) => !hidden.has(link.id)).map((link) => (
             <a
               key={link.id}
               href={link.id === "chat" ? "/app/chat" : `/app/${link.id}`}
               className="sidebar__link"
-              data-active={page === link.id || undefined}
+              data-active={(page === link.id && !(link.id === "chat" && newChatSelected)) || undefined}
               {...railProps(link.label)}
               aria-current={page === link.id ? "page" : undefined}
               onClick={(event) => {
@@ -281,10 +293,10 @@ export default function Sidebar({
         </nav>
       )}
 
-      {variant === "chat" && (
+      {variant === "chat" && visibleAppLinks(RESOURCE_LINKS).some((link) => !hidden.has(link.id)) && (
         <nav className="sidebar__nav sidebar__apps" aria-label="Resources">
-          {!rail && <span className="sidebar__apps-label">Resources</span>}
-          {visibleAppLinks(RESOURCE_LINKS).map((link) => (
+          {!rail && <span className="sidebar__apps-label">Explore</span>}
+          {visibleAppLinks(RESOURCE_LINKS).filter((link) => !hidden.has(link.id)).map((link) => (
             <a key={link.href} href={link.href} className="sidebar__link"
               {...(rail ? railProps(link.ariaLabel ?? link.label) : link.ariaLabel ? { "aria-label": link.ariaLabel } : {})}
               {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
@@ -295,7 +307,22 @@ export default function Sidebar({
         </nav>
       )}
 
-      {!rail && variant !== "image" && (
+      {isBuild && (
+        <nav className="sidebar__nav sidebar__build-nav" aria-label="Other workspaces">
+          {[{ mode: "chat", label: "Chat", icon: <MessageSquare size={20} strokeWidth={1.6} /> }, { mode: "image", label: "Image", icon: <ImageIcon size={20} strokeWidth={1.6} /> }].map((item) => (
+            <a key={item.mode} href={`/app/${item.mode}`} className="sidebar__link" {...railProps(`Back to ${item.label}`)}
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault(); setSidebarOpen(false); onSwitchMode?.(item.mode);
+              }}>
+              {item.icon}
+              {!rail && <span>{item.label}</span>}
+            </a>
+          ))}
+        </nav>
+      )}
+
+      {!rail && (variant === "chat" || variant === "study") && (
         <ConversationLibrary
           api={api}
           productMode={variant}
@@ -303,10 +330,11 @@ export default function Sidebar({
           revision={historyRevision}
           onNew={newChat}
           onNewInGroup={newChatInGroup}
+          showProjects={!hidden.has("projects")}
           {...historyProps}
         />
       )}
-      {!rail && variant === "image" && (
+      {!rail && (variant === "image" || isBuild) && (
         <ConversationHistory
           api={api}
           productMode={variant}
@@ -324,41 +352,51 @@ export default function Sidebar({
             <button type="button" className="plan-nudge__action" onClick={() => go("billing")}>See plans</button>
           </div>
         )}
-        <Menu
-          label="Account"
-          placement="top"
-          align="start"
-          panelClassName="account-menu"
-          trigger={({ ref, open, toggle }) => (
-            <button ref={ref} type="button" className="account" aria-expanded={open} aria-haspopup="menu" onClick={toggle} {...railProps(`Account menu, ${displayName}`)}>
-              <span className="avatar" aria-hidden="true">{initials || "V"}</span>
-              {!rail && (
-                <>
+        <div className="account-row">
+          <Menu
+            label="Account"
+            placement="top"
+            align="workspace"
+            panelClassName="account-menu"
+            trigger={({ ref, open, toggle }) => (
+              <button ref={ref} type="button" className="account" aria-expanded={open} aria-haspopup="menu" onClick={toggle} {...railProps(`Account menu, ${displayName}`)}>
+                <Avatar user={user} displayName={displayName} />
+                {!rail && (
                   <span className="account__copy">
                     <strong>{displayName}</strong>
-                    <small>{tierLabel} plan</small>
+                    <small>{tierKey === "free" ? user.email : `${tierLabel} plan`}</small>
                   </span>
-                  <ChevronDown className="account__caret" size={15} strokeWidth={2} />
-                </>
-              )}
+                )}
+              </button>
+            )}
+          >
+            <MenuLabel>{user.email}</MenuLabel>
+            <MenuItem icon={<SettingsIcon size={16} />} href="/app/settings/account" target="_self" onSelect={(event) => navigate(event, "settings")}>Settings</MenuItem>
+            <MenuItem icon={<BarChart3 size={16} />} href="/app/usage" target="_self" onSelect={(event) => navigate(event, "usage")}>Usage & limits</MenuItem>
+            <MenuItem icon={<CreditCard size={16} />} href="/app/billing" target="_self" onSelect={(event) => navigate(event, "billing")}>Plan and billing</MenuItem>
+            <AccountBillingMenu api={api} userId={user.id} />
+            <MenuSeparator />
+            <MenuItem
+              icon={appearance.resolved === "light" ? <Moon size={16} /> : <Sun size={16} />}
+              onSelect={() => appearance.setThemeId(appearance.resolved === "light" ? "dark" : "light")}
+            >
+              {appearance.resolved === "light" ? "Switch to Deep Space" : "Switch to Daybreak"}
+            </MenuItem>
+            <MenuSeparator />
+            <MenuItem icon={<LogOut size={16} />} tone="danger" onSelect={onSignOut}>Sign out</MenuItem>
+          </Menu>
+          {!rail && (
+            <button
+              type="button"
+              className="account__settings-btn"
+              title="Settings"
+              aria-label="Settings"
+              onClick={(event) => navigate(event, "settings")}
+            >
+              <SettingsIcon className="account__gear" size={20} strokeWidth={1.6} aria-hidden="true" />
             </button>
           )}
-        >
-          <MenuLabel>{user.email}</MenuLabel>
-          <MenuItem icon={<SettingsIcon size={16} />} href="/app/settings/account" target="_self" onSelect={(event) => navigate(event, "settings")}>Settings</MenuItem>
-          <MenuItem icon={<BarChart3 size={16} />} href="/app/usage" target="_self" onSelect={(event) => navigate(event, "usage")}>Usage & limits</MenuItem>
-          <MenuItem icon={<CreditCard size={16} />} href="/app/billing" target="_self" onSelect={(event) => navigate(event, "billing")}>Plan and billing</MenuItem>
-          <AccountBillingMenu api={api} userId={user.id} />
-          <MenuSeparator />
-          <MenuItem
-            icon={appearance.resolved === "light" ? <Moon size={16} /> : <Sun size={16} />}
-            onSelect={() => appearance.setThemeId(appearance.resolved === "light" ? "dark" : "light")}
-          >
-            {appearance.resolved === "light" ? "Switch to Deep Space" : "Switch to Daybreak"}
-          </MenuItem>
-          <MenuSeparator />
-          <MenuItem icon={<LogOut size={16} />} tone="danger" onSelect={onSignOut}>Sign out</MenuItem>
-        </Menu>
+        </div>
       </div>
       {rail && tip && <span className="sidebar__tip" aria-hidden="true" style={{ top: tip.top, left: tip.left }}>{tip.label}</span>}
     </aside>

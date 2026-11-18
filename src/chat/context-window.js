@@ -52,7 +52,7 @@ function normalizeHistory(history) {
     // Conversation persistence stores visible turns only. Drop any accidental
     // tool-call fields so a stale/malformed row cannot create an orphan tool
     // result or leak raw tool syntax back into a later provider request.
-    .map(({ role, content }) => ({ role, content: content.trim() }));
+    .map(({ id, role, content }) => ({ ...(id ? { id } : {}), role, content: content.trim() }));
 }
 
 function groupExchanges(history) {
@@ -79,21 +79,62 @@ function truncateText(value, maxTokens) {
   };
 }
 
+// What a person said that later turns must keep honouring: corrections, preferences, standing instructions and facts about themselves.
+export const KEY_FACT_PATTERN = /\b(correction|actually|instead|anymore|i prefer|prefer|always|never|don't|do not|please (?:always|never)|remember|from now on|make sure|my (?:name|favou?rite|[a-z]+) (?:is|are)|i (?:am|live|work|use|need))\b/i;
+export const SUMMARY_VERSION = "extract-v2";
+const KEY_LINE_CHARS = 320;
+const RECENT_LINE_CHARS = 240;
+
+function clipLine(text, max) {
+  const compact = String(text ?? "").replace(/\s+/g, " ").trim();
+  return compact.length > max ? `${compact.slice(0, max - 1)}…` : compact;
+}
+
+// The abridged part of a long conversation. Built from the saved messages on every request (nothing is cached), so an edit or a deletion
+// shows up at once. User lines that carry corrections, preferences or standing instructions are kept first, newest first, from anywhere in
+// the abridged part; then the most recent abridged exchanges fill what is left. Lines are whole (never cut in the middle), in their original
+// order, and earlier assistant replies are labelled as possibly outdated so they are never read as the person's own statements.
 function historySummary(groups, maxTokens) {
-  if (!groups.length || maxTokens < 120) return null;
-  const lines = [];
-  for (const group of groups.slice(-12)) {
-    for (const message of group) {
-      const label = message.role === "user" ? "User" : "VibhavGPT";
-      const compact = message.content.replace(/\s+/g, " ").trim();
-      if (compact) lines.push(`${label}: ${compact}`);
-    }
+  const omitted = groups.flat().map((message, index) => ({ ...message, index }));
+  if (!omitted.length || maxTokens < 120) return null;
+  const header = `Earlier conversation context (an abridged extract of ${omitted.length} earlier messages, oldest first; later messages and corrections take precedence over anything here):`;
+  let budget = maxTokens - textTokenEstimate(header) - 16;
+  const chosen = new Map();
+  const take = (message, line) => {
+    if (chosen.has(message.index)) return true;
+    const cost = textTokenEstimate(line) + 2;
+    if (cost > budget) return false;
+    budget -= cost;
+    chosen.set(message.index, { message, line });
+    return true;
+  };
+  const keyFacts = omitted.filter((m) => m.role === "user" && KEY_FACT_PATTERN.test(m.content));
+  const keyBudgetFloor = Math.floor(budget * 0.4);
+  for (const message of [...keyFacts].reverse()) {
+    if (budget <= keyBudgetFloor && chosen.size) break;
+    take(message, `User: ${clipLine(message.content, KEY_LINE_CHARS)}`);
   }
-  const summary = truncateText(
-    `Earlier conversation context, abridged from previous turns:\n${lines.join("\n")}`,
-    maxTokens,
-  );
-  return { role: "user", content: summary.text };
+  for (const message of [...omitted].reverse()) {
+    const label = message.role === "user" ? "User" : "VibhavGPT (earlier reply; may be outdated)";
+    if (!take(message, `${label}: ${clipLine(message.content, RECENT_LINE_CHARS)}`)) break;
+  }
+  // A very small budget where no whole line fits: keep the newest abridged message, shortened to what fits.
+  if (!chosen.size) {
+    const message = omitted.at(-1);
+    const label = message.role === "user" ? "User" : "VibhavGPT (earlier reply; may be outdated)";
+    const room = Math.floor((budget - 4) * 3) - label.length - 8;
+    if (room >= 40) take(message, `${label}: ${clipLine(message.content, room)}`);
+  }
+  if (!chosen.size) return null;
+  const lines = [...chosen.values()].sort((a, b) => a.message.index - b.message.index).map((entry) => entry.line);
+  return {
+    message: { role: "user", content: `${header}\n${lines.join("\n")}` },
+    provenance: {
+      version: SUMMARY_VERSION,
+      omittedMessageIds: omitted.map((m) => m.id).filter(Boolean),
+      includedMessageIds: [...chosen.values()].sort((a, b) => a.message.index - b.message.index).map((entry) => entry.message.id).filter(Boolean),
+    },
+  };
 }
 
 function fitReferences(references, maxTokens) {
@@ -137,6 +178,7 @@ function fitReferences(references, maxTokens) {
 export function fitConversationContext({
   systemMessages = [],
   history = [],
+  earlierHistory = [],
   referenceMessages = [],
   currentMessage,
   maxInputTokens = CHAT_INPUT_TOKEN_BUDGET,
@@ -147,6 +189,8 @@ export function fitConversationContext({
     : { role: "user", content: "" };
   const normalizedHistory = normalizeHistory(history);
   const groups = groupExchanges(normalizedHistory);
+  // Messages older than the loaded window that state a correction, preference or instruction: they can only ever appear in the extract.
+  const earlierGroups = normalizeHistory(earlierHistory).map((message) => [message]);
   const base = [...systems, current];
   const baseTokens = estimateChatPromptTokens(base);
   if (baseTokens > maxInputTokens) {
@@ -154,7 +198,7 @@ export function fitConversationContext({
   }
 
   const remaining = maxInputTokens - baseTokens;
-  const hasHistory = groups.length > 0;
+  const hasHistory = groups.length > 0 || earlierGroups.length > 0;
   const summaryReserve = hasHistory ? Math.min(MAX_HISTORY_SUMMARY_TOKENS, Math.floor(remaining * 0.12)) : 0;
   const historyReserve = hasHistory ? Math.min(MAX_HISTORY_TOKENS, Math.floor(remaining * 0.38)) : 0;
   const referenceBudget = Math.min(MAX_REFERENCE_TOKENS, Math.max(0, remaining - historyReserve - summaryReserve));
@@ -195,8 +239,9 @@ export function fitConversationContext({
     break;
   }
 
-  const omittedGroups = groups.slice(0, firstKept);
-  let summary = historySummary(omittedGroups, Math.min(summaryReserve, Math.max(0, historyBudget - recentTokens)));
+  const omittedGroups = [...earlierGroups, ...groups.slice(0, firstKept)];
+  let compacted = historySummary(omittedGroups, Math.min(summaryReserve, Math.max(0, historyBudget - recentTokens)));
+  let summary = compacted?.message ?? null;
   let messages = [...systems, ...(summary ? [summary] : []), ...recentGroups.flat(), ...references.kept, current];
   let estimatedTokens = estimateChatPromptTokens(messages);
 
@@ -206,7 +251,8 @@ export function fitConversationContext({
   while (estimatedTokens > maxInputTokens && recentGroups.length) {
     recentGroups.shift();
     const priorGroups = omittedGroups.concat(recentGroups.length ? [] : groups.slice(firstKept));
-    summary = historySummary(priorGroups, Math.min(MAX_HISTORY_SUMMARY_TOKENS, Math.max(0, maxInputTokens - baseTokens - references.usedTokens - 150)));
+    compacted = historySummary(priorGroups, Math.min(MAX_HISTORY_SUMMARY_TOKENS, Math.max(0, maxInputTokens - baseTokens - references.usedTokens - 150)));
+    summary = compacted?.message ?? null;
     messages = [...systems, ...(summary ? [summary] : []), ...recentGroups.flat(), ...references.kept, current];
     estimatedTokens = estimateChatPromptTokens(messages);
   }
@@ -219,6 +265,8 @@ export function fitConversationContext({
     historyMessages: normalizedHistory.length,
     keptHistoryMessages: recentGroups.flat().length,
     historySummarized: Boolean(summary),
+    // Which saved messages were abridged and which made it into the extract: ids only, never text.
+    summaryProvenance: compacted?.provenance ?? null,
     referencesTruncated: references.truncated,
   };
 }

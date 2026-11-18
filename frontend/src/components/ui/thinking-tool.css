@@ -5,7 +5,7 @@
 .thinking-tool__toggle:not(:disabled):hover{border-color:#3a6690}
 :root[data-theme="light"] .thinking-tool__toggle:not(:disabled):hover{border-color:#8fb0cc}
 .thinking-tool__toggle:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
-:root[data-theme="light"] .thinking-tool__toggle{border-color:#b7c9dc;background:linear-gradient(120deg,#ffffff,#edf4fb);color:#17304b;box-shadow:0 3px 12px rgb(25 67 102 / 12%)}
+:root[data-theme="light"] .thinking-tool__toggle{border-color:#b7c9dc;background:linear-gradient(120deg,var(--color-paper-2),#edf4fb);color:#17304b;box-shadow:0 3px 12px rgb(25 67 102 / 12%)}
 :root[data-theme="light"] .thinking-tool__orb{background:radial-gradient(circle at 35% 25%,#e4fbff,#1688bb 43%,#17488f 76%);box-shadow:0 0 0 2px rgb(22 136 187 / 12%),0 0 16px rgb(22 136 187 / 38%)}
 :root[data-theme="light"] .thinking-tool__orb i{border-color:#e8fcff}
 .an-thinking-shimmer{display:inline-flex;align-items:center;background-size:250% 100%;background-clip:text;-webkit-background-clip:text;color:transparent;background-image:linear-gradient(90deg,var(--accent) 0%,var(--accent) 40%,var(--ink) 50%,var(--accent) 60%,var(--accent) 100%);background-repeat:no-repeat;animation:an-thinking-shimmer 1.2s linear infinite}

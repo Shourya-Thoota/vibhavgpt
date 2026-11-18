@@ -29,6 +29,11 @@
                 <data android:scheme="vibhavgpt" android:host="account" />
             </intent-filter>
 
+            <!-- Launcher shortcuts: New Chat, New Image, New Build (res/xml-v25/shortcuts.xml). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+
         </activity>
 
         <provider
@@ -45,4 +50,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Settings > Location > Use device location: the web view asks at runtime, once, when the person presses the button. Only the
+         nearest city is kept; the position is used for that one lookup and dropped. Android 12+ lets the person grant approximate only. -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>
